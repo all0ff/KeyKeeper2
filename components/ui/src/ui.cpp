@@ -1,12 +1,10 @@
 #include "ui/ui.hpp"
 
 #include "ui/screens/quick_screen.hpp"
-#include "ui/screens/setup_pin_screen.hpp"
 #include "ui/ui_manager.hpp"
 
 #include "display/lvgl_port.hpp"
 #include "input/input.hpp"
-#include "security/pin_manager.hpp"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -30,6 +28,15 @@ bool initialized = false;
 UiManager manager;
 TaskHandle_t task_handle = nullptr;
 
+/**
+ * @brief Translate one input::Event into zero or more Screen-level
+ *        InputAction dispatches.
+ *
+ * A single EncoderRotate event can represent several notches at once
+ * (a fast spin), so it dispatches one action per notch rather than
+ * one action per event -- otherwise fast scrolling would visually
+ * skip less than it should.
+ */
 void dispatch_event(const input::Event& event)
 {
     switch (event.type) {
@@ -53,6 +60,12 @@ void dispatch_event(const input::Event& event)
         case input::EventType::ButtonBackLongPress:
             manager.handle_input(InputAction::BackLong);
             break;
+
+        // Down/Up/Repeat and anything else: docs/GUI.md's Input Model
+        // (section 5) only defines Rotate Left/Right, Short Press,
+        // Long Press -- no separate "repeat while held" behavior is
+        // specified for screens, so these are intentionally not
+        // mapped to any InputAction.
         default:
             break;
     }
@@ -87,14 +100,7 @@ bool init()
     lvgl_port::lock();
     const bool manager_ok = manager.init(lv_screen_active());
     if (manager_ok) {
-        // First boot: no PIN configured -> force setup
-        // Otherwise: normal QuickScreen
-        if (!security::pin::has_pin()) {
-            ESP_LOGI(TAG, "First boot: no PIN set, showing SetupPinScreen");
-            manager.push(std::make_unique<screens::SetupPinScreen>());
-        } else {
-            manager.push(std::make_unique<screens::QuickScreen>());
-        }
+        manager.push(std::make_unique<screens::QuickScreen>());
     }
     lvgl_port::unlock();
 

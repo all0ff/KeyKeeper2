@@ -1,6 +1,5 @@
 #include "ui/screens/lock_screen.hpp"
 
-#include "ui/screens/main_menu.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -11,7 +10,6 @@
 #include "esp_log.h"
 
 #include <cstdio>
-#include <memory>
 
 namespace ui::screens {
 
@@ -76,7 +74,10 @@ void LockScreen::try_unlock()
     switch (result) {
         case security::pin::VerifyResult::Success:
             ESP_LOGI(TAG, "Unlock successful");
-            manager().replace(std::make_unique<MainMenu>());
+            // PLACEHOLDER: should go to Main Menu (GUI.md 8) once it
+            // exists -- see lock_screen.hpp. For now, back to
+            // QuickScreen, which will show its Unlocked state.
+            manager().pop();
             return;
 
         case security::pin::VerifyResult::WrongPin: {

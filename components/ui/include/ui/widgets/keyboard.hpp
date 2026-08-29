@@ -73,14 +73,11 @@ public:
     /// the first slot.
     void reset();
 
-    static constexpr uint8_t MAX_LENGTH = 8;  ///< Public: external screens need buffer sizing
-
-    lv_obj_t* root() const { return container_; }
-
 private:
     void render();
 
     lv_obj_t* container_ = nullptr;
+    static constexpr uint8_t MAX_LENGTH = 8;
     lv_obj_t* digit_labels_[MAX_LENGTH]{};
 
     Config cfg_{};
