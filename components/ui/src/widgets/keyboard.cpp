@@ -21,7 +21,6 @@ void PinEntry::init(lv_obj_t* parent, const Config& cfg)
     lv_obj_set_size(container_, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(container_, LV_FLEX_FLOW_ROW);
     lv_obj_set_style_pad_column(container_, 6, 0);
-    lv_obj_center(container_);
 
     for (uint8_t i = 0; i < cfg_.length; ++i) {
         lv_obj_t* box = lv_obj_create(container_);
