@@ -32,7 +32,7 @@ public:
          * Raw PCNT edge counts per mechanical detent. Standard EC11
          * modules produce 4 quadrature edges per detent (x4 decoding).
          */
-        uint8_t steps_per_notch = 4;
+        uint8_t steps_per_notch = 2;
 
         /**
          * Flip rotation direction without rewiring, in case A/B are

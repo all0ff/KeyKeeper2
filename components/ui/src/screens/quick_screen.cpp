@@ -1,6 +1,7 @@
 #include "ui/screens/quick_screen.hpp"
 
 #include "ui/screens/lock_screen.hpp"
+#include "ui/screens/main_menu.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -73,6 +74,8 @@ bool QuickScreen::on_input(InputAction action)
                 manager().push(std::make_unique<LockScreen>());
                 return true; // suppress default pop while locked
             }
+
+            manager().push(std::make_unique<MainMenu>());
             return false; // QuickScreen is always stack-bottom; pop() is a no-op anyway
 
         case InputAction::BackLong: {
