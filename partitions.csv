@@ -1,0 +1,21 @@
+# KeyKeeper2 partition table
+# Board has 16 MB flash (CONFIG_ESPTOOLPY_FLASHSIZE_16MB).
+#
+# No OTA slots yet -- single "factory" app. Add ota_0/ota_1 +
+# otadata later if/when OTA updates are actually implemented; that
+# requires a full reflash anyway, so no reason to reserve the space
+# now.
+#
+# "storage" is the internal LittleFS partition that holds
+# /vault/vault.db (see storage_paths.hpp) -- it must always be
+# available, independent of whether a microSD card is inserted.
+# subtype is "spiffs" because gen_esp32part.py has no dedicated
+# "littlefs" subtype keyword; the actual filesystem used at runtime
+# is whatever esp_vfs_littlefs_register() is called with in
+# filesystem.cpp, not something the CSV subtype name implies.
+#
+# Name,     Type, SubType,  Offset,    Size,      Flags
+nvs,        data, nvs,      0x9000,    0x8000,
+phy_init,   data, phy,      0x11000,   0x1000,
+factory,    app,  factory,  0x20000,   0x300000,
+storage,    data, spiffs,   0x320000,  0x400000,

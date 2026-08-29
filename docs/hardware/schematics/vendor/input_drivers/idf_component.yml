@@ -1,0 +1,28 @@
+dependencies:
+  espp/base_component: '>=1.0'
+  espp/touch: '>=1.0'
+  idf:
+    version: '>=5.0'
+  lvgl/lvgl:
+    version: '>=9.2.2'
+description: LVGL Input Drivers component for ESP-IDF
+documentation: https://esp-cpp.github.io/espp/input/index.html
+license: MIT
+maintainers:
+- William Emfinger <waemfinger@gmail.com>
+repository: git://github.com/esp-cpp/espp.git
+repository_info:
+  commit_sha: 0b3e361331f05ec4ef61f88582f7ac8b2fa72782
+  path: components/input_drivers
+tags:
+- cpp
+- Component
+- Input
+- Driver
+- LVGL
+- Keypad
+- Encoder
+- Pointer
+- Touchpad
+url: https://github.com/esp-cpp/espp/tree/main/components/input_drivers
+version: 1.1.8

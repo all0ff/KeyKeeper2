@@ -1,0 +1,52 @@
+<mxfile host="Electron">
+  <diagram name="GPIO Map" id="0">
+    <mxGraphModel dx="1073" dy="869" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="layer-1" parent="0" />
+        <mxCell id="1" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f4e78;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO Allocation — KeyKeeper2" vertex="1">
+          <mxGeometry height="80" width="560" x="520" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="2" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO0 — BOOT — Reserved" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="140" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO1–3 — Strapping — Do not use" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="198" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO4 — Encoder A — Project" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="256" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO5 — Encoder B — Project" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="314" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO6 — Encoder SW / OK — Project" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="372" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO7 — BACK — Project" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO8–13 — Expansion — Free" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="488" as="geometry" />
+        </mxCell>
+        <mxCell id="9" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO14–18,21 — microSD — Reserved" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="546" as="geometry" />
+        </mxCell>
+        <mxCell id="10" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO38 — RGB LED — Reserved" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="604" as="geometry" />
+        </mxCell>
+        <mxCell id="11" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO39–42 — LCD — Reserved" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="662" as="geometry" />
+        </mxCell>
+        <mxCell id="12" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO43–44 — UART — Reserved" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="720" as="geometry" />
+        </mxCell>
+        <mxCell id="13" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO45–48 — LCD control — Reserved" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="778" as="geometry" />
+        </mxCell>
+        <mxCell id="14" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="GPIO26–37 — PSRAM — Internal" vertex="1">
+          <mxGeometry height="48" width="740" x="430" y="836" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

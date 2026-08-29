@@ -1,0 +1,128 @@
+# ============================================================
+# KeyKeeper2 - ESP-IDF default configuration
+# Board: Waveshare ESP32-S3-LCD-1.47B
+# ============================================================
+
+
+# ------------------------------------------------------------
+# Target
+# ------------------------------------------------------------
+
+CONFIG_IDF_TARGET="esp32s3"
+
+
+# ------------------------------------------------------------
+# ESP32-S3 memory
+# ------------------------------------------------------------
+
+# External PSRAM
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+
+# Use PSRAM where appropriate for application/runtime buffers
+CONFIG_SPIRAM_USE_MALLOC=y
+
+
+# ------------------------------------------------------------
+# Flash
+# ------------------------------------------------------------
+
+# Board uses 16 MB Flash
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+
+
+# ------------------------------------------------------------
+# CPU
+# ------------------------------------------------------------
+
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+
+# ------------------------------------------------------------
+# FreeRTOS
+# ------------------------------------------------------------
+
+CONFIG_FREERTOS_HZ=1000
+
+
+# ------------------------------------------------------------
+# Logging
+# ------------------------------------------------------------
+
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+
+
+# ------------------------------------------------------------
+# Console / UART
+# ------------------------------------------------------------
+
+# Keep the ESP-IDF console available during development.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+
+
+# ------------------------------------------------------------
+# SPI
+# ------------------------------------------------------------
+
+# LCD uses SPI3_HOST.
+# GPIO assignment is defined in components/bsp/.
+# Do not place LCD GPIO numbers here.
+
+
+# ------------------------------------------------------------
+# LCD / LVGL
+# ------------------------------------------------------------
+
+# Display driver configuration is implemented by components/display/.
+# ST7789 configuration belongs to the display component/BSP.
+
+
+# ------------------------------------------------------------
+# Partition table
+# ------------------------------------------------------------
+
+# Custom table (project root partitions.csv): sized for the board's
+# 16 MB flash, adds the "storage" LittleFS partition that vault.db
+# lives on. See components/storage/README.md.
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+
+# ------------------------------------------------------------
+# microSD / SDMMC
+# ------------------------------------------------------------
+
+# KeyKeeper2 uses the board microSD interface in 4-bit mode.
+# (Removed CONFIG_SDMMC_HOST_SUPPORTS_8BIT=y that was here before --
+# it was an unrecognized/irrelevant symbol: we use 4-bit, not 8-bit,
+# and only 6 SD pins are wired on this board. See
+# components/storage/README.md.)
+
+
+# ------------------------------------------------------------
+# Filesystems
+# ------------------------------------------------------------
+
+# NVS is used for persistent settings.
+CONFIG_NVS_ENCRYPTION=n
+
+# Internal vault storage uses LittleFS (components/storage/), pulled
+# in via components/storage/idf_component.yml (joltwallet/littlefs).
+# (Removed CONFIG_LITTLEFS=y that was here before -- it was an
+# unrecognized symbol that did nothing; there is no such bare toggle.
+# See components/storage/README.md.)
+
+
+# ------------------------------------------------------------
+# Watchdog
+# ------------------------------------------------------------
+
+CONFIG_ESP_TASK_WDT_EN=y
+
+
+# ------------------------------------------------------------
+# Application
+# ------------------------------------------------------------
+
+# Application-specific configuration belongs to components,
+# not to sdkconfig.defaults, unless it is an ESP-IDF Kconfig option.

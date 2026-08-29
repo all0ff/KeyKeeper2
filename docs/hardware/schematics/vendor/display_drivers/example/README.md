@@ -1,0 +1,67 @@
+# Display Drivers Example
+
+This example is designed to show how the `display_drivers` component can be used
+to drive various different displays with LVGL and a simple GUI (that is
+contained within the example: `main/gui.hpp`). It demonstrates both the
+object-style display-controller API and the shared SPI transport helpers used by
+the BSPs in this repository.
+
+## Demo
+
+Below can be seen what the demo looks like on the T-Encoder-Pro devkit:
+
+![SH8601](https://github.com/user-attachments/assets/2bca4a03-3777-4e49-a467-29fa50ca0202)
+
+https://github.com/user-attachments/assets/fef57074-bab7-4fdf-a25e-f4590773c926
+
+Here it is running on the ALXV Labs Byte90:
+
+![image](https://github.com/user-attachments/assets/064ecb08-59cf-4982-ad08-0ffca7ffdded)
+![image](https://github.com/user-attachments/assets/4f854b1c-5677-4713-9b08-b5987223468e)
+
+## How to use example
+
+### Hardware Required
+
+This example can be configured to run on the following dev boards:
+* ESP32-WROVER-Kit
+* TTGO T-Display
+* ESP32-S3-BOX
+* Smartknob-HA
+* T-Encoder Pro
+* ALXV Labs Byte90
+
+### Configure the project
+
+```
+idf.py menuconfig
+```
+
+When configuring the project, select the `Display Drivers Example Configuration`
+value that matches the board you've selected (must be one of the boards
+mentioned above.)
+
+### Build and Flash
+
+Build the project and flash it to the board, then run monitor tool to view serial output:
+
+```
+idf.py -p PORT flash monitor
+```
+
+(Replace PORT with the name of the serial port to use.)
+
+(To exit the serial monitor, type ``Ctrl-]``.)
+
+See the Getting Started Guide for full steps to configure and use ESP-IDF to build projects.
+
+## Example Breakdown
+
+The example has the following functionality:
+* Uses the shared `espp::Spi` wrapper for the display bus on every supported board
+* Uses `espp::SpiPanelIo` for standard command/data SPI panels
+* Keeps the T-Encoder Pro quad-SPI path on `espp::Spi::Device`, since that panel needs custom
+  multi-line transactions
+* Exercises the object-style controller classes from the `display_drivers` component
+* `Gui` class (contained in `main/gui.hpp`) which encapsulates some very basic
+  LVGL components into an object that manages gui update task and synchronization.

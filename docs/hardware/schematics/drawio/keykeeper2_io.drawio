@@ -1,0 +1,55 @@
+<mxfile host="Electron">
+  <diagram name="KeyKeeper2 I/O" id="0">
+    <mxGraphModel dx="941" dy="767" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="layer-1" parent="0" />
+        <mxCell id="1" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1f4e78;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="Waveshare ESP32-S3-LCD-1.47B" vertex="1">
+          <mxGeometry height="100" width="440" x="580" y="350" as="geometry" />
+        </mxCell>
+        <mxCell id="2" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="LCD / ST7789V2&lt;br&gt;CS39 SCLK40 MOSI41 DC42 RST45 BL46" vertex="1">
+          <mxGeometry height="80" width="300" x="60" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="3" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="microSD&#xa;GPIO14–18, GPIO21" vertex="1">
+          <mxGeometry height="80" width="300" x="1100" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="4" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="USB Type-C" vertex="1">
+          <mxGeometry height="80" width="300" x="60" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="5" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="UART&#xa;TX43 RX44" vertex="1">
+          <mxGeometry height="80" width="300" x="1100" y="390" as="geometry" />
+        </mxCell>
+        <mxCell id="6" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="EC11&#xa;A4 B5 SW6" vertex="1">
+          <mxGeometry height="80" width="300" x="60" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="7" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="BACK&#xa;GPIO7" vertex="1">
+          <mxGeometry height="80" width="300" x="1100" y="680" as="geometry" />
+        </mxCell>
+        <mxCell id="8" parent="layer-1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=13;fontStyle=1;" value="Free Header&#xa;GPIO8–13" vertex="1">
+          <mxGeometry height="80" width="300" x="580" y="700" as="geometry" />
+        </mxCell>
+        <mxCell id="9" edge="1" parent="layer-1" source="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="2" value="LCD">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="10" edge="1" parent="layer-1" source="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="3" value="SD">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="11" edge="1" parent="layer-1" source="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="4" value="USB">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="12" edge="1" parent="layer-1" source="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="5" value="UART">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="13" edge="1" parent="layer-1" source="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="6" value="INPUT">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="14" edge="1" parent="layer-1" source="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="7" value="INPUT">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="15" edge="1" parent="layer-1" source="1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="8" value="EXPANSION">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
