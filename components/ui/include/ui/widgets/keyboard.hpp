@@ -27,6 +27,10 @@ namespace ui::widgets {
 class PinEntry
 {
 public:
+    static constexpr uint8_t MAX_LENGTH = 8;
+
+    lv_obj_t* root() const { return container_; }
+    
     struct Config
     {
         uint8_t length = 6; ///< Digits required. See settings::all().security.pin_length.
@@ -39,6 +43,7 @@ public:
     };
 
     void init(lv_obj_t* parent, const Config& cfg);
+   
 
     /**
      * @brief Feed one input action to the widget.
@@ -77,7 +82,7 @@ private:
     void render();
 
     lv_obj_t* container_ = nullptr;
-    static constexpr uint8_t MAX_LENGTH = 8;
+    
     lv_obj_t* digit_labels_[MAX_LENGTH]{};
 
     Config cfg_{};

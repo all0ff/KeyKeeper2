@@ -1,5 +1,6 @@
 #include "ui/screens/main_menu.hpp"
 
+#include "ui/screens/backup_screen.hpp"
 #include "ui/screens/settings_screen.hpp"
 #include "ui/screens/vault_list_screen.hpp"
 #include "ui/theme.hpp"
@@ -21,6 +22,7 @@ constexpr char TAG[] = "ui.main_menu";
 constexpr const char* ITEM_NAMES[] = {
     "Vault",
     "Settings",
+    "Backup",
     "Lock",
     "About",
 };
@@ -223,6 +225,15 @@ void MainMenu::activate()
             manager().push(std::make_unique<SettingsScreen>());
 
             ESP_LOGI(TAG, "Settings selected");
+            break;
+
+        case Item::Backup:
+            /*
+             * BackupScreen -- see docs/GUI.md section 15.
+             */
+            manager().push(std::make_unique<BackupScreen>());
+
+            ESP_LOGI(TAG, "Backup selected");
             break;
 
         case Item::Lock:
