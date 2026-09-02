@@ -42,6 +42,9 @@ idf_component_register(
     # esp_app_format confirmed as the correct component for
     # esp_app_desc.h / esp_app_get_description() on ESP-IDF v6.0.2 (was
     # missing, causing a "No such file" build error -- fixed here).
+    # esp_get_free_heap_size() has been fine coming in transitively so
+    # far; if that changes, same fix pattern applies -- check the
+    # exact component name in the error and add it here.
     #
     # Still grows as more screens/widgets are added (see README.md for
     # the rest of docs/BUILD_PLAN.md's ui/ file list):
