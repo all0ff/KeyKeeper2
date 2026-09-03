@@ -20,9 +20,8 @@ namespace ui::screens {
  *
  * The actual destination screens for Settings and About are added in
  * subsequent UI slices. Until then, selecting those entries displays
- * a short "not implemented yet" status message. Vault, Settings, and
- * Backup now open real screens (VaultListScreen, SettingsScreen,
- * BackupScreen).
+ * a short "not implemented yet" status message. Vault now opens a
+ * real screen (VaultListScreen).
  *
  * Lock is functional and calls security::lock::lock().
  */
@@ -41,7 +40,6 @@ private:
     {
         Vault = 0,
         Settings,
-        Backup,
         Lock,
         About,
         Count,

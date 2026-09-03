@@ -1,6 +1,7 @@
 #include "ui/screens/lock_screen.hpp"
 
 #include "ui/screens/main_menu.hpp"
+#include "ui/screens/setup_pin_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -51,11 +52,6 @@ void LockScreen::on_show()
 
 bool LockScreen::on_input(InputAction action)
 {
-    // BackShort with nothing entered means "leave this screen", not
-    // "erase a digit" -- widgets::PinEntry::on_input() already
-    // returns false for exactly that case, so falling through to
-    // UiManager's default (pop) is correct without any special-casing
-    // here.
     const bool consumed = pin_entry_.on_input(action);
 
     if (consumed && pin_entry_.is_complete()) {
@@ -69,8 +65,6 @@ void LockScreen::try_unlock()
 {
     const security::pin::VerifyResult result = security::lock::unlock(pin_entry_.pin());
 
-    // Never keep entered digits around longer than one verification
-    // attempt, right or wrong.
     pin_entry_.reset();
 
     switch (result) {
@@ -94,8 +88,9 @@ void LockScreen::try_unlock()
             return;
 
         case security::pin::VerifyResult::NoPinSet:
-            lv_label_set_text(message_label_, "No PIN set up yet");
-            ESP_LOGW(TAG, "Unlock attempted but no PIN is configured");
+            // PIN was never configured -- redirect to setup flow
+            ESP_LOGI(TAG, "No PIN set, redirecting to SetupPinScreen");
+            manager().replace(std::make_unique<SetupPinScreen>());
             return;
     }
 }

@@ -6,6 +6,7 @@
 
 #include "security/permission_manager.hpp"
 #include "vault/vault.hpp"
+#include "usb/usb_service.hpp"
 
 #include "esp_log.h"
 
@@ -260,20 +261,29 @@ void AccountViewScreen::activate()
         case Action::PrintUsername:
         case Action::PrintPassword:
         case Action::PrintOtp: {
-            // No PermissionManager operation exists for "Print URL"/
-            // "Print Username" -- reusing PrintPassword's gate as a
-            // placeholder, same decision already made in
-            // QuickScreen. See account_view_screen.hpp.
             const security::permission::Operation op = (action == Action::PrintOtp)
                                                              ? security::permission::Operation::PrintOtp
                                                              : security::permission::Operation::PrintPassword;
             const security::permission::Result result = security::permission::check(op);
 
             if (result == security::permission::Result::Allowed) {
-                // PLACEHOLDER: no USB HID OutputChannel implementation
-                // yet (see interfaces::channels).
-                ESP_LOGI(TAG, "%s: permission OK, USB HID not implemented yet", action_name(action));
-                lv_label_set_text(status_label_, "USB typing: coming soon");
+                switch (action) {
+                    case Action::PrintUrl:
+                        usb::print_field(entry_, usb::Field::Url);
+                        break;
+                    case Action::PrintUsername:
+                        usb::print_field(entry_, usb::Field::Login);
+                        break;
+                    case Action::PrintPassword:
+                        usb::print_field(entry_, usb::Field::Password);
+                        break;
+                    case Action::PrintOtp:
+                        usb::print_field(entry_, usb::Field::Otp);
+                        break;
+                    default:
+                        break;
+                }
+                lv_label_set_text(status_label_, usb::last_status());
             } else {
                 ESP_LOGI(TAG, "%s denied (%d)", action_name(action), static_cast<int>(result));
                 lv_label_set_text(status_label_, "Not allowed");

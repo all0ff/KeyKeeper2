@@ -14,6 +14,7 @@
 #include "app_system/logger.hpp"
 #include "vault/vault.hpp"
 #include "ui/ui.hpp"
+#include "usb/usb_service.hpp"
 
 #include "esp_log.h"
 
@@ -296,6 +297,23 @@ bool initialize_vault()
     return true;
 }
 
+bool initialize_usb()
+{
+    state::set_boot_stage(state::BootStage::Usb);
+    logger::boot_stage("USB");
+
+    if (!usb::init()) {
+        report_failure(
+            state::BootStage::Usb,
+            0,
+            "USB initialization failed"
+        );
+        return false;
+    }
+
+    return true;
+}
+
 bool initialize_ui()
 {
     state::set_boot_stage(state::BootStage::Ui);
@@ -410,6 +428,13 @@ bool init()
      * Vault
      */
     if (!initialize_vault()) {
+        return false;
+    }
+
+    /*
+     * USB HID
+     */
+    if (!initialize_usb()) {
         return false;
     }
 

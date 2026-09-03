@@ -52,12 +52,10 @@ void SetupPinScreen::initialize(lv_obj_t* content_parent)
     cfg.length = settings::all().security.pin_length;
     cfg.mask_confirmed = true;
     pin_entry_.init(content_parent, cfg);
-    lv_obj_update_layout(content_parent); //заставляет LVGL пересчитать область экрана, в которой находится PinEntry.
-    lv_obj_update_layout(pin_entry_.root()); //заставляет LVGL непосредственно рассчитать размер LV_SIZE_CONTENT + flex-контейнера PIN.
     lv_obj_align(pin_entry_.root(), LV_ALIGN_CENTER, 0, -10);
 
     // Message / error label
-    message_label_ = lv_label_create(content_parent); 
+    message_label_ = lv_label_create(content_parent);
     lv_obj_set_style_text_color(message_label_, pal.error, 0);
     lv_label_set_text(message_label_, "");
     lv_obj_align(message_label_, LV_ALIGN_BOTTOM_MID, 0, -4);

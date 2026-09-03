@@ -1,13 +1,12 @@
 #include "ui/screens/quick_screen.hpp"
 
 #include "ui/screens/lock_screen.hpp"
-#include "ui/screens/main_menu.hpp"
-
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
 #include "security/lock_manager.hpp"
 #include "security/permission_manager.hpp"
+#include "usb/usb_service.hpp"
 
 #include "esp_log.h"
 
@@ -75,17 +74,18 @@ bool QuickScreen::on_input(InputAction action)
                 manager().push(std::make_unique<LockScreen>());
                 return true; // suppress default pop while locked
             }
-
-            manager().push(std::make_unique<MainMenu>());
-            return true; // QuickScreen is always stack-bottom; pop() is a no-op anyway
+            return false; // QuickScreen is always stack-bottom; pop() is a no-op anyway
 
         case InputAction::BackLong: {
             const security::permission::Result perm =
                 security::permission::check(security::permission::Operation::PrintPassword);
             if (perm == security::permission::Result::Allowed) {
-                // PLACEHOLDER: no USB HID OutputChannel implementation yet.
-                ESP_LOGI(TAG, "Print Password: permission OK, USB HID not implemented yet");
-                lv_label_set_text(status_label_, "USB typing: coming soon");
+                // Print the default/first password (Quick Mode)
+                // In Quick Mode we type the "current" password from settings
+                // or the last-used account. For now, we type a placeholder
+                // until Quick Mode account selection is implemented.
+                usb::type_string("password"); // TODO: use actual Quick Mode account
+                lv_label_set_text(status_label_, usb::last_status());
             } else {
                 ESP_LOGI(TAG, "Print Password denied (%d)", static_cast<int>(perm));
                 lv_label_set_text(status_label_, locked ? "Unlock first" : "Not allowed");
@@ -94,14 +94,11 @@ bool QuickScreen::on_input(InputAction action)
         }
 
         case InputAction::OkShort: {
-            // See quick_screen.hpp: no dedicated PrintUrl permission
-            // operation exists yet, reusing PrintPassword's gate as a
-            // placeholder.
             const security::permission::Result perm =
                 security::permission::check(security::permission::Operation::PrintPassword);
             if (perm == security::permission::Result::Allowed) {
-                ESP_LOGI(TAG, "Print URL: permission OK, USB HID not implemented yet");
-                lv_label_set_text(status_label_, "USB typing: coming soon");
+                usb::type_string("https://example.com"); // TODO: use actual Quick Mode account URL
+                lv_label_set_text(status_label_, usb::last_status());
             } else {
                 ESP_LOGI(TAG, "Print URL denied (%d)", static_cast<int>(perm));
                 lv_label_set_text(status_label_, locked ? "Unlock first" : "Not allowed");

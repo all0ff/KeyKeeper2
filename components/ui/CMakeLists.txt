@@ -6,6 +6,7 @@ idf_component_register(
         "src/icon.cpp"
         "src/screens/quick_screen.cpp"
         "src/screens/lock_screen.cpp"
+        "src/screens/setup_pin_screen.cpp"
         "src/screens/main_menu.cpp"
         "src/screens/vault_list_screen.cpp"
         "src/screens/account_view_screen.cpp"
@@ -15,7 +16,6 @@ idf_component_register(
         "src/screens/security_settings_screen.cpp"
         "src/screens/usb_settings_screen.cpp"
         "src/screens/system_info_screen.cpp"
-        "src/screens/backup_screen.cpp"
         "src/widgets/keyboard.cpp"
         "src/widgets/text_entry.cpp"
 

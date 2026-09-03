@@ -3,7 +3,6 @@ idf_component_register(
         "src/vault.cpp"
         "src/vault_model.cpp"
         "src/vault_repository.cpp"
-        "src/vault_backup.cpp"
 
     INCLUDE_DIRS
         "include"

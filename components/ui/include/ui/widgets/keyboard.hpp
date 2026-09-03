@@ -27,10 +27,6 @@ namespace ui::widgets {
 class PinEntry
 {
 public:
-    static constexpr uint8_t MAX_LENGTH = 8;
-
-    lv_obj_t* root() const { return container_; }
-    
     struct Config
     {
         uint8_t length = 6; ///< Digits required. See settings::all().security.pin_length.
@@ -43,7 +39,6 @@ public:
     };
 
     void init(lv_obj_t* parent, const Config& cfg);
-   
 
     /**
      * @brief Feed one input action to the widget.
@@ -74,15 +69,19 @@ public:
     /// entirely (owning screen's job, via UiManager::pop()).
     bool is_empty() const { return cursor_ == 0; }
 
+    /// Access the underlying LVGL container (for lv_obj_align, etc.)
+    lv_obj_t* root() const { return container_; }
+
     /// Clears all entered digits and the on-screen display, back to
     /// the first slot.
     void reset();
+
+    static constexpr uint8_t MAX_LENGTH = 8;  ///< Public: external screens need buffer sizing
 
 private:
     void render();
 
     lv_obj_t* container_ = nullptr;
-    
     lv_obj_t* digit_labels_[MAX_LENGTH]{};
 
     Config cfg_{};
