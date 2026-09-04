@@ -6,6 +6,7 @@
 
 #include "security/lock_manager.hpp"
 #include "security/permission_manager.hpp"
+#include "settings/settings.hpp"
 #include "usb/usb_service.hpp"
 
 #include "esp_log.h"
@@ -79,17 +80,28 @@ bool QuickScreen::on_input(InputAction action)
         case InputAction::BackLong: {
             const security::permission::Result perm =
                 security::permission::check(security::permission::Operation::PrintPassword);
-            if (perm == security::permission::Result::Allowed) {
+
+            if (perm != security::permission::Result::Allowed) {
                 // Print the default/first password (Quick Mode)
                 // In Quick Mode we type the "current" password from settings
                 // or the last-used account. For now, we type a placeholder
                 // until Quick Mode account selection is implemented.
-                usb::type_string("password"); // TODO: use actual Quick Mode account
-                lv_label_set_text(status_label_, usb::last_status());
-            } else {
                 ESP_LOGI(TAG, "Print Password denied (%d)", static_cast<int>(perm));
                 lv_label_set_text(status_label_, locked ? "Unlock first" : "Not allowed");
+                return true;
             }
+
+            const char* password =
+                settings::all().usb.default_password;
+
+            if (password == nullptr || password[0] == '\0') {
+                ESP_LOGI(TAG, "Password Shortcut is empty");
+                lv_label_set_text(status_label_, "Password Shortcut empty");
+                return true;
+            }
+
+    usb::type_string(password);
+    lv_label_set_text(status_label_, usb::last_status());
             return true;
         }
 
