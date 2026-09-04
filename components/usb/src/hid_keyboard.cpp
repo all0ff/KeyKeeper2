@@ -1,8 +1,8 @@
 #include "usb/hid_keyboard.hpp"
-
 #include "usb/keycode_map.hpp"
 
 #include "tusb.h"
+#include "class/hid/hid_device.h"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -28,7 +28,7 @@ void set_error(const char* msg)
 // ---------------------------------------------------------------------------
 extern "C" {
 
-void tud_hid_set_report_cb(uint8_t /*itf*/, uint8_t /*report_id",
+void tud_hid_set_report_cb(uint8_t /*itf*/, uint8_t /*report_id*/,
                            hid_report_type_t /*report_type*/,
                            uint8_t const* /*buffer*/, uint16_t /*bufsize*/)
 {
@@ -73,7 +73,7 @@ bool send_key(uint8_t keycode, uint8_t modifier, uint32_t press_ms)
     }
 
     uint8_t report[6] = { keycode, 0, 0, 0, 0, 0 };
-    tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, modifier, report);
+    tud_hid_keyboard_report(0, modifier, report);
 
     if (press_ms > 0) {
         vTaskDelay(pdMS_TO_TICKS(press_ms));
@@ -85,7 +85,7 @@ bool send_key(uint8_t keycode, uint8_t modifier, uint32_t press_ms)
 
 void release_all()
 {
-    tud_hid_keyboard_report(HID_ITF_PROTOCOL_KEYBOARD, 0, nullptr);
+    tud_hid_keyboard_report(0, 0, nullptr);
     vTaskDelay(pdMS_TO_TICKS(10));
 }
 

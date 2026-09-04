@@ -30,6 +30,7 @@ idf_component_register(
         settings
         storage
         vault
+        usb
         esp_app_format
         lvgl
         log

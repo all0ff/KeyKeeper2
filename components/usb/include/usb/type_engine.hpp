@@ -21,18 +21,25 @@ namespace usb {
 class TypeEngine {
 public:
     struct Timing {
-        uint32_t press_ms = 10;   // Key hold time
-        uint32_t inter_ms = 10;   // Delay between keys
-        uint32_t chunk_ms = 0;    // Pause after 32 characters
+        uint32_t press_ms;   // Key hold time
+        uint32_t inter_ms;   // Delay between keys
+        uint32_t chunk_ms;    // Pause after 32 characters
+
+        Timing()
+        : press_ms(10),
+          inter_ms(10),
+          chunk_ms(0)
+        {
+        }
     };
 
     // Send a complete string. Blocking call.
     // Returns number of characters successfully sent.
-    size_t type_string(const std::string& text, const Timing& timing = Timing{});
+    size_t type_string(const std::string& text, const Timing& timing = Timing());
 
     // Send a single character. Blocking call.
     // Returns true on success.
-    bool type_char(char c, const Timing& timing = Timing{});
+    bool type_char(char c, const Timing& timing = Timing());
 
     // Check whether USB is connected before typing.
     bool can_type() const;

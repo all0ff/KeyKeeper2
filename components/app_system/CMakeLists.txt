@@ -18,6 +18,7 @@ idf_component_register(
         settings
         security
         vault
+        usb
         ui
         esp_timer
         log

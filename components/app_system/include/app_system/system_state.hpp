@@ -40,6 +40,7 @@ enum class BootStage : uint8_t
     Settings,
     Security,
     Vault,
+    Usb,
     Ui,
     Ready,
     Failed,
