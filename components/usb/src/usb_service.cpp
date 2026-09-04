@@ -95,6 +95,21 @@ void type_string(const std::string& text)
 
 void print_field(const vault::VaultEntry& entry, Field field)
 {
+    security::permission::Operation operation =
+        security::permission::Operation::PrintPassword;
+
+    if (field == Field::Otp) {
+        operation = security::permission::Operation::PrintOtp;
+    }
+
+    const security::permission::Result permission =
+        security::permission::check(operation);
+
+    if (permission != security::permission::Result::Allowed) {
+        set_status("USB print not allowed");
+        return;
+    }
+
     if (!is_connected()) {
         set_status("USB not connected");
         return;
