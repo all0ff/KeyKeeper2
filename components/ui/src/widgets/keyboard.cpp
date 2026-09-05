@@ -7,11 +7,18 @@ namespace ui::widgets {
 void PinEntry::init(lv_obj_t* parent, const Config& cfg)
 {
     cfg_ = cfg;
+
     if (cfg_.length > MAX_LENGTH) {
         cfg_.length = MAX_LENGTH;
     }
+
+    if (cfg_.min_length > cfg_.length) {
+    cfg_.min_length = cfg_.length;
+    }
+
     cursor_ = 0;
     spin_value_ = 0;
+    finished_ = false;
     buffer_[0] = '\0';
 
     const theme::Palette& pal = theme::current();
@@ -87,15 +94,29 @@ bool PinEntry::on_input(InputAction action)
             return true;
 
         case InputAction::OkShort:
+
             if (cursor_ >= cfg_.length) {
                 return true; // already complete -- ignore further OK presses
             }
+
             buffer_[cursor_] = static_cast<char>('0' + spin_value_);
             ++cursor_;
+
             buffer_[cursor_] = '\0';
+
             spin_value_ = 0;
+
             render();
+
             return true;
+
+        case InputAction::OkLong:
+
+            if (cursor_ >= cfg_.min_length && cursor_ <= cfg_.length) {
+            finished_ = true;
+            }
+
+            return true;   
 
         case InputAction::BackShort:
             if (cursor_ == 0) {
@@ -116,6 +137,8 @@ void PinEntry::reset()
 {
     cursor_ = 0;
     spin_value_ = 0;
+    finished_ = false;
+    
     for (char& c : buffer_) {
         c = '\0';
     }

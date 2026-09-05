@@ -51,12 +51,11 @@ private:
     enum class Row : uint8_t
     {
         ChangePin,
-        AutoLockEnabled,
-        AutoLockTimeout,
+        AutoLock,
         WebUiViewAccounts,
         Save,
     };
-    static constexpr size_t ROW_COUNT = 5;
+    static constexpr size_t ROW_COUNT = 4;
 
     enum class Mode : uint8_t
     {
@@ -80,7 +79,7 @@ private:
     void save();
 
     void begin_change_pin();
-    void show_pin_step();
+    void show_pin_step(const char* error = nullptr);
     void handle_pin_step_complete();
     void cancel_change_pin();
 
@@ -92,7 +91,7 @@ private:
     Mode mode_ = Mode::Browse;
 
     // Working copy -- deferred fields only, persisted on Save.
-    bool auto_lock_enabled_ = true;
+    ///bool auto_lock_enabled_ = true;
     uint32_t auto_lock_timeout_s_ = 30;
     bool web_ui_view_accounts_ = false;
 

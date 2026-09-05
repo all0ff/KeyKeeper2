@@ -18,7 +18,7 @@ constexpr lv_coord_t ROW_Y_START = 4;
 constexpr lv_coord_t ROW_SPACING = 20;
 
 constexpr int32_t TIMEOUT_STEP_S = 5;
-constexpr uint32_t TIMEOUT_MIN_S = 5;
+constexpr uint32_t TIMEOUT_MIN_S = 0;
 constexpr uint32_t TIMEOUT_MAX_S = 300; // placeholder range, not spec'd anywhere
 
 } // namespace
@@ -34,7 +34,7 @@ const char* SecuritySettingsScreen::footer_hint() const
         case Mode::Adjust:
             return "ROTATE  Change    OK/BACK  Confirm";
         case Mode::ChangingPin:
-            return "ROTATE  Digit    OK  Next    BACK  Erase/Cancel";
+            return "ROTATE Digit OK Next Hold OK Done BACK Erase/Cancel";
         default:
             return "OK  Open    BACK  Cancel";
     }
@@ -45,8 +45,8 @@ void SecuritySettingsScreen::initialize(lv_obj_t* content_parent)
     content_parent_ = content_parent;
 
     const settings::SecuritySettings& s = settings::all().security;
-    auto_lock_enabled_ = s.auto_lock_enabled;
-    auto_lock_timeout_s_ = s.auto_lock_timeout_s;
+    ///auto_lock_enabled_ = s.auto_lock_enabled;
+    auto_lock_timeout_s_ = s.auto_lock_enabled ? s.auto_lock_timeout_s : 0;
     web_ui_view_accounts_ = (s.web_ui_permissions & settings::WEB_UI_VIEW_ACCOUNTS) != 0;
 
     build_rows();
@@ -92,20 +92,27 @@ void SecuritySettingsScreen::render_rows()
             case Row::ChangePin:
                 lv_label_set_text_fmt(row_labels_[i], "%sChange PIN", prefix);
                 break;
-            case Row::AutoLockEnabled:
-                lv_label_set_text_fmt(row_labels_[i], "%sAuto Lock: %s", prefix,
-                                       auto_lock_enabled_ ? "On" : "Off");
+
+            case Row::AutoLock:
+                if (auto_lock_timeout_s_ == 0) {
+                    lv_label_set_text_fmt(row_labels_[i], "%sAuto Lock: off", prefix);
+                } else {
+                    lv_label_set_text_fmt(
+                        row_labels_[i],
+                        "%sAuto Lock: %lus",
+                        prefix,
+                        static_cast<unsigned long>(auto_lock_timeout_s_));
+                }
                 break;
-            case Row::AutoLockTimeout:
-                lv_label_set_text_fmt(row_labels_[i], "%sAuto Lock Timeout: %lus", prefix,
-                                       static_cast<unsigned long>(auto_lock_timeout_s_));
-                break;
+
             case Row::WebUiViewAccounts:
                 lv_label_set_text_fmt(row_labels_[i], "%sWeb UI View: %s", prefix,
-                                       web_ui_view_accounts_ ? "Allowed" : "Off");
+                                    web_ui_view_accounts_ ? "Allowed" : "Off");
                 break;
+
             case Row::Save:
                 lv_label_set_text_fmt(row_labels_[i], "%sSave", prefix);
+                
                 break;
         }
     }
@@ -132,19 +139,23 @@ void SecuritySettingsScreen::move_selection(int32_t delta)
 void SecuritySettingsScreen::adjust_value(int32_t delta)
 {
     switch (static_cast<Row>(selected_row_)) {
-        case Row::AutoLockEnabled:
-            auto_lock_enabled_ = !auto_lock_enabled_;
-            break;
+        
+        case Row::AutoLock: {
+            int32_t v = static_cast<int32_t>(auto_lock_timeout_s_);
+            // до 30 с шаг 5, дальше шаг 15
+            const int32_t step = (v >= 30) ? 15 * delta : 5 * delta;    // или + delta * TIMEOUT_STEP_S
+            v += step;
 
-        case Row::AutoLockTimeout: {
-            int32_t value = static_cast<int32_t>(auto_lock_timeout_s_) + delta * TIMEOUT_STEP_S;
-            if (value < static_cast<int32_t>(TIMEOUT_MIN_S)) {
-                value = static_cast<int32_t>(TIMEOUT_MIN_S);
+            if (v < static_cast<int32_t>(TIMEOUT_MIN_S)) {
+                v = static_cast<int32_t>(TIMEOUT_MIN_S);
             }
-            if (value > static_cast<int32_t>(TIMEOUT_MAX_S)) {
-                value = static_cast<int32_t>(TIMEOUT_MAX_S);
+
+            if (v > static_cast<int32_t>(TIMEOUT_MAX_S)) {
+                v = static_cast<int32_t>(TIMEOUT_MAX_S);
             }
-            auto_lock_timeout_s_ = static_cast<uint32_t>(value);
+
+            auto_lock_timeout_s_ = static_cast<uint32_t>(v);
+            ///auto_lock_enabled_   = auto_lock_timeout_s_ > 0;
             break;
         }
 
@@ -179,7 +190,7 @@ void SecuritySettingsScreen::activate()
 void SecuritySettingsScreen::save()
 {
     settings::SecuritySettings updated = settings::all().security;
-    updated.auto_lock_enabled = auto_lock_enabled_;
+    updated.auto_lock_enabled   = auto_lock_timeout_s_ > 0;
     updated.auto_lock_timeout_s = auto_lock_timeout_s_;
     updated.web_ui_permissions =
         web_ui_view_accounts_ ? settings::WEB_UI_VIEW_ACCOUNTS : settings::WEB_UI_NONE;
@@ -201,9 +212,10 @@ void SecuritySettingsScreen::begin_change_pin()
     show_pin_step();
 }
 
-void SecuritySettingsScreen::show_pin_step()
+void SecuritySettingsScreen::show_pin_step(const char* error /* = nullptr */)
 {
     lv_obj_clean(content_parent_);
+    status_label_ = nullptr;        // ← объект уничтожен, честно обнуляем
 
     const theme::Palette& pal = theme::current();
     lv_obj_t* header = lv_label_create(content_parent_);
@@ -218,20 +230,48 @@ void SecuritySettingsScreen::show_pin_step()
     lv_label_set_text(header, text);
     lv_obj_align(header, LV_ALIGN_TOP_MID, 0, 4);
 
+    if (error != nullptr) {                // ← ошибка показывается внутри шага
+        lv_obj_t* err = lv_label_create(content_parent_);
+        lv_obj_set_style_text_color(err, pal.warning, 0);
+        lv_label_set_text(err, error);
+        lv_obj_align(err, LV_ALIGN_TOP_MID, 0, 24);
+    }
+
     widgets::PinEntry::Config cfg{};
-    cfg.length = settings::all().security.pin_length;
+
+    cfg.length = 6;
+    cfg.min_length = 4;
     pin_entry_.init(content_parent_, cfg);
 }
 
 void SecuritySettingsScreen::handle_pin_step_complete()
 {
     switch (change_step_) {
-        case ChangePinStep::Old:
+        case ChangePinStep::Old: {
             old_pin_ = pin_entry_.pin();
+
+            const security::pin::VerifyResult result =
+                security::pin::verify(old_pin_.c_str());
+
             pin_entry_.reset();
+
+            if (result != security::pin::VerifyResult::Success) {
+                old_pin_.clear();
+
+                if (result == security::pin::VerifyResult::LockedOut) {
+                    lv_label_set_text(status_label_, "Locked out, try later");
+                } else {
+                    lv_label_set_text(status_label_, "Wrong current PIN");
+                }
+
+                show_pin_step();
+                return;
+            }
+
             change_step_ = ChangePinStep::New;
             show_pin_step();
             return;
+        }
 
         case ChangePinStep::New:
             new_pin_ = pin_entry_.pin();
@@ -248,13 +288,13 @@ void SecuritySettingsScreen::handle_pin_step_complete()
             bool ok = false;
 
             if (!mismatch) {
-                ok = security::pin::set_pin(new_pin_.c_str(),
-                                             old_pin_.empty() ? nullptr : old_pin_.c_str());
+                ok = security::pin::set_pin(
+                    new_pin_.c_str(),
+                    old_pin_.empty() ? nullptr : old_pin_.c_str());
             }
 
             old_pin_.clear();
             new_pin_.clear();
-
             mode_ = Mode::Browse;
             lv_obj_clean(content_parent_);
             build_rows();
@@ -267,8 +307,9 @@ void SecuritySettingsScreen::handle_pin_step_complete()
                 lv_label_set_text(status_label_, "PIN changed");
             } else {
                 ESP_LOGI(TAG, "PIN change failed");
-                lv_label_set_text(status_label_, "PIN change failed (wrong current PIN?)");
+                lv_label_set_text(status_label_, "PIN change failed");
             }
+
             return;
         }
     }

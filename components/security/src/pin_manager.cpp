@@ -92,15 +92,14 @@ bool pin_length_ok(const char* pin)
     if (pin == nullptr) {
         return false;
     }
+
     const size_t len = strlen(pin);
-    const uint8_t expected = settings::all().security.pin_length;
+
+    return len >= 4 && len <= 6;
+    
     // Trust the configured preference, but never accept outside the
     // 4-6 digit range REQUIREMENTS 12.3 specifies, even if settings
     // somehow held something else.
-    if (expected < 4 || expected > 6) {
-        return len >= 4 && len <= 6;
-    }
-    return len == expected;
 }
 
 void reset_lockout_state()

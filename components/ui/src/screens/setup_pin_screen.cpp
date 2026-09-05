@@ -28,9 +28,9 @@ const char* SetupPinScreen::footer_hint() const
 {
     switch (stage_) {
         case Stage::EnterNew:
-            return "ROTATE  Digit    OK  Next    BACK  Erase";
+            return "ROTATE Digit OK Next Hold OK Done BACK Erase";
         case Stage::Confirm:
-            return "ROTATE  Digit    OK  Next    BACK  Erase";
+            return "ROTATE Digit OK Next Hold OK Done BACK Erase";
         case Stage::MismatchError:
             return "OK  Retry";
         default:
@@ -49,8 +49,11 @@ void SetupPinScreen::initialize(lv_obj_t* content_parent)
 
     // PinEntry widget
     widgets::PinEntry::Config cfg{};
-    cfg.length = settings::all().security.pin_length;
+
+    cfg.length = 6;
+    cfg.min_length = 4;
     cfg.mask_confirmed = true;
+
     pin_entry_.init(content_parent, cfg);
     lv_obj_align(pin_entry_.root(), LV_ALIGN_CENTER, 0, -10);
 

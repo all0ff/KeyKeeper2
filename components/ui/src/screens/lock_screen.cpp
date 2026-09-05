@@ -33,7 +33,8 @@ const char* LockScreen::footer_hint() const
 void LockScreen::initialize(lv_obj_t* content_parent)
 {
     widgets::PinEntry::Config cfg{};
-    cfg.length = settings::all().security.pin_length;
+    cfg.length = 6;
+    cfg.min_length = 4;
     pin_entry_.init(content_parent, cfg);
 
     const theme::Palette& pal = theme::current();

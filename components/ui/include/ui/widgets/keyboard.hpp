@@ -29,7 +29,9 @@ class PinEntry
 public:
     struct Config
     {
-        uint8_t length = 6; ///< Digits required. See settings::all().security.pin_length.
+        uint8_t length = 6; ///< Maximum number of digits displayed.
+        uint8_t min_length = 4; ///< Minimum number of digits required to finish. 
+        ///< Digits required. See settings::all().security.pin_length.
 
         /// Confirmed digits show as a mask dot rather than the actual
         /// digit, standard PIN-entry UX. The digit currently being
@@ -87,6 +89,7 @@ private:
     Config cfg_{};
     uint8_t cursor_ = 0;
     uint8_t spin_value_ = 0;
+    bool finished_ = false;
     char buffer_[MAX_LENGTH + 1]{};
 };
 
