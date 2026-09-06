@@ -78,7 +78,7 @@ bool QuickScreen::on_input(InputAction action)
             }
 
             manager().push(std::make_unique<MainMenu>());
-            return false; // QuickScreen is always stack-bottom; pop() is a no-op anyway
+            return true; // QuickScreen is always stack-bottom; pop() is a no-op anyway
 
         case InputAction::BackLong: {
             const security::permission::Result perm =
