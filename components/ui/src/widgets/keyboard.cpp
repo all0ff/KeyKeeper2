@@ -33,7 +33,7 @@ void PinEntry::init(lv_obj_t* parent, const Config& cfg)
     for (uint8_t i = 0; i < cfg_.length; ++i) {
         lv_obj_t* box = lv_obj_create(container_);
         lv_obj_remove_style_all(box);
-        lv_obj_set_size(box, 20, 24);
+        lv_obj_set_size(box, 22, 26);   ///Размер ячейки пароля для 16 px, была 20*24
         lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
         lv_obj_set_style_bg_color(box, pal.surface, 0);
         lv_obj_set_style_radius(box, 4, 0);
@@ -42,6 +42,7 @@ void PinEntry::init(lv_obj_t* parent, const Config& cfg)
 
         lv_obj_t* label = lv_label_create(box);
         lv_obj_set_style_text_color(label, pal.primary_text, 0);
+        lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0); ///16 — штатный шрифт LVGL; он предназначен именно для размера 16 px
         lv_obj_center(label);
         digit_labels_[i] = label;
     }
@@ -105,7 +106,9 @@ bool PinEntry::on_input(InputAction action)
             buffer_[cursor_] = '\0';
 
             spin_value_ = 0;
-
+            if (cfg_.finish_on_short && cursor_ >= cfg_.length) {
+                finished_ = true;
+            }
             render();
 
             return true;

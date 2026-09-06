@@ -30,7 +30,9 @@ public:
     struct Config
     {
         uint8_t length = 6; ///< Maximum number of digits displayed.
-        uint8_t min_length = 4; ///< Minimum number of digits required to finish. 
+        uint8_t min_length = 4; ///< Minimum number of digits required to finish.
+        bool finish_on_short = false; ///< Finish automatically after the last digit on OkShort.
+        
         ///< Digits required. See settings::all().security.pin_length.
 
         /// Confirmed digits show as a mask dot rather than the actual

@@ -239,8 +239,22 @@ void SecuritySettingsScreen::show_pin_step(const char* error /* = nullptr */)
 
     widgets::PinEntry::Config cfg{};
 
-    cfg.length = 6;
-    cfg.min_length = 4;
+    if (change_step_ == ChangePinStep::Old) {
+        cfg.length = settings::all().security.pin_length;
+
+        if (cfg.length < 4 || cfg.length > 6) {
+            cfg.length = 6;
+        }
+
+        cfg.min_length = cfg.length;
+        cfg.finish_on_short = true;
+    } else {
+        cfg.length = 6;
+        cfg.min_length = 4;
+        cfg.finish_on_short = false;
+    }
+
+
     pin_entry_.init(content_parent_, cfg);
 }
 
@@ -290,6 +304,15 @@ void SecuritySettingsScreen::handle_pin_step_complete()
                 ok = security::pin::set_pin(
                     new_pin_.c_str(),
                     old_pin_.empty() ? nullptr : old_pin_.c_str());
+
+                if (ok) {
+                    settings::SecuritySettings updated = settings::all().security;
+                    updated.pin_length = static_cast<uint8_t>(new_pin_.length());
+
+                    if (!settings::set_security(updated)) {
+                        ESP_LOGW(TAG, "PIN saved, but PIN length setting could not be saved");
+                    }
+                }
             }
 
             old_pin_.clear();

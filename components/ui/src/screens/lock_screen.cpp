@@ -27,14 +27,20 @@ const char* LockScreen::title() const
 
 const char* LockScreen::footer_hint() const
 {
-    return "BACK  Erase digit / Cancel";
+    return "OK Next  BACK Erase / Cancel";
 }
 
 void LockScreen::initialize(lv_obj_t* content_parent)
 {
     widgets::PinEntry::Config cfg{};
-    cfg.length = 6;
-    cfg.min_length = 4;
+    cfg.length = settings::all().security.pin_length;
+    if (cfg.length < 4 || cfg.length > 6) {
+        cfg.length = 6;
+    }
+
+    cfg.min_length = cfg.length;
+    cfg.finish_on_short = true;
+    
     pin_entry_.init(content_parent, cfg);
 
     const theme::Palette& pal = theme::current();

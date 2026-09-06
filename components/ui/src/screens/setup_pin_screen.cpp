@@ -138,6 +138,13 @@ void SetupPinScreen::try_finish()
             return;
         }
 
+        settings::SecuritySettings updated = settings::all().security;
+        updated.pin_length = static_cast<uint8_t>(std::strlen(first_pin_));
+
+        if (!settings::set_security(updated)) {
+            ESP_LOGW(TAG, "PIN saved, but PIN length setting could not be saved");
+        }
+
         // Unlock (must happen before clearing first_pin_)
         const security::pin::VerifyResult unlock_result = security::lock::unlock(first_pin_);
         if (unlock_result != security::pin::VerifyResult::Success) {
