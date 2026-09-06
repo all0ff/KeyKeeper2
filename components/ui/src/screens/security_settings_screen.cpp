@@ -259,13 +259,12 @@ void SecuritySettingsScreen::handle_pin_step_complete()
                 old_pin_.clear();
 
                 if (result == security::pin::VerifyResult::LockedOut) {
-                    lv_label_set_text(status_label_, "Locked out, try later");
+                    show_pin_step("Locked out, try later");
                 } else {
-                    lv_label_set_text(status_label_, "Wrong current PIN");
+                    show_pin_step("Wrong current PIN");
                 }
 
-                show_pin_step();
-                return;
+            return;
             }
 
             change_step_ = ChangePinStep::New;

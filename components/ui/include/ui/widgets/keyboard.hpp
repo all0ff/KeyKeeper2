@@ -58,7 +58,7 @@ public:
     bool on_input(InputAction action);
 
     /// True once all `length` digits have been entered and confirmed.
-    bool is_complete() const { return cursor_ >= cfg_.length; }
+    bool is_complete() const { return finished_; }
 
     /// Null-terminated entered PIN. Valid after is_complete() is true;
     /// call reset() once you're done reading it so the digits don't
