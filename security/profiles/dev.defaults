@@ -1,0 +1,13 @@
+# KeyKeeper2 Development Security Profile
+#
+# Development profile intentionally keeps irreversible
+# hardware security features disabled.
+#
+# Normal development workflow:
+#   idf.py build
+#   idf.py flash
+#   idf.py monitor
+
+CONFIG_SECURE_BOOT=n
+CONFIG_SECURE_FLASH_ENC_ENABLED=n
+CONFIG_NVS_ENCRYPTION=n

@@ -1,0 +1,10 @@
+# KeyKeeper2 Production Security Profile
+#
+# IMPORTANT:
+# This profile is preparation only.
+# Do not use it for device provisioning yet.
+#
+# Secure Boot, Flash Encryption and NVS Encryption
+# will be enabled only during final production provisioning.
+
+# Reserved for production security configuration.

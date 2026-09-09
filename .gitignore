@@ -3,9 +3,22 @@ api_key.txt
 #Игнорировать все файлы с определённым расширением:
 *.log
 #Игнорировать целый каталог и его содержимое:(обратите внимание на косую черту в конце).
+
+# ESP-IDF build/configuration artifacts
 build/
+build_dev/
+build_production/   # на будущее
+
+# Local ESP-IDF configuration
+sdkconfig
+sdkconfig.old
 managed_components/
 LovyanGFX/
+
+# Production security keys
+security/keys/*
+!security/keys/.gitkeep
+
 #*   **Использовать символы подстановки:** `file?.txt` (будет соответствовать `file1.txt`, `file2.txt` и т.д.).
 #*   **Отменить действие шаблона:** поставьте восклицательный знак перед шаблоном, например `!important.txt`.
 
