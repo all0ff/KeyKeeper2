@@ -44,16 +44,34 @@ namespace vault::repository {
 inline constexpr uint16_t VAULT_FORMAT_VERSION = 1;
 
 /**
- * @brief Load vault.db via storage::vaultfile into memory, or start
- *        an empty vault if it doesn't exist yet (a brand new device).
+ * @brief Initialize the repository without loading vault.db.
  *
- * @return true on success. false if vault.db exists but is corrupt/
- *         unreadable (an empty, nonexistent vault.db is NOT a
- *         failure -- see above).
+ * Secret data is intentionally not read while the device is locked.
+ * Call load() after the DeviceUnlocked event.
  */
 bool init();
 
+/**
+ * @brief Load vault.db into memory after the device has been unlocked.
+ *
+ * A missing vault.db is treated as an empty vault.
+ *
+ * @return true on success. false if vault.db exists but is corrupt or
+ *         unreadable.
+ */
+bool load();
+
+/**
+ * @brief Wipe the in-memory vault copy and release its storage.
+ *
+ * Secret string contents are overwritten before the containers are
+ * cleared. The on-disk vault.db is intentionally left untouched.
+ */
+void clear();
+
 bool is_initialized();
+
+bool is_loaded();
 
 size_t entry_count();
 

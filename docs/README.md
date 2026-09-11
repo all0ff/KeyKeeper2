@@ -75,7 +75,7 @@ KeyKeeper2 — это автономный менеджер паролей с а
 Основные компоненты:
 
 - C++20;
-- ESP-IDF 5.5.x;
+- ESP-IDF ESP-IDF 5.5.x → 6.0.2;
 - FreeRTOS;
 - LVGL 9.x;
 - TinyUSB;

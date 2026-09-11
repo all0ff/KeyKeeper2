@@ -21,12 +21,53 @@ constexpr char TAG[] = "vault.repository";
 constexpr uint32_t MAGIC = 0x54564B4B;
 
 bool initialized = false;
+bool loaded = false;
 std::vector<VaultEntry> entries;
 uint32_t next_id = 1;
 
 uint32_t now_s()
 {
     return static_cast<uint32_t>(esp_timer_get_time() / 1'000'000);
+}
+
+void secure_clear_string(std::string& value)
+{
+    volatile char* data = value.empty() ? nullptr : value.data();
+    for (size_t i = 0; data != nullptr && i < value.size(); ++i) {
+        data[i] = '\0';
+    }
+    value.clear();
+}
+
+void secure_clear_bytes(std::vector<uint8_t>& value)
+{
+    volatile uint8_t* data = value.empty() ? nullptr : value.data();
+    for (size_t i = 0; data != nullptr && i < value.size(); ++i) {
+        data[i] = 0;
+    }
+    value.clear();
+}
+
+void secure_clear_entry(VaultEntry& entry)
+{
+    secure_clear_string(entry.login);
+    secure_clear_string(entry.password);
+    secure_clear_string(entry.url);
+    secure_clear_string(entry.notes);
+    secure_clear_string(entry.totp_secret);
+    entry.id = INVALID_ID;
+    entry.created_at = 0;
+    entry.updated_at = 0;
+}
+
+void clear_entries()
+{
+    for (VaultEntry& entry : entries) {
+        secure_clear_entry(entry);
+    }
+    entries.clear();
+    entries.shrink_to_fit();
+    next_id = 1;
 }
 
 // ---------------------------------------------------------------
@@ -298,8 +339,11 @@ std::vector<uint8_t> encode_all(const std::vector<VaultEntry>& in)
 
 bool persist()
 {
-    const std::vector<uint8_t> buf = encode_all(entries);
-    if (!storage::vaultfile::write_all(buf.data(), buf.size())) {
+    std::vector<uint8_t> buf = encode_all(entries);
+    const bool written = storage::vaultfile::write_all(buf.data(), buf.size());
+    secure_clear_bytes(buf);
+
+    if (!written) {
         ESP_LOGE(TAG, "persist: storage::vaultfile::write_all failed");
         return false;
     }
@@ -315,12 +359,29 @@ bool init()
         return true;
     }
 
-    entries.clear();
-    next_id = 1;
+    clear_entries();
+    loaded = false;
+    initialized = true;
+
+    ESP_LOGI(TAG, "Repository initialized without loading vault.db");
+    return true;
+}
+
+bool load()
+{
+    if (!initialized) {
+        return false;
+    }
+
+    if (loaded) {
+        return true;
+    }
+
+    clear_entries();
 
     if (!storage::vaultfile::exists()) {
         ESP_LOGI(TAG, "No vault.db yet -- starting with an empty vault");
-        initialized = true;
+        loaded = true;
         return true;
     }
 
@@ -330,13 +391,18 @@ bool init()
 
     if (!storage::vaultfile::read_all(buf.data(), read_size)) {
         ESP_LOGE(TAG, "Failed to read vault.db");
+        secure_clear_bytes(buf);
         return false;
     }
 
     if (!decode_all(buf.data(), read_size, entries)) {
         ESP_LOGE(TAG, "vault.db is corrupt or unreadable");
+        secure_clear_bytes(buf);
+        clear_entries();
         return false;
     }
+
+    secure_clear_bytes(buf);
 
     for (const VaultEntry& e : entries) {
         if (e.id >= next_id) {
@@ -344,9 +410,20 @@ bool init()
         }
     }
 
-    initialized = true;
+    loaded = true;
     ESP_LOGI(TAG, "Loaded %u entries from vault.db", static_cast<unsigned>(entries.size()));
     return true;
+}
+
+void clear()
+{
+    if (!initialized) {
+        return;
+    }
+
+    clear_entries();
+    loaded = false;
+    ESP_LOGI(TAG, "In-memory vault cleared");
 }
 
 bool is_initialized()
@@ -354,14 +431,19 @@ bool is_initialized()
     return initialized;
 }
 
+bool is_loaded()
+{
+    return initialized && loaded;
+}
+
 size_t entry_count()
 {
-    return entries.size();
+    return loaded ? entries.size() : 0;
 }
 
 size_t list(VaultEntry* out, size_t max_count, size_t offset)
 {
-    if (!initialized || out == nullptr || offset >= entries.size()) {
+    if (!initialized || !loaded || out == nullptr || offset >= entries.size()) {
         return 0;
     }
 
@@ -374,7 +456,7 @@ size_t list(VaultEntry* out, size_t max_count, size_t offset)
 
 bool get(uint32_t id, VaultEntry& out)
 {
-    if (!initialized) {
+    if (!initialized || !loaded) {
         return false;
     }
     for (const VaultEntry& e : entries) {
@@ -388,7 +470,7 @@ bool get(uint32_t id, VaultEntry& out)
 
 uint32_t add(VaultEntry entry)
 {
-    if (!initialized || !validate(entry)) {
+    if (!initialized || !loaded || !validate(entry)) {
         return INVALID_ID;
     }
 
@@ -408,7 +490,7 @@ uint32_t add(VaultEntry entry)
 
 bool update(const VaultEntry& entry)
 {
-    if (!initialized || !validate(entry) || entry.id == INVALID_ID) {
+    if (!initialized || !loaded || !validate(entry) || entry.id == INVALID_ID) {
         return false;
     }
 
@@ -433,7 +515,7 @@ bool update(const VaultEntry& entry)
 
 bool remove(uint32_t id)
 {
-    if (!initialized) {
+    if (!initialized || !loaded) {
         return false;
     }
 

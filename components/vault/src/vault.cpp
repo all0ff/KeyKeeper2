@@ -14,11 +14,43 @@ namespace {
 constexpr char TAG[] = "vault";
 
 bool initialized = false;
+int system_sub_handle = -1;
 
 bool is_unlocked()
 {
     return security::lock::is_initialized() &&
            security::lock::state() == security::lock::State::Unlocked;
+}
+
+bool ensure_loaded()
+{
+    if (!initialized || !is_unlocked()) {
+        return false;
+    }
+
+    return repository::is_loaded() || repository::load();
+}
+
+void on_system_event(const event_bus::Event& event, void* /*ctx*/)
+{
+    if (event.category != event_bus::Category::System) {
+        return;
+    }
+
+    switch (static_cast<event_bus::SystemEventId>(event.id)) {
+        case event_bus::SystemEventId::DeviceUnlocked:
+            if (!repository::load()) {
+                ESP_LOGE(TAG, "Failed to load vault after unlock");
+            }
+            break;
+
+        case event_bus::SystemEventId::DeviceLocked:
+            repository::clear();
+            break;
+
+        default:
+            break;
+    }
 }
 
 void publish(VaultEventId id, uint32_t entry_id)
@@ -46,9 +78,20 @@ bool init()
         return false;
     }
 
+    if (!event_bus::is_initialized()) {
+        ESP_LOGE(TAG, "EventBus must be initialized before Vault");
+        return false;
+    }
+
+    system_sub_handle =
+        event_bus::subscribe(event_bus::Category::System, on_system_event, nullptr);
+    if (system_sub_handle < 0) {
+        ESP_LOGE(TAG, "Failed to subscribe to System events");
+        return false;
+    }
+
     initialized = true;
-    ESP_LOGI(TAG, "Vault initialized (%u entries)",
-             static_cast<unsigned>(repository::entry_count()));
+    ESP_LOGI(TAG, "Vault initialized (database remains unloaded while locked)");
     return true;
 }
 
@@ -59,12 +102,12 @@ bool is_initialized()
 
 size_t entry_count()
 {
-    return initialized ? repository::entry_count() : 0;
+    return ensure_loaded() ? repository::entry_count() : 0;
 }
 
 size_t list_entries(VaultEntry* out, size_t max_count, size_t offset)
 {
-    if (!initialized || !is_unlocked()) {
+    if (!ensure_loaded()) {
         return 0;
     }
     return repository::list(out, max_count, offset);
@@ -72,7 +115,7 @@ size_t list_entries(VaultEntry* out, size_t max_count, size_t offset)
 
 bool get_entry(uint32_t id, VaultEntry& out)
 {
-    if (!initialized || !is_unlocked()) {
+    if (!ensure_loaded()) {
         return false;
     }
     return repository::get(id, out);
@@ -80,8 +123,8 @@ bool get_entry(uint32_t id, VaultEntry& out)
 
 uint32_t create_entry(const VaultEntry& entry)
 {
-    if (!initialized || !is_unlocked()) {
-        ESP_LOGW(TAG, "create_entry: denied (locked or not initialized)");
+    if (!ensure_loaded()) {
+        ESP_LOGW(TAG, "create_entry: denied (locked, not initialized, or vault not loaded)");
         return INVALID_ID;
     }
 
@@ -94,8 +137,8 @@ uint32_t create_entry(const VaultEntry& entry)
 
 bool update_entry(const VaultEntry& entry)
 {
-    if (!initialized || !is_unlocked()) {
-        ESP_LOGW(TAG, "update_entry: denied (locked or not initialized)");
+    if (!ensure_loaded()) {
+        ESP_LOGW(TAG, "update_entry: denied (locked, not initialized, or vault not loaded)");
         return false;
     }
 
@@ -108,8 +151,8 @@ bool update_entry(const VaultEntry& entry)
 
 bool delete_entry(uint32_t id)
 {
-    if (!initialized || !is_unlocked()) {
-        ESP_LOGW(TAG, "delete_entry: denied (locked or not initialized)");
+    if (!ensure_loaded()) {
+        ESP_LOGW(TAG, "delete_entry: denied (locked, not initialized, or vault not loaded)");
         return false;
     }
 

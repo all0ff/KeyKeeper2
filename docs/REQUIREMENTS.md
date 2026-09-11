@@ -740,7 +740,7 @@ USB HID должен корректно работать с Windows, Linux и ma
 
 Используется:
 
-- ESP-IDF 5.5.x.
+- EESP-IDF 5.5.x → 6.0.2.
 
 Использование Arduino Framework не допускается.
 
