@@ -59,7 +59,7 @@ EventBus example list.
 
 ## Placeholder values -- not a considered policy
 
-- `pin_manager.cpp`: `MAX_ATTEMPTS = 5`, `LOCKOUT_DURATION_MS = 30000`.
+- `pin_manager.cpp`: `MAX_ATTEMPTS = 7`, `LOCKOUT_DURATION_MS = 30000`.
   Reasonable-looking defaults, not a threat-modeled anti-bruteforce
   policy. Revisit once you have an actual opinion on this trade-off
   (a longer lockout is more annoying to a legitimate user who
