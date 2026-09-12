@@ -19,7 +19,7 @@ constexpr char TAG[] = "security.pin";
 constexpr char NVS_NAMESPACE[] = "security";
 constexpr char NVS_KEY[] = "pin";
 
-constexpr uint8_t MAX_ATTEMPTS = 5;
+constexpr uint8_t MAX_ATTEMPTS = 7;
 // Placeholder, not a considered anti-bruteforce policy -- see
 // components/security/README.md.
 constexpr uint32_t LOCKOUT_DURATION_MS = 30'000;

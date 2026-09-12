@@ -35,7 +35,7 @@ bool TypeEngine::type_char(char c, const Timing& timing)
         // Character not supported on US keyboard (e.g. Cyrillic).
         // Skip silently -- future Russian layout support will handle this.
         ESP_LOGW(TAG, "Unsupported character: 0x%02X", static_cast<unsigned char>(c));
-        return false; // not a hard failure
+        return true; // not a hard failure
     }
 
     const bool ok = hid::send_key(km.keycode, km.modifier, timing.press_ms);
