@@ -8,6 +8,8 @@
 
 #include "esp_log.h"
 
+#include <cstdio>
+
 namespace ui::screens {
 
 namespace {
@@ -274,8 +276,28 @@ void SecuritySettingsScreen::handle_pin_step_complete()
 
                 if (result == security::pin::VerifyResult::LockedOut) {
                     show_pin_step("Locked out, try later");
+                } else if (result == security::pin::VerifyResult::WipeRequired) {
+                    // NOTE: reaching the wipe threshold here (verifying
+                    // the OLD PIN while changing it) does NOT trigger an
+                    // actual wipe -- only LockScreen's unlock path does.
+                    // The device is already Unlocked to reach this screen
+                    // at all, so the vault isn't protected by a wipe here
+                    // either way; this is a deliberate scope decision, not
+                    // an oversight -- flagged for you to confirm it's the
+                    // behavior you want.
+                    show_pin_step("Too many failed attempts");
                 } else {
-                    show_pin_step("Wrong current PIN");
+                    const uint8_t remaining = security::pin::attempts_remaining();
+                    char buf[48];
+                    if (remaining > 0) {
+                        std::snprintf(buf, sizeof(buf), "Wrong current PIN, %u left",
+                                      static_cast<unsigned>(remaining));
+                    } else {
+                        const uint8_t until_wipe = security::pin::attempts_until_wipe();
+                        std::snprintf(buf, sizeof(buf), "Wrong PIN! %u attempts until vault wipe",
+                                      static_cast<unsigned>(until_wipe));
+                    }
+                    show_pin_step(buf);
                 }
 
             return;
@@ -301,17 +323,32 @@ void SecuritySettingsScreen::handle_pin_step_complete()
             bool ok = false;
 
             if (!mismatch) {
-                ok = security::pin::set_pin(
-                    new_pin_.c_str(),
-                    old_pin_.empty() ? nullptr : old_pin_.c_str());
+                // Update the pin_length setting BEFORE calling
+                // set_pin(): set_pin() validates the new PIN's length
+                // against settings::all().security.pin_length
+                // internally, so it must already reflect the new
+                // length or a legitimately shorter/longer new PIN
+                // would be rejected. Rolled back below if set_pin()
+                // fails, so a failed change never leaves pin_length
+                // out of sync with the still-active (old) PIN.
+                const uint8_t previous_pin_length = settings::all().security.pin_length;
 
-                if (ok) {
-                    settings::SecuritySettings updated = settings::all().security;
-                    updated.pin_length = static_cast<uint8_t>(new_pin_.length());
+                settings::SecuritySettings updated = settings::all().security;
+                updated.pin_length = static_cast<uint8_t>(new_pin_.length());
+                const bool length_saved = settings::set_security(updated);
 
-                    if (!settings::set_security(updated)) {
-                        ESP_LOGW(TAG, "PIN saved, but PIN length setting could not be saved");
+                if (length_saved) {
+                    ok = security::pin::set_pin(
+                        new_pin_.c_str(),
+                        old_pin_.empty() ? nullptr : old_pin_.c_str());
+
+                    if (!ok) {
+                        settings::SecuritySettings rollback = settings::all().security;
+                        rollback.pin_length = previous_pin_length;
+                        settings::set_security(rollback);
                     }
+                } else {
+                    ESP_LOGE(TAG, "Failed to save PIN length setting before set_pin()");
                 }
             }
 

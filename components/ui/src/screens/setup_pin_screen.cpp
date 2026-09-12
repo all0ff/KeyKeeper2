@@ -131,18 +131,26 @@ void SetupPinScreen::try_finish()
             return;
         }
 
+        // Save PIN length BEFORE calling set_pin(): set_pin() validates
+        // the new PIN's length against settings::all().security.pin_length
+        // internally, so if that's still the old/default value (e.g. 6)
+        // and the user chose a different length (e.g. 4), set_pin()
+        // would reject it as invalid. Updating the setting first, then
+        // calling set_pin(), keeps both consistent.
+        settings::SecuritySettings updated = settings::all().security;
+        updated.pin_length = static_cast<uint8_t>(std::strlen(first_pin_));
+
+        if (!settings::set_security(updated)) {
+            show_message("Failed to save PIN length setting");
+            ESP_LOGE(TAG, "set_security() failed before set_pin()");
+            return;
+        }
+
         // Match — save PIN
         if (!security::pin::set_pin(first_pin_, nullptr)) {
             show_message("Failed to save PIN");
             ESP_LOGE(TAG, "set_pin() failed");
             return;
-        }
-
-        settings::SecuritySettings updated = settings::all().security;
-        updated.pin_length = static_cast<uint8_t>(std::strlen(first_pin_));
-
-        if (!settings::set_security(updated)) {
-            ESP_LOGW(TAG, "PIN saved, but PIN length setting could not be saved");
         }
 
         // Unlock (must happen before clearing first_pin_)

@@ -32,6 +32,7 @@ idf_component_register(
         vault
         usb
         esp_app_format
+        efuse
         lvgl
         log
 
@@ -46,6 +47,12 @@ idf_component_register(
     # esp_get_free_heap_size() has been fine coming in transitively so
     # far; if that changes, same fix pattern applies -- check the
     # exact component name in the error and add it here.
+    #
+    # efuse is my best guess for esp_efuse_is_flash_encryption_enabled()
+    # / esp_efuse.h (SystemInfoScreen's Flash Encryption status row) --
+    # NOT yet verified against your ESP-IDF v6.0.2, unlike esp_app_format
+    # above. If the build complains about a missing header/component
+    # here, check the exact name in the error and swap it in.
     #
     # Still grows as more screens/widgets are added (see README.md for
     # the rest of docs/BUILD_PLAN.md's ui/ file list):

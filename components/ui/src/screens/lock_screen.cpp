@@ -8,6 +8,7 @@
 #include "security/lock_manager.hpp"
 #include "security/pin_manager.hpp"
 #include "settings/settings.hpp"
+#include "vault/vault_repository.hpp"
 
 #include "esp_log.h"
 
@@ -82,10 +83,20 @@ void LockScreen::try_unlock()
 
         case security::pin::VerifyResult::WrongPin: {
             const uint8_t remaining = security::pin::attempts_remaining();
-            char buf[32];
-            std::snprintf(buf, sizeof(buf), "Wrong PIN, %u left", static_cast<unsigned>(remaining));
+            char buf[48];
+            if (remaining > 0) {
+                std::snprintf(buf, sizeof(buf), "Wrong PIN, %u left", static_cast<unsigned>(remaining));
+            } else {
+                // Past the first lockout threshold -- attempts_remaining()
+                // saturates at 0 here, which used to give the user no
+                // indication at all that they're getting closer to an
+                // irreversible automatic wipe. Escalate explicitly.
+                const uint8_t until_wipe = security::pin::attempts_until_wipe();
+                std::snprintf(buf, sizeof(buf), "Wrong PIN! %u attempts until vault wipe",
+                              static_cast<unsigned>(until_wipe));
+            }
             lv_label_set_text(message_label_, buf);
-            ESP_LOGI(TAG, "Wrong PIN, %u attempts left", static_cast<unsigned>(remaining));
+            ESP_LOGW(TAG, "Wrong PIN, %u until wipe", static_cast<unsigned>(security::pin::attempts_until_wipe()));
             return;
         }
 
@@ -93,6 +104,27 @@ void LockScreen::try_unlock()
             lv_label_set_text(message_label_, "Locked out, try later");
             ESP_LOGI(TAG, "Unlock denied: locked out");
             return;
+
+        case security::pin::VerifyResult::WipeRequired: {
+            ESP_LOGW(TAG, "Automatic wipe requested after PIN failure threshold");
+
+            // Remove the persistent vault first. Only erase the PIN after
+            // the vault wipe has completed successfully.
+            const bool vault_wiped = vault::repository::wipe();
+            const bool pin_wiped = vault_wiped && security::pin::wipe();
+
+            if (!pin_wiped) {
+                lv_label_set_text(message_label_, "Wipe error");
+                ESP_LOGE(TAG, "Automatic wipe failed (vault=%d, pin=%d)",
+                         vault_wiped ? 1 : 0, pin_wiped ? 1 : 0);
+                return;
+            }
+
+            // Return to the normal first-launch setup flow. Do not expose
+            // a separate "Vault wiped" state or message.
+            manager().replace(std::make_unique<SetupPinScreen>());
+            return;
+        }
 
         case security::pin::VerifyResult::NoPinSet:
             // PIN was never configured -- redirect to setup flow

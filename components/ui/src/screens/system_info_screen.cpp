@@ -9,6 +9,7 @@
 #include "vault/vault_repository.hpp"
 
 #include "esp_app_desc.h"
+#include "esp_efuse.h"
 #include "esp_system.h"
 
 #include <cstdio>
@@ -69,6 +70,16 @@ void SystemInfoScreen::refresh()
     add_row(buf);
 
     std::snprintf(buf, sizeof(buf), "Device: %s (rev %s)", bsp::board_name(), bsp::board_revision());
+    add_row(buf);
+
+    // Read-only status -- Flash Encryption itself can't be turned on
+    // from this menu (or any running app code): it's an sdkconfig
+    // build-time setting (CONFIG_SECURE_FLASH_ENC_ENABLED), and the
+    // actual eFuse burn happens automatically on the first boot after
+    // flashing with that option set. This just reports whether it's
+    // currently active on this chip.
+    std::snprintf(buf, sizeof(buf), "Flash Encryption: %s",
+                   esp_efuse_is_flash_encryption_enabled() ? "On" : "Off");
     add_row(buf);
 
     std::snprintf(buf, sizeof(buf), "Free heap: %u KB",

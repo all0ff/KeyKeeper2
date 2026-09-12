@@ -20,15 +20,20 @@ constexpr char NVS_NAMESPACE[] = "security";
 constexpr char NVS_KEY[] = "pin";
 
 constexpr uint8_t MAX_ATTEMPTS = 7;
-// Placeholder, not a considered anti-bruteforce policy -- see
-// components/security/README.md.
+constexpr uint8_t WIPE_THRESHOLD = 17;
 constexpr uint32_t LOCKOUT_DURATION_MS = 30'000;
 
 constexpr size_t SALT_LEN = 16;
-constexpr size_t HASH_LEN = 32; // SHA-256 digest size
+constexpr size_t HASH_LEN = 32;
+constexpr uint32_t PBKDF2_ITERATIONS = 100'000;
+constexpr uint32_t PIN_BLOB_MAGIC = 0x4B4B5032; // "KKP2"
+constexpr uint8_t PIN_BLOB_VERSION = 1;
 
 struct StoredPin
 {
+    uint32_t magic;
+    uint8_t version;
+    uint8_t reserved[3];
     uint8_t salt[SALT_LEN];
     uint8_t hash[HASH_LEN];
 };
@@ -48,34 +53,40 @@ uint32_t now_ms()
     return static_cast<uint32_t>(esp_timer_get_time() / 1000);
 }
 
-/**
- * ESP-IDF v6.0 moved to Mbed TLS 4.x, which removed the legacy
- * mbedtls_sha256_*() API in favor of PSA Crypto (see
- * components/security/README.md). This computes salt || pin -> SHA-256
- * in one call via psa_hash_compute() -- still a single, unstretched
- * hash, not a KDF; see the scope note at the top of pin_manager.hpp.
- */
 bool compute_hash(const uint8_t* salt, const char* pin_digits, uint8_t out_hash[HASH_LEN])
 {
     const size_t pin_len = strlen(pin_digits);
 
-    // PIN length is validated elsewhere (pin_length_ok(), 4-6 digits),
-    // so this headroom is generous, not a tight fit.
-    uint8_t buffer[SALT_LEN + 32];
-    if (pin_len > sizeof(buffer) - SALT_LEN) {
-        ESP_LOGE(TAG, "PIN too long for hash buffer (%u chars)", static_cast<unsigned>(pin_len));
+    psa_key_derivation_operation_t operation = PSA_KEY_DERIVATION_OPERATION_INIT;
+    psa_status_t status = psa_key_derivation_setup(
+        &operation, PSA_ALG_PBKDF2_HMAC(PSA_ALG_SHA_256));
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "psa_key_derivation_setup failed (status %d)", static_cast<int>(status));
         return false;
     }
 
-    memcpy(buffer, salt, SALT_LEN);
-    memcpy(buffer + SALT_LEN, pin_digits, pin_len);
+    status = psa_key_derivation_input_integer(
+        &operation, PSA_KEY_DERIVATION_INPUT_COST, PBKDF2_ITERATIONS);
+    if (status == PSA_SUCCESS) {
+        status = psa_key_derivation_input_bytes(
+            &operation, PSA_KEY_DERIVATION_INPUT_SALT, salt, SALT_LEN);
+    }
+    if (status == PSA_SUCCESS) {
+        status = psa_key_derivation_input_bytes(
+            &operation, PSA_KEY_DERIVATION_INPUT_PASSWORD,
+            reinterpret_cast<const uint8_t*>(pin_digits), pin_len);
+    }
+    if (status == PSA_SUCCESS) {
+        status = psa_key_derivation_set_capacity(&operation, HASH_LEN);
+    }
+    if (status == PSA_SUCCESS) {
+        status = psa_key_derivation_output_bytes(&operation, out_hash, HASH_LEN);
+    }
 
-    size_t hash_len_out = 0;
-    const psa_status_t status = psa_hash_compute(
-        PSA_ALG_SHA_256, buffer, SALT_LEN + pin_len, out_hash, HASH_LEN, &hash_len_out);
+    psa_key_derivation_abort(&operation);
 
-    if (status != PSA_SUCCESS || hash_len_out != HASH_LEN) {
-        ESP_LOGE(TAG, "psa_hash_compute failed (status %d)", static_cast<int>(status));
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "PBKDF2 failed (status %d)", static_cast<int>(status));
         return false;
     }
 
@@ -94,25 +105,59 @@ bool pin_length_ok(const char* pin)
     }
 
     const size_t len = strlen(pin);
+    const uint8_t configured_length = settings::all().security.pin_length;
 
-    return len >= 4 && len <= 6;
-    
-    // Trust the configured preference, but never accept outside the
-    // 4-6 digit range REQUIREMENTS 12.3 specifies, even if settings
-    // somehow held something else.
+    if (len != configured_length || len < 4 || len > 6) {
+        return false;
+    }
+
+    for (size_t i = 0; i < len; ++i) {
+        if (pin[i] < '0' || pin[i] > '9') {
+            return false;
+        }
+    }
+
+    return true;
 }
 
-void reset_lockout_state()
+bool stored_pin_valid(const StoredPin& value)
+{
+    return value.magic == PIN_BLOB_MAGIC && value.version == PIN_BLOB_VERSION;
+}
+
+void reset_failure_state()
 {
     consecutive_failures = 0;
     locked_out = false;
+    lockout_started_ms = 0;
 }
 
 void check_lockout_expiry()
 {
     if (locked_out && (now_ms() - lockout_started_ms >= LOCKOUT_DURATION_MS)) {
-        ESP_LOGI(TAG, "Lockout expired, attempts reset");
-        reset_lockout_state();
+        // The lockout expires, but the failure counter is deliberately
+        // retained so attempts 8..17 remain part of one sequence.
+        locked_out = false;
+        lockout_started_ms = 0;
+        ESP_LOGI(TAG, "Lockout expired, failure counter retained at %u",
+                 static_cast<unsigned>(consecutive_failures));
+    }
+}
+
+void register_failure()
+{
+    if (consecutive_failures < WIPE_THRESHOLD) {
+        ++consecutive_failures;
+    }
+}
+
+void start_lockout_if_needed()
+{
+    if (consecutive_failures >= MAX_ATTEMPTS && !locked_out) {
+        locked_out = true;
+        lockout_started_ms = now_ms();
+        ESP_LOGW(TAG, "Too many failed PIN attempts, locked out for %u ms",
+                 static_cast<unsigned>(LOCKOUT_DURATION_MS));
     }
 }
 
@@ -135,14 +180,16 @@ bool init()
     }
 
     size_t len = sizeof(stored);
-    if (storage::nvs::get_blob(NVS_NAMESPACE, NVS_KEY, &stored, len) && len == sizeof(stored)) {
+    if (storage::nvs::get_blob(NVS_NAMESPACE, NVS_KEY, &stored, len) &&
+        len == sizeof(stored) && stored_pin_valid(stored)) {
         pin_set = true;
         ESP_LOGI(TAG, "PIN loaded from NVS");
     } else {
         pin_set = false;
-        ESP_LOGI(TAG, "No PIN set yet (first boot or NVS entry missing/mismatched)");
+        ESP_LOGI(TAG, "No valid PIN set yet (first boot or old PIN format)");
     }
 
+    reset_failure_state();
     initialized = true;
     return true;
 }
@@ -171,9 +218,11 @@ bool set_pin(const char* new_pin, const char* old_pin)
     }
 
     StoredPin next{};
+    next.magic = PIN_BLOB_MAGIC;
+    next.version = PIN_BLOB_VERSION;
     generate_salt(next.salt);
     if (!compute_hash(next.salt, new_pin, next.hash)) {
-        ESP_LOGE(TAG, "set_pin: hash computation failed");
+        ESP_LOGE(TAG, "set_pin: PBKDF2 computation failed");
         return false;
     }
 
@@ -184,7 +233,7 @@ bool set_pin(const char* new_pin, const char* old_pin)
 
     stored = next;
     pin_set = true;
-    reset_lockout_state();
+    reset_failure_state();
 
     if (event_bus::is_initialized()) {
         event_bus::publish(event_bus::Category::System,
@@ -192,6 +241,25 @@ bool set_pin(const char* new_pin, const char* old_pin)
     }
 
     ESP_LOGI(TAG, "PIN changed");
+    return true;
+}
+
+bool wipe()
+{
+    if (!initialized) {
+        return false;
+    }
+
+    if (!storage::nvs::erase_key(NVS_NAMESPACE, NVS_KEY)) {
+        ESP_LOGE(TAG, "Failed to erase PIN from NVS");
+        return false;
+    }
+
+    std::memset(&stored, 0, sizeof(stored));
+    pin_set = false;
+    reset_failure_state();
+
+    ESP_LOGW(TAG, "Stored PIN erased as part of automatic wipe");
     return true;
 }
 
@@ -207,36 +275,43 @@ VerifyResult verify(const char* pin)
         return VerifyResult::LockedOut;
     }
 
-    if (pin == nullptr) {
+    if (!pin_length_ok(pin)) {
+        register_failure();
+        if (consecutive_failures >= WIPE_THRESHOLD) {
+            ESP_LOGE(TAG, "PIN failure threshold %u reached: wipe required",
+                     static_cast<unsigned>(WIPE_THRESHOLD));
+            return VerifyResult::WipeRequired;
+        }
+        start_lockout_if_needed();
         return VerifyResult::WrongPin;
     }
 
-    uint8_t candidate_hash[HASH_LEN];
+    uint8_t candidate_hash[HASH_LEN]{};
     if (!compute_hash(stored.salt, pin, candidate_hash)) {
         return VerifyResult::WrongPin;
     }
 
-    // Constant-time-ish compare: XOR every byte instead of an early-
-    // exit memcmp, so guess timing doesn't leak how many leading
-    // bytes matched.
     uint8_t diff = 0;
     for (size_t i = 0; i < HASH_LEN; ++i) {
         diff |= static_cast<uint8_t>(candidate_hash[i] ^ stored.hash[i]);
     }
 
     if (diff == 0) {
-        reset_lockout_state();
+        reset_failure_state();
+        std::memset(candidate_hash, 0, sizeof(candidate_hash));
         return VerifyResult::Success;
     }
 
-    ++consecutive_failures;
-    if (consecutive_failures >= MAX_ATTEMPTS) {
-        locked_out = true;
-        lockout_started_ms = now_ms();
-        ESP_LOGW(TAG, "Too many failed PIN attempts, locked out for %u ms",
-                 static_cast<unsigned>(LOCKOUT_DURATION_MS));
+    register_failure();
+    std::memset(candidate_hash, 0, sizeof(candidate_hash));
+
+    if (consecutive_failures >= WIPE_THRESHOLD) {
+        ESP_LOGE(TAG, "PIN failure threshold %u reached: wipe required",
+                 static_cast<unsigned>(WIPE_THRESHOLD));
+        return VerifyResult::WipeRequired;
     }
 
+    start_lockout_if_needed();
     return VerifyResult::WrongPin;
 }
 
@@ -247,6 +322,14 @@ uint8_t attempts_remaining()
         return 0;
     }
     return MAX_ATTEMPTS - consecutive_failures;
+}
+
+uint8_t attempts_until_wipe()
+{
+    if (consecutive_failures >= WIPE_THRESHOLD) {
+        return 0;
+    }
+    return WIPE_THRESHOLD - consecutive_failures;
 }
 
 bool is_locked_out()

@@ -5,29 +5,9 @@
 // =============================================================================
 // security::pin -- PinManager
 //
-// Per docs/ARCHITECTURE.md's SecurityService breakdown: stores PIN
-// parameters, verifies/changes the PIN, tracks wrong attempts, and
-// enforces a lockout after too many consecutive failures.
-//
-// SCOPE BOUNDARY (per the user's explicit decision -- see
-// components/security/README.md): this is NOT the future
-// AES-256/key-derivation layer. The PIN is never used to derive an
-// encryption key, and nothing here encrypts vault.db. PIN verification
-// only gates logical/software access to the firmware's own UI/API --
-// a flash dump still exposes vault.db in plaintext. That limitation
-// is intentional for this version (REQUIREMENTS.md 9.4: encryption is
-// "Future Security"), not an oversight.
-//
-// One design choice made here that sits right on that boundary and is
-// called out explicitly rather than assumed: the PIN is stored as a
-// salted SHA-256 digest (via mbedtls), not in plaintext. This is a
-// single, unstretched hash used ONLY to verify a guess against the
-// stored digest -- it is NOT key derivation (no KDF stretching, the
-// output is never used as an encryption key, nothing downstream
-// depends on it being slow to compute). The intent is "don't leave
-// the PIN sitting in NVS as cleartext", not "start building the future
-// crypto layer early". If that reasoning doesn't hold up, this is a
-// small, isolated piece to revisit.
+// Stores and verifies the device PIN and enforces the staged
+// anti-bruteforce policy. PIN verification is separate from the future
+// vault-encryption key hierarchy.
 // =============================================================================
 
 namespace security::pin {
@@ -37,52 +17,53 @@ enum class VerifyResult : uint8_t
     Success,
     WrongPin,
     LockedOut,
+    WipeRequired,
     NoPinSet,
 };
 
-/**
- * @brief Load PIN parameters from NVS (via storage::nvs), if any were
- *        previously set.
- *
- * Must be called after storage::init() and settings::init(). Safe to
- * call once; a second call is a no-op that returns true. Does NOT
- * require a PIN to already be set -- has_pin() reports whether one is
- * (first boot: no PIN, device effectively "open" until one is set;
- * that first-setup UX is a GUI/system concern, not this component's).
- */
 bool init();
-
 bool is_initialized();
-
 bool has_pin();
 
 /**
  * @brief Set or replace the PIN.
  *
- * @param new_pin Digits only, length checked against
- *                settings::all().security.pin_length (4-6 per
- *                REQUIREMENTS 12.3).
- * @param old_pin Required and verified if has_pin() is true. Pass
- *                nullptr only for first-time setup (!has_pin()).
- *
- * Publishes event_bus::SystemEventId::PinChanged on success.
- *
- * @return true on success.
+ * new_pin must contain only digits and have the configured PIN length.
+ * If a PIN already exists, old_pin must verify successfully.
  */
 bool set_pin(const char* new_pin, const char* old_pin);
 
 /**
+ * @brief Remove the stored PIN and reset PIN failure state.
+ *
+ * Intended for the completed automatic-wipe path. This does not modify
+ * settings or vault storage.
+ */
+bool wipe();
+
+/**
  * @brief Verify a PIN guess.
  *
- * Consecutive wrong guesses count toward a lockout (see
- * components/security/README.md for the current threshold/duration --
- * placeholder values, not a considered anti-bruteforce policy). A
- * correct guess resets the counter.
+ * Policy:
+ *   - 7 consecutive failures start a 30-second lockout.
+ *   - The failure counter remains at 7 after lockout expiry.
+ *   - Failures 8..16 continue counting in RAM.
+ *   - Failure 17 returns WipeRequired.
+ *   - A successful PIN resets the failure counter.
  */
 VerifyResult verify(const char* pin);
 
-/// Attempts left before lockout kicks in. 0 while locked out.
+/// Attempts remaining before the first 30-second lockout. 0 while
+/// locked out or when the first threshold has already been reached.
 uint8_t attempts_remaining();
+
+/// Attempts remaining before the automatic wipe (17 total consecutive
+/// failures). Meaningful mainly once attempts_remaining() has reached
+/// 0 -- before that point the two overlap. Callers (e.g. LockScreen)
+/// should show this once attempts_remaining() hits 0, since a wrong
+/// guess in that range is one step closer to an irreversible wipe
+/// with no other warning otherwise.
+uint8_t attempts_until_wipe();
 
 bool is_locked_out();
 
