@@ -16,6 +16,7 @@
 #include "ui/ui.hpp"
 #include "usb/usb_service.hpp"
 #include "wifi/wifi_service.hpp"
+#include "web/web_service.hpp"
 
 #include "esp_log.h"
 
@@ -291,6 +292,31 @@ bool initialize_wifi()
     return true;
 }
 
+bool initialize_web()
+{
+    state::set_boot_stage(state::BootStage::Web);
+    logger::boot_stage("Web");
+
+    if (!web::init()) {
+        report_failure(
+            state::BootStage::Web,
+            0,
+            "Web initialization failed"
+        );
+        return false;
+    }
+
+    // Placed after Security/Vault, not right after WiFi: the login
+    // handler's WipeRequired path calls vault::repository::wipe() and
+    // security::pin::wipe() directly, so both must already be ready
+    // before the HTTP server can possibly receive a login request.
+    if (!web::start()) {
+        logger::error("Web start() failed -- HTTP server not running");
+    }
+
+    return true;
+}
+
 bool initialize_security()
 {
     state::set_boot_stage(state::BootStage::Security);
@@ -467,6 +493,14 @@ bool init()
      * Vault
      */
     if (!initialize_vault()) {
+        return false;
+    }
+
+    /*
+     * Web -- needs security:: and vault:: ready first (the login
+     * handler's automatic-wipe path calls into both directly).
+     */
+    if (!initialize_web()) {
         return false;
     }
 

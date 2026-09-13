@@ -1,4 +1,14 @@
 dependencies:
+  espressif/cjson:
+    component_hash: e788323270d90738662d66fffa910bfe1fba019bba087f01557e70c40485b469
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 1.7.19~2
   espressif/esp_tinyusb:
     component_hash: 9a73a76a6bc17907f6e523342ff6b1e440023e8aac2c11f4691212106ec24e66
     dependencies:
@@ -57,10 +67,11 @@ dependencies:
       type: service
     version: 9.5.0
 direct_dependencies:
+- espressif/cjson
 - espressif/esp_tinyusb
 - idf
 - joltwallet/littlefs
 - lvgl/lvgl
-manifest_hash: 94f0a352b4c59d17895f7bc53cb882ae4e2a4c98e1e635e855d1657b5d879ce5
+manifest_hash: 67af9e517344b792d42d1beacd2d8189d101a2eb831b73edf5cada6c7c253110
 target: esp32s3
 version: 3.0.0

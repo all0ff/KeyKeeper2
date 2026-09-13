@@ -36,6 +36,7 @@ enum class Category : uint8_t
     Power,
     System,
     Wifi,
+    Web,
 };
 
 /// IDs for Category::System. No other component owns "System" events,

@@ -20,6 +20,7 @@ idf_component_register(
         vault
         usb
         wifi
+        web
         ui
         esp_timer
         log
