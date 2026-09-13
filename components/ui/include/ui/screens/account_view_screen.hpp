@@ -14,12 +14,13 @@
 //
 // Displayed fields per GUI.md 11: Name, URL, Username, Password, OTP,
 // Notes, Category, Favorite -- "empty fields are not shown". As with
-// VaultListScreen, vault::VaultEntry (vault_model.hpp) has no Name,
-// Category, or Favorite field at all, so those three are simply never
-// shown here; not a bug, that data doesn't exist. "Username" is
-// VaultEntry::login. OTP shows only a "configured" indicator -- no
-// code is generated (see vault_model.hpp's file comment: no
-// trustworthy time source yet).
+// VaultListScreen, "Name" and "Username" both map to VaultEntry::login
+// (no separate Name field exists). Category/Favorite (format v2) are
+// now real: Category is shown only when non-empty, Favorite as a
+// "Yes"/nothing-shown-if-false row plus a "Toggle Favorite" action.
+// OTP shows only a "configured" indicator -- no code is generated
+// (see vault_model.hpp's file comment: no trustworthy time source
+// yet).
 //
 // Password is masked by default with a fixed-width placeholder (not
 // matching the real length, to avoid leaking that) and a "Reveal
@@ -61,6 +62,7 @@ private:
     enum class Action : uint8_t
     {
         RevealPassword,
+        ToggleFavorite,
         PrintUrl,
         PrintUsername,
         PrintPassword,
@@ -86,7 +88,7 @@ private:
     lv_obj_t* password_value_label_ = nullptr;
     bool password_revealed_ = false;
 
-    static constexpr size_t MAX_ACTIONS = 7;
+    static constexpr size_t MAX_ACTIONS = 8;
     Action available_actions_[MAX_ACTIONS]{};
     size_t action_count_ = 0;
     lv_obj_t* action_labels_[MAX_ACTIONS]{};

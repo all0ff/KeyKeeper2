@@ -101,11 +101,11 @@ lv_coord_t AccountViewScreen::build_fields(lv_obj_t* parent)
         y += FIELD_SPACING;
     };
 
-    // Per GUI.md 11: empty fields are not shown. Name/Category/
-    // Favorite are skipped entirely -- vault::VaultEntry has none of
-    // those fields, see account_view_screen.hpp.
+    // Per GUI.md 11: empty fields are not shown. "Username" is
+    // VaultEntry::login (no separate Name field exists).
     add_text_field("URL", entry_.url);
     add_text_field("Username", entry_.login);
+    add_text_field("Category", entry_.category);
 
     if (!entry_.password.empty()) {
         lv_obj_t* row = lv_label_create(parent);
@@ -120,6 +120,14 @@ lv_coord_t AccountViewScreen::build_fields(lv_obj_t* parent)
         lv_obj_t* row = lv_label_create(parent);
         lv_obj_set_style_text_color(row, pal.secondary_text, 0);
         lv_label_set_text(row, "OTP: configured");
+        lv_obj_align(row, LV_ALIGN_TOP_LEFT, 4, y);
+        y += FIELD_SPACING;
+    }
+
+    if (entry_.favorite) {
+        lv_obj_t* row = lv_label_create(parent);
+        lv_obj_set_style_text_color(row, pal.accent, 0);
+        lv_label_set_text(row, "* Favorite");
         lv_obj_align(row, LV_ALIGN_TOP_LEFT, 4, y);
         y += FIELD_SPACING;
     }
@@ -155,6 +163,7 @@ void AccountViewScreen::build_actions(lv_obj_t* parent, lv_coord_t y_start)
     if (!entry_.password.empty()) {
         add_action(Action::RevealPassword);
     }
+    add_action(Action::ToggleFavorite);
     if (!entry_.url.empty()) {
         add_action(Action::PrintUrl);
     }
@@ -181,6 +190,7 @@ const char* AccountViewScreen::action_name(Action action) const
 {
     switch (action) {
         case Action::RevealPassword: return "Reveal Password";
+        case Action::ToggleFavorite: return entry_.favorite ? "Remove from Favorites" : "Add to Favorites";
         case Action::PrintUrl:       return "Print URL";
         case Action::PrintUsername:  return "Print Username";
         case Action::PrintPassword:  return "Print Password";
@@ -256,6 +266,25 @@ void AccountViewScreen::activate()
             update_password_label();
             lv_label_set_text(status_label_, "");
             return;
+
+        case Action::ToggleFavorite: {
+            vault::VaultEntry updated = entry_;
+            updated.favorite = !updated.favorite;
+
+            if (vault::update_entry(updated)) {
+                entry_.favorite = updated.favorite;
+                ESP_LOGI(TAG, "Entry %lu favorite -> %d", static_cast<unsigned long>(entry_id_),
+                         entry_.favorite ? 1 : 0);
+                // Rebuild: the Favorite field row and this action's
+                // label both depend on entry_.favorite.
+                reload();
+            } else {
+                ESP_LOGE(TAG, "Failed to toggle favorite for entry %lu",
+                         static_cast<unsigned long>(entry_id_));
+                lv_label_set_text(status_label_, "Update failed");
+            }
+            return;
+        }
 
         case Action::PrintUrl:
         case Action::PrintUsername:

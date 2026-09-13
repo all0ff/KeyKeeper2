@@ -1,6 +1,5 @@
-#include "ui/screens/vault_list_screen.hpp"
+#include "ui/screens/favorites_screen.hpp"
 
-#include "ui/screens/account_edit_screen.hpp"
 #include "ui/screens/account_view_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
@@ -15,55 +14,50 @@ namespace ui::screens {
 
 namespace {
 
-constexpr char TAG[] = "ui.vault_list";
+constexpr char TAG[] = "ui.favorites";
 
 constexpr lv_coord_t FIRST_ITEM_Y = 4;
 constexpr lv_coord_t ITEM_SPACING = 20;
 
+// How many total vault entries to scan looking for favorites --
+// separate from MAX_ROWS (how many favorites can be DISPLAYED).
+// Placeholder, same reasoning as VaultListScreen::MAX_ROWS: fine for
+// a personal vault's realistic size, not a considered limit.
+constexpr size_t SCAN_CAP = 256;
+
 } // namespace
 
-const char* VaultListScreen::title() const
+const char* FavoritesScreen::title() const
 {
-    return "Vault";
+    return "Favorites";
 }
 
-const char* VaultListScreen::footer_hint() const
+const char* FavoritesScreen::footer_hint() const
 {
-    return "ROTATE  Select    OK  Open    Hold OK  New    BACK  Return";
+    return "ROTATE  Select    OK  Open    BACK  Return";
 }
 
-void VaultListScreen::initialize(lv_obj_t* content_parent)
+void FavoritesScreen::initialize(lv_obj_t* content_parent)
 {
     content_parent_ = content_parent;
 
     const theme::Palette& pal = theme::current();
-
     empty_label_ = lv_label_create(content_parent);
     lv_obj_set_style_text_color(empty_label_, pal.secondary_text, 0);
-    lv_label_set_text(empty_label_, "Vault is empty");
+    lv_label_set_text(empty_label_, "No favorites yet");
     lv_obj_center(empty_label_);
     lv_obj_add_flag(empty_label_, LV_OBJ_FLAG_HIDDEN);
 
-    status_label_ = lv_label_create(content_parent);
-    lv_obj_set_style_text_color(status_label_, pal.secondary_text, 0);
-    lv_label_set_text(status_label_, "");
-    lv_obj_align(status_label_, LV_ALIGN_BOTTOM_MID, 0, -2);
-
     reload();
 }
 
-void VaultListScreen::on_show()
+void FavoritesScreen::on_show()
 {
-    lv_label_set_text(status_label_, "");
     reload();
 }
 
-void VaultListScreen::reload()
+void FavoritesScreen::reload()
 {
-    // Drop any previously created row labels first -- on_show() calls
-    // this every time the screen becomes active again, and the entry
-    // count may have changed (once AccountEdit exists to actually
-    // change it; harmless no-op re-render until then).
     for (size_t i = 0; i < MAX_ROWS; ++i) {
         if (row_labels_[i] != nullptr) {
             lv_obj_del(row_labels_[i]);
@@ -71,17 +65,25 @@ void VaultListScreen::reload()
         }
     }
 
-    const size_t total = vault::entry_count();
-    const size_t to_load = (total > MAX_ROWS) ? MAX_ROWS : total;
+    entries_.clear();
 
-    entries_.assign(to_load, vault::VaultEntry{});
-    if (to_load > 0) {
-        vault::list_entries(entries_.data(), to_load, 0);
+    const size_t total = vault::entry_count();
+    const size_t scan_count = (total > SCAN_CAP) ? SCAN_CAP : total;
+
+    if (scan_count > 0) {
+        std::vector<vault::VaultEntry> scanned(scan_count);
+        vault::list_entries(scanned.data(), scan_count, 0);
+
+        for (const vault::VaultEntry& e : scanned) {
+            if (e.favorite && entries_.size() < MAX_ROWS) {
+                entries_.push_back(e);
+            }
+        }
     }
 
-    if (total > MAX_ROWS) {
-        ESP_LOGW(TAG, "Vault has %u entries, only showing the first %u (see README.md)",
-                 static_cast<unsigned>(total), static_cast<unsigned>(MAX_ROWS));
+    if (total > SCAN_CAP) {
+        ESP_LOGW(TAG, "Vault has %u entries, only the first %u were scanned for favorites",
+                 static_cast<unsigned>(total), static_cast<unsigned>(SCAN_CAP));
     }
 
     selected_ = 0;
@@ -104,7 +106,7 @@ void VaultListScreen::reload()
     render();
 }
 
-void VaultListScreen::render()
+void FavoritesScreen::render()
 {
     const theme::Palette& pal = theme::current();
 
@@ -115,9 +117,8 @@ void VaultListScreen::render()
         const char* login = entry.login.empty() ? "(no login)" : entry.login.c_str();
 
         lv_obj_set_style_text_color(row_labels_[i], is_selected ? pal.accent : pal.primary_text, 0);
-        lv_label_set_text_fmt(row_labels_[i], "%s%s%s%s",
-                               is_selected ? "> " : "", entry.favorite ? "* " : "",
-                               login, has_otp ? "  [OTP]" : "");
+        lv_label_set_text_fmt(row_labels_[i], "%s%s%s",
+                               is_selected ? "> " : "", login, has_otp ? "  [OTP]" : "");
     }
 
     if (!entries_.empty()) {
@@ -125,7 +126,7 @@ void VaultListScreen::render()
     }
 }
 
-void VaultListScreen::move_selection(int32_t delta)
+void FavoritesScreen::move_selection(int32_t delta)
 {
     if (entries_.empty()) {
         return;
@@ -133,31 +134,29 @@ void VaultListScreen::move_selection(int32_t delta)
 
     int32_t index = static_cast<int32_t>(selected_) + delta;
     const int32_t count = static_cast<int32_t>(entries_.size());
-
     if (index < 0) {
         index = count - 1;
     }
     if (index >= count) {
         index = 0;
     }
-
     selected_ = static_cast<size_t>(index);
     render();
 }
 
-void VaultListScreen::activate()
+void FavoritesScreen::activate()
 {
     if (entries_.empty()) {
         return;
     }
 
     const vault::VaultEntry& entry = entries_[selected_];
-    ESP_LOGI(TAG, "Selected entry id=%lu login='%s'",
+    ESP_LOGI(TAG, "Selected favorite id=%lu login='%s'",
              static_cast<unsigned long>(entry.id), entry.login.c_str());
     manager().push(std::make_unique<AccountViewScreen>(entry.id));
 }
 
-bool VaultListScreen::on_input(InputAction action)
+bool FavoritesScreen::on_input(InputAction action)
 {
     switch (action) {
         case InputAction::RotateLeft:
@@ -170,14 +169,6 @@ bool VaultListScreen::on_input(InputAction action)
 
         case InputAction::OkShort:
             activate();
-            return true;
-
-        case InputAction::OkLong:
-            // Create a new entry -- there's no dedicated "+ Add" row,
-            // this is the only entry point into AccountEditScreen for
-            // a fresh entry (editing an existing one is reached via
-            // AccountViewScreen's Edit action instead).
-            manager().push(std::make_unique<AccountEditScreen>(vault::INVALID_ID));
             return true;
 
         case InputAction::BackShort:

@@ -18,12 +18,17 @@ namespace ui::screens {
  *   BackShort                -> return to QuickScreen
  *   BackLong                 -> lock device
  *
- * The actual destination screens for Settings and About are added in
- * subsequent UI slices. Until then, selecting those entries displays
- * a short "not implemented yet" status message. Vault now opens a
- * real screen (VaultListScreen).
+ * Vault, Favorites, Categories, Search, Settings, Backup, and About
+ * all open real screens. Lock is functional and calls
+ * security::lock::lock().
  *
- * Lock is functional and calls security::lock::lock().
+ * Favorites/Categories/Search were added later (Favorites/Categories
+ * depend on vault_model.hpp's format-v2 category/favorite fields --
+ * they weren't meaningfully buildable before those existed). Note
+ * this project's Main Menu doesn't match docs/GUI.md section 9's list
+ * 1:1 -- it has no separate "System" item (that lives inside Settings
+ * instead, see SettingsScreen), and adds Backup/Lock/About which
+ * aren't in GUI.md's own 7-item list at all.
  */
 class MainMenu : public Screen
 {
@@ -39,7 +44,11 @@ private:
     enum class Item : uint8_t
     {
         Vault = 0,
+        Favorites,
+        Categories,
+        Search,
         Settings,
+        Backup,
         Lock,
         About,
         Count,

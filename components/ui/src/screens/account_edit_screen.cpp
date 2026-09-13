@@ -104,6 +104,8 @@ const char* AccountEditScreen::field_label(FieldId field) const
         case FieldId::Url:       return "URL";
         case FieldId::OtpSecret: return "OTP Secret";
         case FieldId::Notes:     return "Notes";
+        case FieldId::Category:  return "Category";
+        case FieldId::Favorite:  return "Favorite";
         case FieldId::Save:      return "Save";
         case FieldId::Count:     return "";
     }
@@ -118,6 +120,7 @@ size_t AccountEditScreen::field_max_length(FieldId field) const
         case FieldId::Url:       return vault::MAX_URL_LEN;
         case FieldId::OtpSecret: return vault::MAX_TOTP_SECRET_LEN;
         case FieldId::Notes:     return vault::MAX_NOTES_LEN;
+        case FieldId::Category:  return vault::MAX_CATEGORY_LEN;
         default:                 return 64;
     }
 }
@@ -152,6 +155,14 @@ void AccountEditScreen::render_rows()
             case FieldId::Notes:
                 lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, field_label(field),
                                        entry_.notes.empty() ? "(empty)" : entry_.notes.c_str());
+                break;
+            case FieldId::Category:
+                lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, field_label(field),
+                                       entry_.category.empty() ? "(none)" : entry_.category.c_str());
+                break;
+            case FieldId::Favorite:
+                lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, field_label(field),
+                                       entry_.favorite ? "Yes" : "No");
                 break;
             case FieldId::Save:
                 lv_label_set_text_fmt(row_labels_[i], "%s%s", prefix, field_label(field));
@@ -192,6 +203,14 @@ void AccountEditScreen::enter_edit_mode()
         return;
     }
 
+    if (field == FieldId::Favorite) {
+        // Plain boolean toggle -- no text entry involved, flip it in
+        // place and stay in the row list.
+        entry_.favorite = !entry_.favorite;
+        render_rows();
+        return;
+    }
+
     editing_field_ = field;
     mode_ = Mode::EditField;
 
@@ -210,6 +229,7 @@ void AccountEditScreen::enter_edit_mode()
         case FieldId::Url:       current_value = &entry_.url; break;
         case FieldId::OtpSecret: current_value = &entry_.totp_secret; break;
         case FieldId::Notes:     current_value = &entry_.notes; break;
+        case FieldId::Category:  current_value = &entry_.category; break;
         default: break;
     }
 
@@ -245,6 +265,7 @@ void AccountEditScreen::apply_edited_field()
         case FieldId::Url:       entry_.url = value; break;
         case FieldId::OtpSecret: entry_.totp_secret = value; break;
         case FieldId::Notes:     entry_.notes = value; break;
+        case FieldId::Category:  entry_.category = value; break;
         default: break;
     }
 }

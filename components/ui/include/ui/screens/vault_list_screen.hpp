@@ -15,13 +15,12 @@
 //
 // docs/GUI.md 10 says each row may show: name, category, URL, an OTP
 // indicator, and a favorite flag. vault::VaultEntry (see
-// vault_model.hpp) does not have category or favorite fields at all
-// -- those were never part of the data model the vault component
-// actually built. This screen shows what the model has: login (used
-// as the row's identifying name -- there's no separate "title"
-// field), and an [OTP] tag derived from whether totp_secret is
-// non-empty. Category/favorite are simply not displayed; not a bug,
-// the data to display doesn't exist.
+// vault_model.hpp) gained category/favorite in format v2 -- this row
+// shows login (used as the row's identifying name -- there's no
+// separate "title" field), a leading "*" when favorite, and an [OTP]
+// tag derived from whether totp_secret is non-empty. Category itself
+// still isn't shown per-row (screen space) -- see CategoriesScreen for
+// browsing by category instead.
 //
 // Selecting an entry (OkShort) pushes ui::screens::AccountViewScreen
 // with the entry's id. Holding OK (OkLong) pushes

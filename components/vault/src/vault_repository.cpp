@@ -55,6 +55,8 @@ void secure_clear_entry(VaultEntry& entry)
     secure_clear_string(entry.url);
     secure_clear_string(entry.notes);
     secure_clear_string(entry.totp_secret);
+    secure_clear_string(entry.category);
+    entry.favorite = false;
     entry.id = INVALID_ID;
     entry.created_at = 0;
     entry.updated_at = 0;
@@ -112,7 +114,21 @@ enum FieldType : uint8_t
     FIELD_TOTP_SECRET = 5,
     FIELD_CREATED_AT = 6,
     FIELD_UPDATED_AT = 7,
+    // Added in format v2 -- see vault_repository.hpp's
+    // VAULT_FORMAT_VERSION comment. A v1 file simply never wrote
+    // these, which decode_entry() below already handles correctly
+    // (the field's absence leaves category/favorite at their
+    // default-constructed values: empty string, false).
+    FIELD_CATEGORY = 8,
+    FIELD_FAVORITE = 9,
 };
+
+void write_field_u8(std::vector<uint8_t>& buf, FieldType type, uint8_t value)
+{
+    append_u8(buf, static_cast<uint8_t>(type));
+    append_u16(buf, 1);
+    append_u8(buf, value);
+}
 
 void write_field_u32(std::vector<uint8_t>& buf, FieldType type, uint32_t value)
 {
@@ -137,6 +153,8 @@ std::vector<uint8_t> encode_entry(const VaultEntry& e)
     write_field_str(fields, FIELD_URL, e.url);
     write_field_str(fields, FIELD_NOTES, e.notes);
     write_field_str(fields, FIELD_TOTP_SECRET, e.totp_secret);
+    write_field_str(fields, FIELD_CATEGORY, e.category);
+    write_field_u8(fields, FIELD_FAVORITE, e.favorite ? 1 : 0);
     write_field_u32(fields, FIELD_CREATED_AT, e.created_at);
     write_field_u32(fields, FIELD_UPDATED_AT, e.updated_at);
 
@@ -243,6 +261,15 @@ bool decode_entry(const uint8_t* data, size_t len, VaultEntry& out)
             case FIELD_TOTP_SECRET:
                 if (!r.read_str(field_len, out.totp_secret)) return false;
                 break;
+            case FIELD_CATEGORY:
+                if (!r.read_str(field_len, out.category)) return false;
+                break;
+            case FIELD_FAVORITE: {
+                uint8_t v = 0;
+                if (field_len != 1 || !r.read_u8(v)) return false;
+                out.favorite = (v != 0);
+                break;
+            }
             case FIELD_CREATED_AT: {
                 uint32_t v;
                 if (field_len != 4 || !r.read_u32(v)) return false;
@@ -282,13 +309,20 @@ bool decode_all(const uint8_t* data, size_t len, std::vector<VaultEntry>& out)
     if (!r.read_u16(version)) {
         return false;
     }
-    if (version != VAULT_FORMAT_VERSION) {
-        // Nothing to migrate FROM yet -- exactly one format version
-        // exists so far. A real migration path belongs here once a
-        // second version does.
-        ESP_LOGE(TAG, "decode_all: unsupported format version %u (expected %u)",
+    if (version < 1 || version > VAULT_FORMAT_VERSION) {
+        ESP_LOGE(TAG, "decode_all: unsupported format version %u (this firmware supports v1..v%u)",
                  version, VAULT_FORMAT_VERSION);
         return false;
+    }
+    if (version < VAULT_FORMAT_VERSION) {
+        // Nothing else to do here -- decode_entry() above already
+        // treats fields introduced after this file's version as
+        // simply absent, leaving them at their default-constructed
+        // values (e.g. category/favorite added in v2). The file gets
+        // rewritten at the current version next time anything in it
+        // is saved (add/update/remove all call persist()).
+        ESP_LOGI(TAG, "decode_all: loading older vault.db format v%u (current v%u)",
+                 static_cast<unsigned>(version), static_cast<unsigned>(VAULT_FORMAT_VERSION));
     }
     if (!r.read_u16(reserved) || !r.read_u32(count)) {
         return false;

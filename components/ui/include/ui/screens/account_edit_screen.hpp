@@ -15,13 +15,13 @@
 // an existing entry's id to edit it.
 //
 // Editable Fields per GUI.md 12: Name, URL, Username, Password, OTP
-// Secret, Notes, Category, Favorite. As with every other vault
-// screen, vault::VaultEntry (vault_model.hpp) has no Name, Category,
-// or Favorite field -- those three are not editable here because
-// there is nowhere to store them. GUI.md's validation rule "Name
-// must not be empty" is applied to Username (VaultEntry::login)
-// instead, since that's the closest thing to an identifying field the
-// model actually has.
+// Secret, Notes, Category, Favorite. Name/Username both map to
+// VaultEntry::login (no separate Name field exists) -- GUI.md's
+// validation rule "Name must not be empty" is applied to that.
+// Category/Favorite (format v2) are now real editable fields:
+// Category via widgets::TextEntry like the other text fields;
+// Favorite is a plain toggle (OkShort on its row flips it directly,
+// no text entry involved).
 //
 // "OTP must have a valid format" (GUI.md 12) is checked as: empty is
 // fine (no OTP configured), non-empty must be valid Base32
@@ -74,6 +74,8 @@ private:
         Url,
         OtpSecret,
         Notes,
+        Category,
+        Favorite,
         Save,
         Count,
     };

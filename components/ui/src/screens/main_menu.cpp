@@ -1,5 +1,10 @@
 #include "ui/screens/main_menu.hpp"
 
+#include "ui/screens/about_screen.hpp"
+#include "ui/screens/backup_screen.hpp"
+#include "ui/screens/categories_screen.hpp"
+#include "ui/screens/favorites_screen.hpp"
+#include "ui/screens/search_screen.hpp"
 #include "ui/screens/settings_screen.hpp"
 #include "ui/screens/vault_list_screen.hpp"
 #include "ui/theme.hpp"
@@ -20,13 +25,17 @@ constexpr char TAG[] = "ui.main_menu";
 
 constexpr const char* ITEM_NAMES[] = {
     "Vault",
+    "Favorites",
+    "Categories",
+    "Search",
     "Settings",
+    "Backup",
     "Lock",
     "About",
 };
 
 constexpr lv_coord_t FIRST_ITEM_Y = 8;
-constexpr lv_coord_t ITEM_SPACING = 26;
+constexpr lv_coord_t ITEM_SPACING = 20;
 
 } // namespace
 
@@ -202,34 +211,50 @@ void MainMenu::refresh()
             );
         }
     }
+
+    // With 8 items now, the menu no longer always fits in the visible
+    // content area -- keep the selected row in view as it moves.
+    if (item_labels_[selected_index] != nullptr) {
+        lv_obj_scroll_to_view(item_labels_[selected_index], LV_ANIM_ON);
+    }
 }
 
 void MainMenu::activate()
 {
     switch (selected_) {
         case Item::Vault:
-            /*
-             * VaultListScreen -- see docs/GUI.md section 10.
-             */
             manager().push(std::make_unique<VaultListScreen>());
-
             ESP_LOGI(TAG, "Vault selected");
             break;
 
-        case Item::Settings:
-            /*
-             * SettingsScreen -- see docs/GUI.md section 14.
-             */
-            manager().push(std::make_unique<SettingsScreen>());
+        case Item::Favorites:
+            manager().push(std::make_unique<FavoritesScreen>());
+            ESP_LOGI(TAG, "Favorites selected");
+            break;
 
+        case Item::Categories:
+            manager().push(std::make_unique<CategoriesScreen>());
+            ESP_LOGI(TAG, "Categories selected");
+            break;
+
+        case Item::Search:
+            manager().push(std::make_unique<SearchScreen>());
+            ESP_LOGI(TAG, "Search selected");
+            break;
+
+        case Item::Settings:
+            manager().push(std::make_unique<SettingsScreen>());
             ESP_LOGI(TAG, "Settings selected");
+            break;
+
+        case Item::Backup:
+            manager().push(std::make_unique<BackupScreen>());
+            ESP_LOGI(TAG, "Backup selected");
             break;
 
         case Item::Lock:
             security::lock::lock();
-
             ESP_LOGI(TAG, "Device locked from Main Menu");
-
             /*
              * MainMenu is removed from the stack. QuickScreen becomes
              * active and reflects the Locked security state.
@@ -238,14 +263,7 @@ void MainMenu::activate()
             break;
 
         case Item::About:
-            /*
-             * AboutScreen will be added later.
-             */
-            lv_label_set_text(
-                status_label_,
-                "About: coming soon"
-            );
-
+            manager().push(std::make_unique<AboutScreen>());
             ESP_LOGI(TAG, "About selected");
             break;
 

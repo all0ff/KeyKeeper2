@@ -8,7 +8,9 @@
 //
 // VaultEntry: one account record. Fields per the build plan (Account/
 // Login/Password/URL/Notes/Metadata) plus totp_secret, per
-// docs/STORAGE.md ("vault.db содержит ... OTP").
+// docs/STORAGE.md ("vault.db содержит ... OTP"). category/favorite
+// added later (format v2) for docs/GUI.md's Vault/Account/Search/
+// Favorites/Categories screens, which name these fields explicitly.
 //
 // IMPORTANT: totp_secret is stored, but nothing in this component
 // generates a TOTP code from it yet -- that needs a trustworthy time
@@ -32,6 +34,7 @@ inline constexpr size_t MAX_PASSWORD_LEN = 128;
 inline constexpr size_t MAX_URL_LEN = 256;
 inline constexpr size_t MAX_NOTES_LEN = 512;
 inline constexpr size_t MAX_TOTP_SECRET_LEN = 128;
+inline constexpr size_t MAX_CATEGORY_LEN = 64;
 
 /// Never a valid entry id -- used as a "not found" / "not yet saved"
 /// sentinel.
@@ -49,6 +52,15 @@ struct VaultEntry
     /// Storage only -- see the file-level comment. Empty means "no
     /// TOTP configured for this entry".
     std::string totp_secret;
+
+    /// Free-text category, e.g. "Work", "Banking". Empty means
+    /// uncategorized. Added in format v2 -- see vault_repository.hpp
+    /// for how older vault.db files (no category data at all) load.
+    std::string category;
+
+    /// Added in format v2, same as category. Defaults to false for
+    /// entries from an older vault.db that never had this field.
+    bool favorite = false;
 
     /// Unix epoch seconds, best-effort (see components/vault/README.md
     /// -- there is currently no trustworthy time source, so these may

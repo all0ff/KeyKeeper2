@@ -9,6 +9,7 @@ bool validate(const VaultEntry& entry)
     if (entry.url.size() > MAX_URL_LEN) return false;
     if (entry.notes.size() > MAX_NOTES_LEN) return false;
     if (entry.totp_secret.size() > MAX_TOTP_SECRET_LEN) return false;
+    if (entry.category.size() > MAX_CATEGORY_LEN) return false;
 
     return true;
 }
