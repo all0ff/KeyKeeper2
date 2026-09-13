@@ -156,7 +156,7 @@ private:
     std::string old_pin_;
     std::string new_pin_;
 
-    DuressPinStep duress_step_ = DuressPinStep::VerifyCurrent;
+    DuressPinStep duress_step_ = DuressPinStep::CurrentPin;
     std::string duress_current_pin_;
     std::string duress_new_pin_;
 
