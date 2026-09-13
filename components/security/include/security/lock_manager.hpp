@@ -57,6 +57,22 @@ State state();
 pin::VerifyResult unlock(const char* pin);
 
 /**
+ * @brief Transition directly to Unlocked WITHOUT calling
+ *        pin::verify() -- for the one legitimate case where a fresh
+ *        PIN was JUST established via pin::set_pin() (which already
+ *        proved knowledge of the old PIN, if one existed) in the same
+ *        logical flow. Re-verifying that brand-new PIN with another
+ *        full PBKDF2 pass immediately afterward is provably redundant
+ *        (~10 seconds wasted for nothing -- see pin_manager.hpp).
+ *
+ * NOT a general unlock bypass -- this must only ever be called
+ * immediately after set_pin() returns true for a new PIN, never as a
+ * substitute for unlock() anywhere else. No-op (returns false) if
+ * pin::has_pin() is false, as a minimal misuse guard.
+ */
+bool unlock_after_pin_set();
+
+/**
  * @brief Lock immediately (manual "lock now", or called internally by
  *        the auto-lock timer).
  *

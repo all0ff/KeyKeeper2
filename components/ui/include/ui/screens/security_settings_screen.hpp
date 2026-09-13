@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ui/async_pin_check.hpp"
 #include "ui/screen.hpp"
 #include "ui/widgets/keyboard.hpp"
 
@@ -33,6 +34,12 @@
 // the whole flow, discarding everything entered so far -- consistent
 // with how BACK behaves elsewhere in this UI (AccountEditScreen,
 // LockScreen).
+//
+// The Old-PIN and set_pin() steps both run via ui::AsyncPinCheck, not
+// direct blocking security::pin::verify()/set_pin() calls -- same
+// ~10-second PBKDF2 freeze reasoning as LockScreen (see that class's
+// header comment and AsyncPinCheck's own). While either check is in
+// flight, on_input() ignores everything, same as LockScreen.
 // =============================================================================
 
 namespace ui::screens {
@@ -81,6 +88,10 @@ private:
     void begin_change_pin();
     void show_pin_step(const char* error = nullptr);
     void handle_pin_step_complete();
+    void handle_old_pin_result(security::pin::VerifyResult result);
+    static void on_old_pin_check_done(security::pin::VerifyResult result, void* ctx);
+    void handle_set_pin_result(security::pin::VerifyResult result);
+    static void on_set_pin_done(security::pin::VerifyResult result, void* ctx);
     void cancel_change_pin();
 
     lv_obj_t* content_parent_ = nullptr;
@@ -99,6 +110,10 @@ private:
     widgets::PinEntry pin_entry_;
     std::string old_pin_;
     std::string new_pin_;
+
+    AsyncPinCheck async_check_;
+    bool checking_ = false;
+    uint8_t previous_pin_length_ = 0; // for rollback if set_pin() fails -- see the Confirm step
 };
 
 } // namespace ui::screens

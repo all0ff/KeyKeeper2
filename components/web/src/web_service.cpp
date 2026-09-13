@@ -184,7 +184,7 @@ esp_err_t handle_login(httpd_req_t* req)
             // touching the vault or the PIN at all. This still shares
             // pin_manager's single failure counter with on-device
             // attempts -- whichever channel happens to receive the
-            // 17th failure decides the outcome (wipe if on-device,
+            // 12th failure decides the outcome (wipe if on-device,
             // Wi-Fi disabled if via this endpoint).
             ESP_LOGW(TAG, "PIN failure threshold reached via web login -- disabling WiFi instead of wiping");
 

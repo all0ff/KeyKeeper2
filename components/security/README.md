@@ -59,11 +59,14 @@ EventBus example list.
 
 ## Placeholder values -- not a considered policy
 
-- `pin_manager.cpp`: `MAX_ATTEMPTS = 7`, `LOCKOUT_DURATION_MS = 30000`.
-  Reasonable-looking defaults, not a threat-modeled anti-bruteforce
-  policy. Revisit once you have an actual opinion on this trade-off
-  (a longer lockout is more annoying to a legitimate user who
-  fat-fingers their PIN, but also to an attacker).
+- `pin_manager.cpp`: staged anti-bruteforce policy, persisted across
+  reboots via a flash checkpoint (NVS) -- 3/6/9 consecutive failures
+  save a checkpoint (6 also starts a 30-second lockout), 12 triggers
+  an automatic wipe. Reasonable-looking thresholds, not a
+  threat-modeled policy in the sense of having been derived from an
+  actual attack-cost analysis. Revisit once you have an actual opinion
+  on this trade-off (tighter thresholds are more annoying to a
+  legitimate user who fat-fingers their PIN, but also to an attacker).
 - `permission_manager.cpp`'s `WebLogin` check just requires
   `web_ui_permissions != WEB_UI_NONE` (any permission bit set) -- not
   yet operation-specific (e.g. it doesn't distinguish "allowed to view"

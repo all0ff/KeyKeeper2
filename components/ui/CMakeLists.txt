@@ -24,6 +24,7 @@ idf_component_register(
         "src/screens/wifi_settings_screen.cpp"
         "src/widgets/keyboard.cpp"
         "src/widgets/text_entry.cpp"
+        "src/async_pin_check.cpp"
 
     INCLUDE_DIRS
         "include"

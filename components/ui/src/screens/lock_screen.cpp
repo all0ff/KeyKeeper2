@@ -28,6 +28,9 @@ const char* LockScreen::title() const
 
 const char* LockScreen::footer_hint() const
 {
+    if (checking_) {
+        return "Checking...";
+    }
     return "OK Next  BACK Erase / Cancel";
 }
 
@@ -55,11 +58,20 @@ void LockScreen::initialize(lv_obj_t* content_parent)
 void LockScreen::on_show()
 {
     pin_entry_.reset();
+    checking_ = false;
     lv_label_set_text(message_label_, "");
 }
 
 bool LockScreen::on_input(InputAction action)
 {
+    if (checking_) {
+        // Swallow everything while a check is in flight -- see
+        // lock_screen.hpp's file comment. AsyncPinCheck itself would
+        // be safe even if we let BackShort pop this screen mid-check,
+        // but there's no reason to.
+        return true;
+    }
+
     const bool consumed = pin_entry_.on_input(action);
 
     if (consumed && pin_entry_.is_complete()) {
@@ -71,9 +83,25 @@ bool LockScreen::on_input(InputAction action)
 
 void LockScreen::try_unlock()
 {
-    const security::pin::VerifyResult result = security::lock::unlock(pin_entry_.pin());
+    checking_ = true;
+    lv_label_set_text(message_label_, "Checking...");
 
+    // pin_entry_.pin() is copied internally by AsyncPinCheck::start(),
+    // so resetting pin_entry_ right after this call is safe -- same
+    // "never keep entered digits around longer than needed" rule
+    // already followed everywhere else PinEntry is used.
+    async_check_.start(AsyncPinCheck::Kind::Unlock, pin_entry_.pin(), &LockScreen::on_check_done, this);
     pin_entry_.reset();
+}
+
+void LockScreen::on_check_done(security::pin::VerifyResult result, void* ctx)
+{
+    static_cast<LockScreen*>(ctx)->handle_result(result);
+}
+
+void LockScreen::handle_result(security::pin::VerifyResult result)
+{
+    checking_ = false;
 
     switch (result) {
         case security::pin::VerifyResult::Success:

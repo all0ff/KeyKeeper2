@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ui/async_pin_check.hpp"
 #include "ui/screen.hpp"
 #include "ui/widgets/keyboard.hpp"
 
@@ -15,10 +16,18 @@
 // Flow:
 //   1. "Enter new PIN"    -> PinEntry widget
 //   2. "Confirm PIN"      -> PinEntry widget (same length)
-//   3. Match  -> set_pin() + unlock() -> MainMenu
+//   3. Match  -> set_pin() (async, see below) + unlock_after_pin_set()
+//      -> MainMenu
 //   4. Mismatch -> error message -> back to step 1
 //
 // BACK at step 1 with empty entry is a no-op (can't cancel setup).
+//
+// set_pin() runs via ui::AsyncPinCheck::start_set_pin() rather than a
+// direct blocking call -- same ~10-second PBKDF2 freeze reasoning as
+// LockScreen (see that class's header comment and AsyncPinCheck's
+// own). On success, the callback calls
+// security::lock::unlock_after_pin_set() directly (fast, no PBKDF2 --
+// no need to route that through AsyncPinCheck too).
 // =============================================================================
 
 namespace ui::screens {
@@ -44,6 +53,8 @@ private:
     void set_stage(Stage stage);
     void try_finish();
     void show_message(const char* msg);
+    void handle_set_pin_result(security::pin::VerifyResult result);
+    static void on_set_pin_done(security::pin::VerifyResult result, void* ctx);
 
     widgets::PinEntry pin_entry_;
     lv_obj_t* prompt_label_ = nullptr;
@@ -51,6 +62,9 @@ private:
 
     Stage stage_ = Stage::EnterNew;
     char first_pin_[widgets::PinEntry::MAX_LENGTH + 1]{};
+
+    AsyncPinCheck async_check_;
+    bool checking_ = false;
 };
 
 } // namespace ui::screens

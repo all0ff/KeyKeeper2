@@ -18,10 +18,27 @@ namespace {
 constexpr char TAG[] = "security.pin";
 constexpr char NVS_NAMESPACE[] = "security";
 constexpr char NVS_KEY[] = "pin";
+constexpr char NVS_CHECKPOINT_KEY[] = "pin_ckpt";
 
-constexpr uint8_t MAX_ATTEMPTS = 7;
-constexpr uint8_t WIPE_THRESHOLD = 17;
+// Staged anti-bruteforce thresholds -- see pin_manager.hpp's verify()
+// doc comment. Checkpoint values persisted to flash are a plain 0-3
+// state (conceptually 2 bits -- "4 states" was the design goal, not
+// any particular bit pattern; a linear 0/1/2/3 enum is exactly as
+// compact and much more readable than trying to match a specific
+// non-sequential bit encoding).
+constexpr uint8_t FAILURE_CHECKPOINT_1 = 3;
+constexpr uint8_t FAILURE_LOCKOUT = 6;
+constexpr uint8_t FAILURE_CHECKPOINT_3 = 9;
+constexpr uint8_t WIPE_THRESHOLD = 12;
 constexpr uint32_t LOCKOUT_DURATION_MS = 30'000;
+
+enum class Checkpoint : uint32_t
+{
+    None = 0,
+    At3 = 1,
+    At6Lockout = 2,
+    At9 = 3,
+};
 
 constexpr size_t SALT_LEN = 16;
 constexpr size_t HASH_LEN = 32;
@@ -125,18 +142,51 @@ bool stored_pin_valid(const StoredPin& value)
     return value.magic == PIN_BLOB_MAGIC && value.version == PIN_BLOB_VERSION;
 }
 
+Checkpoint load_checkpoint_from_flash()
+{
+    uint32_t value = 0;
+    if (!storage::nvs::get_u32(NVS_NAMESPACE, NVS_CHECKPOINT_KEY, value) || value > 3) {
+        return Checkpoint::None;
+    }
+    return static_cast<Checkpoint>(value);
+}
+
+void save_checkpoint_to_flash(Checkpoint checkpoint)
+{
+    storage::nvs::set_u32(NVS_NAMESPACE, NVS_CHECKPOINT_KEY, static_cast<uint32_t>(checkpoint));
+}
+
+uint8_t checkpoint_failure_count(Checkpoint checkpoint)
+{
+    switch (checkpoint) {
+        case Checkpoint::None: return 0;
+        case Checkpoint::At3: return FAILURE_CHECKPOINT_1;
+        case Checkpoint::At6Lockout: return FAILURE_LOCKOUT;
+        case Checkpoint::At9: return FAILURE_CHECKPOINT_3;
+    }
+    return 0;
+}
+
 void reset_failure_state()
 {
     consecutive_failures = 0;
     locked_out = false;
     lockout_started_ms = 0;
+
+    // Avoid an unconditional flash write on every successful unlock --
+    // only touch flash if there was actually a checkpoint to clear.
+    // Reading first costs nothing (NVS reads don't wear flash).
+    if (load_checkpoint_from_flash() != Checkpoint::None) {
+        save_checkpoint_to_flash(Checkpoint::None);
+    }
 }
 
 void check_lockout_expiry()
 {
     if (locked_out && (now_ms() - lockout_started_ms >= LOCKOUT_DURATION_MS)) {
         // The lockout expires, but the failure counter is deliberately
-        // retained so attempts 8..17 remain part of one sequence.
+        // retained so attempts 7..11 remain part of the same sequence
+        // toward the 12th-failure wipe -- see verify()'s doc comment.
         locked_out = false;
         lockout_started_ms = 0;
         ESP_LOGI(TAG, "Lockout expired, failure counter retained at %u",
@@ -149,11 +199,22 @@ void register_failure()
     if (consecutive_failures < WIPE_THRESHOLD) {
         ++consecutive_failures;
     }
+
+    // Checkpoint writes only happen at these three thresholds -- the
+    // 12th failure (WIPE_THRESHOLD) intentionally writes nothing;
+    // wipe() erases NVS_CHECKPOINT_KEY along with the PIN itself.
+    if (consecutive_failures == FAILURE_CHECKPOINT_1) {
+        save_checkpoint_to_flash(Checkpoint::At3);
+    } else if (consecutive_failures == FAILURE_LOCKOUT) {
+        save_checkpoint_to_flash(Checkpoint::At6Lockout);
+    } else if (consecutive_failures == FAILURE_CHECKPOINT_3) {
+        save_checkpoint_to_flash(Checkpoint::At9);
+    }
 }
 
 void start_lockout_if_needed()
 {
-    if (consecutive_failures >= MAX_ATTEMPTS && !locked_out) {
+    if (consecutive_failures >= FAILURE_LOCKOUT && !locked_out) {
         locked_out = true;
         lockout_started_ms = now_ms();
         ESP_LOGW(TAG, "Too many failed PIN attempts, locked out for %u ms",
@@ -189,7 +250,30 @@ bool init()
         ESP_LOGI(TAG, "No valid PIN set yet (first boot or old PIN format)");
     }
 
-    reset_failure_state();
+    // Restore failure progress from the flash checkpoint, NOT a plain
+    // reset -- see verify()'s doc comment for why: a reboot must never
+    // let an attacker regain attempts below the last checkpoint
+    // reached before the reboot.
+    const Checkpoint saved_checkpoint = load_checkpoint_from_flash();
+    consecutive_failures = checkpoint_failure_count(saved_checkpoint);
+    locked_out = false;
+    lockout_started_ms = 0;
+
+    if (saved_checkpoint == Checkpoint::At6Lockout) {
+        // Rebooted during or shortly after the lockout window. We
+        // can't know how much of the original 30s had already
+        // elapsed (esp_timer_get_time() resets on reboot), so
+        // conservatively restart the full lockout from boot --
+        // rebooting can only ever cost an attacker more time, never
+        // less.
+        locked_out = true;
+        lockout_started_ms = now_ms();
+        ESP_LOGW(TAG, "Restored lockout checkpoint from flash -- 30s lockout restarted from boot");
+    } else if (saved_checkpoint != Checkpoint::None) {
+        ESP_LOGI(TAG, "Restored failure checkpoint from flash: %u consecutive failures",
+                 static_cast<unsigned>(consecutive_failures));
+    }
+
     initialized = true;
     return true;
 }
@@ -318,10 +402,10 @@ VerifyResult verify(const char* pin)
 uint8_t attempts_remaining()
 {
     check_lockout_expiry();
-    if (locked_out || consecutive_failures >= MAX_ATTEMPTS) {
+    if (locked_out || consecutive_failures >= FAILURE_LOCKOUT) {
         return 0;
     }
-    return MAX_ATTEMPTS - consecutive_failures;
+    return FAILURE_LOCKOUT - consecutive_failures;
 }
 
 uint8_t attempts_until_wipe()

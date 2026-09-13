@@ -95,6 +95,20 @@ void auto_lock_task(void* /*arg*/)
     }
 }
 
+void transition_to_unlocked()
+{
+    current_state = State::Unlocked;
+    session::begin_session(session::Origin::Local);
+
+    if (event_bus::is_initialized()) {
+        event_bus::publish(event_bus::Category::System,
+                            static_cast<uint32_t>(event_bus::SystemEventId::DeviceUnlocked));
+    }
+
+    ESP_LOGI(TAG, "Unlocked");
+    fire_callbacks(State::Unlocked);
+}
+
 } // namespace
 
 bool init()
@@ -149,19 +163,20 @@ pin::VerifyResult unlock(const char* pin_guess)
     const pin::VerifyResult result = pin::verify(pin_guess);
 
     if (result == pin::VerifyResult::Success) {
-        current_state = State::Unlocked;
-        session::begin_session(session::Origin::Local);
-
-        if (event_bus::is_initialized()) {
-            event_bus::publish(event_bus::Category::System,
-                                static_cast<uint32_t>(event_bus::SystemEventId::DeviceUnlocked));
-        }
-
-        ESP_LOGI(TAG, "Unlocked");
-        fire_callbacks(State::Unlocked);
+        transition_to_unlocked();
     }
 
     return result;
+}
+
+bool unlock_after_pin_set()
+{
+    if (!initialized || !pin::has_pin()) {
+        return false;
+    }
+
+    transition_to_unlocked();
+    return true;
 }
 
 void lock()

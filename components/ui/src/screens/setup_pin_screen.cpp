@@ -26,6 +26,9 @@ const char* SetupPinScreen::title() const
 
 const char* SetupPinScreen::footer_hint() const
 {
+    if (checking_) {
+        return "Checking...";
+    }
     switch (stage_) {
         case Stage::EnterNew:
             return "ROTATE Digit OK Next Hold OK Done BACK Erase";
@@ -69,11 +72,16 @@ void SetupPinScreen::initialize(lv_obj_t* content_parent)
 void SetupPinScreen::on_show()
 {
     pin_entry_.reset();
+    checking_ = false;
     set_stage(Stage::EnterNew);
 }
 
 bool SetupPinScreen::on_input(InputAction action)
 {
+    if (checking_) {
+        return true; // swallow everything while the async set_pin() runs
+    }
+
     if (stage_ == Stage::MismatchError) {
         if (action == InputAction::OkShort || action == InputAction::BackShort) {
             set_stage(Stage::EnterNew);
@@ -146,28 +154,46 @@ void SetupPinScreen::try_finish()
             return;
         }
 
-        // Match — save PIN
-        if (!security::pin::set_pin(first_pin_, nullptr)) {
-            show_message("Failed to save PIN");
-            ESP_LOGE(TAG, "set_pin() failed");
-            return;
-        }
+        // Match — save PIN (async, see setup_pin_screen.hpp)
+        checking_ = true;
+        show_message("Checking...");
+        async_check_.start_set_pin(first_pin_, nullptr, &SetupPinScreen::on_set_pin_done, this);
 
-        // Unlock (must happen before clearing first_pin_)
-        const security::pin::VerifyResult unlock_result = security::lock::unlock(first_pin_);
-        if (unlock_result != security::pin::VerifyResult::Success) {
-            show_message("Unlock failed after PIN set");
-            ESP_LOGE(TAG, "unlock() failed after set_pin()");
-            return;
-        }
-
-        ESP_LOGI(TAG, "PIN set and device unlocked");
-
-        // Clear sensitive data from RAM
+        // Clear sensitive data from RAM -- start_set_pin() already
+        // copied it internally, safe to wipe our own copy now.
         std::memset(first_pin_, 0, sizeof(first_pin_));
-
-        manager().replace(std::make_unique<MainMenu>());
     }
+}
+
+void SetupPinScreen::on_set_pin_done(security::pin::VerifyResult result, void* ctx)
+{
+    static_cast<SetupPinScreen*>(ctx)->handle_set_pin_result(result);
+}
+
+void SetupPinScreen::handle_set_pin_result(security::pin::VerifyResult result)
+{
+    checking_ = false;
+
+    if (result != security::pin::VerifyResult::Success) {
+        show_message("Failed to save PIN");
+        ESP_LOGE(TAG, "set_pin() failed");
+        return;
+    }
+
+    // Unlock without re-verifying: set_pin() just succeeded for this
+    // exact PIN (proving old-PIN knowledge first, if one existed), so
+    // a second full PBKDF2 pass to verify it again immediately after
+    // would be redundant -- another ~10 seconds wasted for a foregone
+    // conclusion. See security::lock::unlock_after_pin_set()'s doc
+    // comment.
+    if (!security::lock::unlock_after_pin_set()) {
+        show_message("Unlock failed after PIN set");
+        ESP_LOGE(TAG, "unlock_after_pin_set() failed after set_pin()");
+        return;
+    }
+
+    ESP_LOGI(TAG, "PIN set and device unlocked");
+    manager().replace(std::make_unique<MainMenu>());
 }
 
 void SetupPinScreen::show_message(const char* msg)

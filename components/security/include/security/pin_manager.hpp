@@ -44,25 +44,37 @@ bool wipe();
 /**
  * @brief Verify a PIN guess.
  *
- * Policy:
- *   - 7 consecutive failures start a 30-second lockout.
- *   - The failure counter remains at 7 after lockout expiry.
- *   - Failures 8..16 continue counting in RAM.
- *   - Failure 17 returns WipeRequired.
- *   - A successful PIN resets the failure counter.
+ * Staged anti-bruteforce policy, persisted across reboots so power-
+ * cycling can't reset progress below the last reached checkpoint:
+ *   - Failure 3 -> checkpoint saved to flash (NVS).
+ *   - Failure 6 -> checkpoint saved to flash + 30-second lockout.
+ *   - Failure 9 -> checkpoint saved to flash.
+ *   - Failure 12 -> WipeRequired (no checkpoint write -- straight to
+ *     the caller executing the wipe).
+ *   - A successful PIN resets the RAM counter to 0, and clears the
+ *     flash checkpoint IF one was set (a normal successful unlock
+ *     that never hit a checkpoint writes nothing to flash at all).
+ *
+ * On boot, the flash checkpoint (not just the RAM counter) is what's
+ * restored -- rebooting can only ever cost an attacker more time
+ * (re-imposing the 30s lockout if checkpoint 6 was the last one saved),
+ * never less. See pin_manager.cpp for the exact checkpoint values.
  */
 VerifyResult verify(const char* pin);
 
-/// Attempts remaining before the first 30-second lockout. 0 while
-/// locked out or when the first threshold has already been reached.
+/// Attempts remaining before the first 30-second lockout (now at 6
+/// consecutive failures, not 7 -- see verify()'s doc comment). 0
+/// while locked out or when the first threshold has already been
+/// reached.
 uint8_t attempts_remaining();
 
-/// Attempts remaining before the automatic wipe (17 total consecutive
-/// failures). Meaningful mainly once attempts_remaining() has reached
-/// 0 -- before that point the two overlap. Callers (e.g. LockScreen)
-/// should show this once attempts_remaining() hits 0, since a wrong
-/// guess in that range is one step closer to an irreversible wipe
-/// with no other warning otherwise.
+/// Attempts remaining before the automatic wipe (12 total consecutive
+/// failures, not 17 -- see verify()'s doc comment). Meaningful mainly
+/// once attempts_remaining() has reached 0 -- before that point the
+/// two overlap. Callers (e.g. LockScreen) should show this once
+/// attempts_remaining() hits 0, since a wrong guess in that range is
+/// one step closer to an irreversible wipe with no other warning
+/// otherwise.
 uint8_t attempts_until_wipe();
 
 bool is_locked_out();

@@ -32,6 +32,9 @@ const char* SecuritySettingsScreen::title() const
 
 const char* SecuritySettingsScreen::footer_hint() const
 {
+    if (checking_) {
+        return "Checking...";
+    }
     switch (mode_) {
         case Mode::Adjust:
             return "ROTATE  Change    OK/BACK  Confirm";
@@ -265,46 +268,15 @@ void SecuritySettingsScreen::handle_pin_step_complete()
     switch (change_step_) {
         case ChangePinStep::Old: {
             old_pin_ = pin_entry_.pin();
-
-            const security::pin::VerifyResult result =
-                security::pin::verify(old_pin_.c_str());
-
             pin_entry_.reset();
 
-            if (result != security::pin::VerifyResult::Success) {
-                old_pin_.clear();
-
-                if (result == security::pin::VerifyResult::LockedOut) {
-                    show_pin_step("Locked out, try later");
-                } else if (result == security::pin::VerifyResult::WipeRequired) {
-                    // NOTE: reaching the wipe threshold here (verifying
-                    // the OLD PIN while changing it) does NOT trigger an
-                    // actual wipe -- only LockScreen's unlock path does.
-                    // The device is already Unlocked to reach this screen
-                    // at all, so the vault isn't protected by a wipe here
-                    // either way; this is a deliberate scope decision, not
-                    // an oversight -- flagged for you to confirm it's the
-                    // behavior you want.
-                    show_pin_step("Too many failed attempts");
-                } else {
-                    const uint8_t remaining = security::pin::attempts_remaining();
-                    char buf[48];
-                    if (remaining > 0) {
-                        std::snprintf(buf, sizeof(buf), "Wrong current PIN, %u left",
-                                      static_cast<unsigned>(remaining));
-                    } else {
-                        const uint8_t until_wipe = security::pin::attempts_until_wipe();
-                        std::snprintf(buf, sizeof(buf), "Wrong PIN! %u attempts until vault wipe",
-                                      static_cast<unsigned>(until_wipe));
-                    }
-                    show_pin_step(buf);
-                }
-
-            return;
-            }
-
-            change_step_ = ChangePinStep::New;
-            show_pin_step();
+            checking_ = true;
+            // status_label_ is nullptr while in the PIN-step UI (see
+            // show_pin_step()) -- reuse its own message-display path
+            // instead of touching a null label directly.
+            show_pin_step("Checking...");
+            async_check_.start(AsyncPinCheck::Kind::Verify, old_pin_.c_str(),
+                                &SecuritySettingsScreen::on_old_pin_check_done, this);
             return;
         }
 
@@ -319,59 +291,122 @@ void SecuritySettingsScreen::handle_pin_step_complete()
             const std::string confirm_pin = pin_entry_.pin();
             pin_entry_.reset();
 
-            const bool mismatch = (confirm_pin != new_pin_);
-            bool ok = false;
-
-            if (!mismatch) {
-                // Update the pin_length setting BEFORE calling
-                // set_pin(): set_pin() validates the new PIN's length
-                // against settings::all().security.pin_length
-                // internally, so it must already reflect the new
-                // length or a legitimately shorter/longer new PIN
-                // would be rejected. Rolled back below if set_pin()
-                // fails, so a failed change never leaves pin_length
-                // out of sync with the still-active (old) PIN.
-                const uint8_t previous_pin_length = settings::all().security.pin_length;
-
-                settings::SecuritySettings updated = settings::all().security;
-                updated.pin_length = static_cast<uint8_t>(new_pin_.length());
-                const bool length_saved = settings::set_security(updated);
-
-                if (length_saved) {
-                    ok = security::pin::set_pin(
-                        new_pin_.c_str(),
-                        old_pin_.empty() ? nullptr : old_pin_.c_str());
-
-                    if (!ok) {
-                        settings::SecuritySettings rollback = settings::all().security;
-                        rollback.pin_length = previous_pin_length;
-                        settings::set_security(rollback);
-                    }
-                } else {
-                    ESP_LOGE(TAG, "Failed to save PIN length setting before set_pin()");
-                }
-            }
-
-            old_pin_.clear();
-            new_pin_.clear();
-            mode_ = Mode::Browse;
-            lv_obj_clean(content_parent_);
-            build_rows();
-
-            if (mismatch) {
+            if (confirm_pin != new_pin_) {
+                old_pin_.clear();
+                new_pin_.clear();
+                mode_ = Mode::Browse;
+                lv_obj_clean(content_parent_);
+                build_rows();
                 ESP_LOGI(TAG, "PIN change cancelled -- confirmation did not match");
                 lv_label_set_text(status_label_, "PINs did not match");
-            } else if (ok) {
-                ESP_LOGI(TAG, "PIN changed");
-                lv_label_set_text(status_label_, "PIN changed");
-            } else {
-                ESP_LOGI(TAG, "PIN change failed");
-                lv_label_set_text(status_label_, "PIN change failed");
+                return;
             }
 
+            // Update the pin_length setting BEFORE calling set_pin():
+            // set_pin() validates the new PIN's length against
+            // settings::all().security.pin_length internally, so it
+            // must already reflect the new length or a legitimately
+            // shorter/longer new PIN would be rejected. Rolled back in
+            // handle_set_pin_result() if set_pin() fails, so a failed
+            // change never leaves pin_length out of sync with the
+            // still-active (old) PIN.
+            previous_pin_length_ = settings::all().security.pin_length;
+
+            settings::SecuritySettings updated = settings::all().security;
+            updated.pin_length = static_cast<uint8_t>(new_pin_.length());
+
+            if (!settings::set_security(updated)) {
+                ESP_LOGE(TAG, "Failed to save PIN length setting before set_pin()");
+                old_pin_.clear();
+                new_pin_.clear();
+                mode_ = Mode::Browse;
+                lv_obj_clean(content_parent_);
+                build_rows();
+                lv_label_set_text(status_label_, "PIN change failed");
+                return;
+            }
+
+            checking_ = true;
+            show_pin_step("Checking...");
+            async_check_.start_set_pin(new_pin_.c_str(), old_pin_.empty() ? nullptr : old_pin_.c_str(),
+                                        &SecuritySettingsScreen::on_set_pin_done, this);
             return;
         }
     }
+}
+
+void SecuritySettingsScreen::on_set_pin_done(security::pin::VerifyResult result, void* ctx)
+{
+    static_cast<SecuritySettingsScreen*>(ctx)->handle_set_pin_result(result);
+}
+
+void SecuritySettingsScreen::handle_set_pin_result(security::pin::VerifyResult result)
+{
+    checking_ = false;
+
+    const bool ok = (result == security::pin::VerifyResult::Success);
+    if (!ok) {
+        settings::SecuritySettings rollback = settings::all().security;
+        rollback.pin_length = previous_pin_length_;
+        settings::set_security(rollback);
+    }
+
+    old_pin_.clear();
+    new_pin_.clear();
+    mode_ = Mode::Browse;
+    lv_obj_clean(content_parent_);
+    build_rows();
+
+    if (ok) {
+        ESP_LOGI(TAG, "PIN changed");
+        lv_label_set_text(status_label_, "PIN changed");
+    } else {
+        ESP_LOGI(TAG, "PIN change failed");
+        lv_label_set_text(status_label_, "PIN change failed");
+    }
+}
+
+void SecuritySettingsScreen::on_old_pin_check_done(security::pin::VerifyResult result, void* ctx)
+{
+    static_cast<SecuritySettingsScreen*>(ctx)->handle_old_pin_result(result);
+}
+
+void SecuritySettingsScreen::handle_old_pin_result(security::pin::VerifyResult result)
+{
+    checking_ = false;
+
+    if (result != security::pin::VerifyResult::Success) {
+        old_pin_.clear();
+
+        if (result == security::pin::VerifyResult::LockedOut) {
+            show_pin_step("Locked out, try later");
+        } else if (result == security::pin::VerifyResult::WipeRequired) {
+            // NOTE: reaching the wipe threshold here (verifying the OLD
+            // PIN while changing it) does NOT trigger an actual wipe --
+            // only LockScreen's unlock path does. The device is already
+            // Unlocked to reach this screen at all, so the vault isn't
+            // protected by a wipe here either way; this is a deliberate
+            // scope decision, not an oversight -- flagged for you to
+            // confirm it's the behavior you want.
+            show_pin_step("Too many failed attempts");
+        } else {
+            const uint8_t remaining = security::pin::attempts_remaining();
+            char buf[48];
+            if (remaining > 0) {
+                std::snprintf(buf, sizeof(buf), "Wrong current PIN, %u left",
+                              static_cast<unsigned>(remaining));
+            } else {
+                const uint8_t until_wipe = security::pin::attempts_until_wipe();
+                std::snprintf(buf, sizeof(buf), "Wrong PIN! %u attempts until vault wipe",
+                              static_cast<unsigned>(until_wipe));
+            }
+            show_pin_step(buf);
+        }
+        return;
+    }
+
+    change_step_ = ChangePinStep::New;
+    show_pin_step();
 }
 
 void SecuritySettingsScreen::cancel_change_pin()
@@ -386,6 +421,10 @@ void SecuritySettingsScreen::cancel_change_pin()
 
 bool SecuritySettingsScreen::on_input(InputAction action)
 {
+    if (checking_) {
+        return true; // swallow everything while the async check runs
+    }
+
     if (mode_ == Mode::ChangingPin) {
         const bool consumed = pin_entry_.on_input(action);
 
