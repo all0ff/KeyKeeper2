@@ -1,12 +1,9 @@
 #include "ui/screens/main_menu.hpp"
 
 #include "ui/screens/about_screen.hpp"
+#include "ui/screens/accounts_screen.hpp"
 #include "ui/screens/backup_screen.hpp"
-#include "ui/screens/categories_screen.hpp"
-#include "ui/screens/favorites_screen.hpp"
-#include "ui/screens/search_screen.hpp"
 #include "ui/screens/settings_screen.hpp"
-#include "ui/screens/vault_list_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -24,10 +21,7 @@ namespace {
 constexpr char TAG[] = "ui.main_menu";
 
 constexpr const char* ITEM_NAMES[] = {
-    "Vault",
-    "Favorites",
-    "Categories",
-    "Search",
+    "Accounts",
     "Settings",
     "Backup",
     "Lock",
@@ -104,7 +98,7 @@ void MainMenu::on_show()
      * created by LockScreen::try_unlock(). Resetting selection here
      * keeps the menu deterministic whenever it becomes active again.
      */
-    selected_ = Item::Vault;
+    selected_ = Item::Accounts;
 
     if (status_label_ != nullptr) {
         lv_label_set_text(status_label_, "");
@@ -212,8 +206,6 @@ void MainMenu::refresh()
         }
     }
 
-    // With 8 items now, the menu no longer always fits in the visible
-    // content area -- keep the selected row in view as it moves.
     if (item_labels_[selected_index] != nullptr) {
         lv_obj_scroll_to_view(item_labels_[selected_index], LV_ANIM_ON);
     }
@@ -222,24 +214,9 @@ void MainMenu::refresh()
 void MainMenu::activate()
 {
     switch (selected_) {
-        case Item::Vault:
-            manager().push(std::make_unique<VaultListScreen>());
-            ESP_LOGI(TAG, "Vault selected");
-            break;
-
-        case Item::Favorites:
-            manager().push(std::make_unique<FavoritesScreen>());
-            ESP_LOGI(TAG, "Favorites selected");
-            break;
-
-        case Item::Categories:
-            manager().push(std::make_unique<CategoriesScreen>());
-            ESP_LOGI(TAG, "Categories selected");
-            break;
-
-        case Item::Search:
-            manager().push(std::make_unique<SearchScreen>());
-            ESP_LOGI(TAG, "Search selected");
+        case Item::Accounts:
+            manager().push(std::make_unique<AccountsScreen>());
+            ESP_LOGI(TAG, "Accounts selected");
             break;
 
         case Item::Settings:

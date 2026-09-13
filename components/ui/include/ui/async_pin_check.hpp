@@ -54,9 +54,10 @@ class AsyncPinCheck
 public:
     enum class Kind : uint8_t
     {
-        Unlock, ///< security::lock::unlock(pin) -- transitions device state on success.
-        Verify, ///< security::pin::verify(pin) -- read-only check, doesn't change lock state.
-        SetPin, ///< security::pin::set_pin(new_pin, old_pin) -- see start_set_pin().
+        Unlock,       ///< security::lock::unlock(pin) -- transitions device state on success.
+        Verify,       ///< security::pin::verify(pin) -- read-only check, doesn't change lock state.
+        SetPin,       ///< security::pin::set_pin(new_pin, old_pin) -- see start_set_pin().
+        SetDuressPin, ///< security::pin::set_duress_pin(duress_pin, current_pin) -- see start_set_duress_pin().
     };
 
     using ResultCallback = void (*)(security::pin::VerifyResult result, void* ctx);
@@ -90,6 +91,17 @@ public:
      * is already Unlocked to reach that screen at all).
      */
     void start_set_pin(const char* new_pin, const char* old_pin, ResultCallback on_done, void* ctx);
+
+    /**
+     * @brief Async wrapper for security::pin::set_duress_pin(duress_pin,
+     *        current_pin) -- shares SetPin's "two PINs, bool result
+     *        mapped to Success/WrongPin" shape, just a different
+     *        underlying pin_manager call. current_pin is required
+     *        (unlike start_set_pin()'s old_pin, which may legitimately
+     *        be nullptr for first-time setup) -- set_duress_pin()
+     *        always needs to verify it.
+     */
+    void start_set_duress_pin(const char* duress_pin, const char* current_pin, ResultCallback on_done, void* ctx);
 
     bool is_running() const { return running_; }
 

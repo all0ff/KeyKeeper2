@@ -49,10 +49,16 @@ State state();
 
 /**
  * @brief Attempt to unlock with a PIN guess. Delegates to
- *        security::pin::verify().
+ *        security::pin::verify() -- and, first, security::pin::verify_duress()
+ *        if a duress PIN is configured (see pin_manager.hpp's
+ *        VerifyResult::DuressTriggered).
  *
- * On pin::VerifyResult::Success: transitions to Unlocked, begins a
- * session, publishes DeviceUnlocked.
+ * On pin::VerifyResult::Success OR DuressTriggered: transitions to
+ * Unlocked, begins a session, publishes DeviceUnlocked -- identically
+ * in both cases, deliberately (see DuressTriggered's doc comment for
+ * why). The caller is responsible for wiping the vault when
+ * DuressTriggered is returned; this function does not (security::
+ * must not depend on vault::).
  */
 pin::VerifyResult unlock(const char* pin);
 

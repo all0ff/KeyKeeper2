@@ -27,6 +27,12 @@
 // MainMenu (GUI.md 8/9) -- no back-stack entry is left for LockScreen
 // itself, so BACK from Main Menu goes to QuickScreen, not back into
 // the PIN screen.
+//
+// If the entered PIN is the configured DURESS PIN instead of the
+// regular one (security::pin::VerifyResult::DuressTriggered -- see
+// pin_manager.hpp), this screen wipes the vault and proceeds to
+// MainMenu exactly as if it were a real success -- no visible
+// difference. See handle_result()'s own comment.
 // =============================================================================
 
 namespace ui::screens {

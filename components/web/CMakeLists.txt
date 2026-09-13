@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "src/web_service.cpp"
+        "src/web_vault_routes.cpp"
 
     INCLUDE_DIRS
         "include"
@@ -9,6 +10,7 @@ idf_component_register(
         security
         settings
         wifi
+        vault
         event_bus
         esp_http_server
         log

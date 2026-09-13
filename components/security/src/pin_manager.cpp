@@ -59,6 +59,15 @@ bool initialized = false;
 bool pin_set = false;
 StoredPin stored{};
 
+// Duress PIN -- same StoredPin shape, different NVS key. See
+// pin_manager.hpp's VerifyResult::DuressTriggered doc comment for the
+// full design; kept as a plain duplicate of the regular PIN's storage
+// rather than generalized into a template/helper, since there are
+// exactly two of these and both are small.
+constexpr char NVS_DURESS_KEY[] = "duress_pin";
+bool duress_pin_set = false;
+StoredPin stored_duress{};
+
 uint8_t consecutive_failures = 0;
 uint32_t lockout_started_ms = 0;
 bool locked_out = false;
@@ -250,6 +259,15 @@ bool init()
         ESP_LOGI(TAG, "No valid PIN set yet (first boot or old PIN format)");
     }
 
+    size_t duress_len = sizeof(stored_duress);
+    if (storage::nvs::get_blob(NVS_NAMESPACE, NVS_DURESS_KEY, &stored_duress, duress_len) &&
+        duress_len == sizeof(stored_duress) && stored_pin_valid(stored_duress)) {
+        duress_pin_set = true;
+        ESP_LOGI(TAG, "Duress PIN loaded from NVS");
+    } else {
+        duress_pin_set = false;
+    }
+
     // Restore failure progress from the flash checkpoint, NOT a plain
     // reset -- see verify()'s doc comment for why: a reboot must never
     // let an attacker regain attempts below the last checkpoint
@@ -318,6 +336,13 @@ bool set_pin(const char* new_pin, const char* old_pin)
     stored = next;
     pin_set = true;
     reset_failure_state();
+
+    // Any previously configured duress PIN is tied to the OLD regular
+    // PIN (same length requirement, chosen to be distinct from it) --
+    // clear it so the user must consciously re-configure it after any
+    // regular PIN change, rather than silently carrying over a value
+    // that may no longer even be the right length.
+    clear_duress_pin();
 
     if (event_bus::is_initialized()) {
         event_bus::publish(event_bus::Category::System,
@@ -420,6 +445,95 @@ bool is_locked_out()
 {
     check_lockout_expiry();
     return locked_out;
+}
+
+bool has_duress_pin()
+{
+    return duress_pin_set;
+}
+
+bool set_duress_pin(const char* duress_pin, const char* current_pin)
+{
+    if (!initialized || !pin_set) {
+        ESP_LOGW(TAG, "set_duress_pin: no regular PIN configured yet");
+        return false;
+    }
+    if (current_pin == nullptr || verify(current_pin) != VerifyResult::Success) {
+        ESP_LOGW(TAG, "set_duress_pin: current PIN verification failed");
+        return false;
+    }
+    if (!pin_length_ok(duress_pin)) {
+        return false;
+    }
+    if (std::strcmp(duress_pin, current_pin) == 0) {
+        // Identical to the regular PIN would mean every normal
+        // unlock also silently wipes the vault -- not what anyone
+        // wants.
+        ESP_LOGW(TAG, "set_duress_pin: duress PIN must differ from the regular PIN");
+        return false;
+    }
+
+    StoredPin next{};
+    next.magic = PIN_BLOB_MAGIC;
+    next.version = PIN_BLOB_VERSION;
+    generate_salt(next.salt);
+    if (!compute_hash(next.salt, duress_pin, next.hash)) {
+        ESP_LOGE(TAG, "set_duress_pin: PBKDF2 computation failed");
+        return false;
+    }
+
+    if (!storage::nvs::set_blob(NVS_NAMESPACE, NVS_DURESS_KEY, &next, sizeof(next))) {
+        ESP_LOGE(TAG, "Failed to persist duress PIN to NVS");
+        return false;
+    }
+
+    stored_duress = next;
+    duress_pin_set = true;
+    ESP_LOGI(TAG, "Duress PIN configured");
+    return true;
+}
+
+bool clear_duress_pin()
+{
+    if (!initialized) {
+        return false;
+    }
+    if (!duress_pin_set) {
+        return true; // nothing to do
+    }
+
+    if (!storage::nvs::erase_key(NVS_NAMESPACE, NVS_DURESS_KEY)) {
+        ESP_LOGE(TAG, "Failed to erase duress PIN from NVS");
+        return false;
+    }
+
+    std::memset(&stored_duress, 0, sizeof(stored_duress));
+    duress_pin_set = false;
+    ESP_LOGI(TAG, "Duress PIN cleared");
+    return true;
+}
+
+bool verify_duress(const char* pin)
+{
+    if (!initialized || !duress_pin_set || !pin_length_ok(pin)) {
+        return false;
+    }
+
+    uint8_t candidate_hash[HASH_LEN]{};
+    if (!compute_hash(stored_duress.salt, pin, candidate_hash)) {
+        return false;
+    }
+
+    uint8_t diff = 0;
+    for (size_t i = 0; i < HASH_LEN; ++i) {
+        diff |= static_cast<uint8_t>(candidate_hash[i] ^ stored_duress.hash[i]);
+    }
+    std::memset(candidate_hash, 0, sizeof(candidate_hash));
+
+    // Deliberately NOT constant-time relative to a wrong-PIN
+    // verify() call in terms of overall unlock duration -- see
+    // security::lock::unlock()'s own comment on that tradeoff.
+    return diff == 0;
 }
 
 } // namespace security::pin

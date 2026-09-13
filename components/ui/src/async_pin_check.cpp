@@ -42,21 +42,29 @@ void AsyncPinCheck::task_entry(void* arg)
 {
     SharedState* state = static_cast<SharedState*>(arg);
 
-    security::pin::VerifyResult result;
+    security::pin::VerifyResult result = security::pin::VerifyResult::WrongPin;
+
     switch (state->kind) {
         case Kind::Unlock:
             result = security::lock::unlock(state->pin);
             break;
+
         case Kind::Verify:
             result = security::pin::verify(state->pin);
             break;
-        case Kind::SetPin:
-        default: {
+
+        case Kind::SetPin: {
             const bool ok = security::pin::set_pin(state->pin, state->has_old_pin ? state->old_pin : nullptr);
-            // set_pin() returns bool, not a VerifyResult -- map to the
-            // same Success/WrongPin the other two kinds use so every
-            // caller can share one callback signature. Don't read
-            // anything more specific than success/failure into this.
+            // set_pin() returns bool, not a VerifyResult -- map to
+            // Success/WrongPin so every Kind can share one callback
+            // signature. Don't read anything more specific than
+            // success/failure into this.
+            result = ok ? security::pin::VerifyResult::Success : security::pin::VerifyResult::WrongPin;
+            break;
+        }
+
+        case Kind::SetDuressPin: {
+            const bool ok = security::pin::set_duress_pin(state->pin, state->old_pin);
             result = ok ? security::pin::VerifyResult::Success : security::pin::VerifyResult::WrongPin;
             break;
         }
@@ -158,6 +166,23 @@ void AsyncPinCheck::start_set_pin(const char* new_pin, const char* old_pin, Resu
         state->has_old_pin = true;
         std::strncpy(state->old_pin, old_pin, sizeof(state->old_pin) - 1);
     }
+
+    launch(state, on_done, ctx);
+}
+
+void AsyncPinCheck::start_set_duress_pin(const char* duress_pin, const char* current_pin, ResultCallback on_done,
+                                          void* ctx)
+{
+    if (running_) {
+        ESP_LOGW(TAG, "start_set_duress_pin() called while a check is already running -- ignoring");
+        return;
+    }
+
+    auto* state = new SharedState();
+    state->kind = Kind::SetDuressPin;
+    std::strncpy(state->pin, duress_pin, sizeof(state->pin) - 1);
+    state->has_old_pin = true;
+    std::strncpy(state->old_pin, current_pin, sizeof(state->old_pin) - 1);
 
     launch(state, on_done, ctx);
 }

@@ -8,6 +8,7 @@ idf_component_register(
         "src/screens/lock_screen.cpp"
         "src/screens/setup_pin_screen.cpp"
         "src/screens/main_menu.cpp"
+        "src/screens/accounts_screen.cpp"
         "src/screens/vault_list_screen.cpp"
         "src/screens/account_view_screen.cpp"
         "src/screens/account_edit_screen.cpp"

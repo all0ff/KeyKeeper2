@@ -19,6 +19,25 @@ enum class VerifyResult : uint8_t
     LockedOut,
     WipeRequired,
     NoPinSet,
+
+    /// The DURESS PIN was entered, not the regular one. Only ever
+    /// returned by security::lock::unlock() -- see that function's
+    /// doc comment for why security::pin::verify() itself never
+    /// returns this (it's not what "verify a PIN" means in general,
+    /// only in the specific context of an unlock attempt).
+    ///
+    /// The caller (ui::screens::LockScreen) MUST treat this exactly
+    /// like Success -- same screen transition, same log tone, no
+    /// visible "wiped" message -- except it ALSO wipes the vault
+    /// (vault::repository::wipe() -- NOT the PIN itself, so the
+    /// device keeps behaving completely normally afterward, same PIN
+    /// still works). The whole point of a duress PIN is that entering
+    /// it looks, from the outside, exactly like entering the real
+    /// one -- see pin_manager.cpp's duress PIN section for the full
+    /// design reasoning (why the vault is wiped, not the PIN; why the
+    /// duress PIN doesn't reset on its own after triggering; why it
+    /// resets when the regular PIN changes).
+    DuressTriggered,
 };
 
 bool init();
@@ -78,5 +97,44 @@ uint8_t attempts_remaining();
 uint8_t attempts_until_wipe();
 
 bool is_locked_out();
+
+/**
+ * @brief Duress PIN -- an alternate PIN, same length as the regular
+ *        one, that silently wipes the vault when entered at unlock
+ *        instead of granting real access to it. See VerifyResult's
+ *        DuressTriggered value and pin_manager.cpp for the full
+ *        design.
+ */
+bool has_duress_pin();
+
+/**
+ * @brief Configure (or replace) the duress PIN.
+ *
+ * current_pin must verify successfully against the REGULAR PIN first
+ * (same "prove you already know it" gate set_pin() uses for its own
+ * old_pin parameter). duress_pin must pass the same length rule as
+ * the regular PIN (pin_length_ok()) and must NOT equal current_pin --
+ * an identical duress/regular PIN would silently wipe the vault on
+ * every normal unlock, which defeats the entire point.
+ */
+bool set_duress_pin(const char* duress_pin, const char* current_pin);
+
+/**
+ * @brief Clear the stored duress PIN, if any.
+ *
+ * Called automatically by set_pin() whenever the regular PIN changes
+ * (see that function's doc comment) -- also callable directly (e.g.
+ * from Security Settings) to disable the feature without changing
+ * the regular PIN.
+ */
+bool clear_duress_pin();
+
+/// Used only by security::lock::unlock() -- see VerifyResult's
+/// DuressTriggered doc comment for why this is a separate function
+/// from verify() rather than folded into it (verify() is also used
+/// for re-confirming the current PIN in non-unlock contexts, e.g.
+/// Change PIN's old-PIN step, where a duress match must NOT be
+/// treated specially).
+bool verify_duress(const char* pin);
 
 } // namespace security::pin

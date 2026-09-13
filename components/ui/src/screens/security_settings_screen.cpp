@@ -5,8 +5,11 @@
 
 #include "security/pin_manager.hpp"
 #include "settings/settings.hpp"
+#include "vault/vault_repository.hpp"
+#include "wifi/wifi_service.hpp"
 
 #include "esp_log.h"
+#include "esp_system.h"
 
 #include <cstdio>
 
@@ -39,6 +42,8 @@ const char* SecuritySettingsScreen::footer_hint() const
         case Mode::Adjust:
             return "ROTATE  Change    OK/BACK  Confirm";
         case Mode::ChangingPin:
+            return "ROTATE Digit OK Next Hold OK Done BACK Erase/Cancel";
+        case Mode::SettingDuressPin:
             return "ROTATE Digit OK Next Hold OK Done BACK Erase/Cancel";
         default:
             return "OK  Open    BACK  Cancel";
@@ -98,6 +103,20 @@ void SecuritySettingsScreen::render_rows()
                 lv_label_set_text_fmt(row_labels_[i], "%sChange PIN", prefix);
                 break;
 
+            case Row::DuressPin:
+                lv_label_set_text_fmt(row_labels_[i], "%sDuress PIN: %s", prefix,
+                                       security::pin::has_duress_pin() ? "Configured" : "Not set");
+                break;
+
+            case Row::FactoryReset:
+                if (is_selected && factory_reset_confirm_pending_) {
+                    lv_obj_set_style_text_color(row_labels_[i], pal.error, 0);
+                    lv_label_set_text_fmt(row_labels_[i], "%sFactory Reset (confirm?)", prefix);
+                } else {
+                    lv_label_set_text_fmt(row_labels_[i], "%sFactory Reset", prefix);
+                }
+                break;
+
             case Row::AutoLock:
                 if (auto_lock_timeout_s_ == 0) {
                     lv_label_set_text_fmt(row_labels_[i], "%sAuto Lock: off", prefix);
@@ -135,6 +154,7 @@ void SecuritySettingsScreen::move_selection(int32_t delta)
     }
     selected_row_ = static_cast<size_t>(index);
 
+    factory_reset_confirm_pending_ = false;
     if (status_label_ != nullptr) {
         lv_label_set_text(status_label_, "");
     }
@@ -181,6 +201,20 @@ void SecuritySettingsScreen::activate()
 
     if (row == Row::ChangePin) {
         begin_change_pin();
+        return;
+    }
+    if (row == Row::DuressPin) {
+        begin_duress_pin_setup();
+        return;
+    }
+    if (row == Row::FactoryReset) {
+        if (!factory_reset_confirm_pending_) {
+            factory_reset_confirm_pending_ = true;
+            render_rows();
+            lv_label_set_text(status_label_, "This erases EVERYTHING. Press OK again to confirm.");
+            return;
+        }
+        perform_factory_reset();
         return;
     }
     if (row == Row::Save) {
@@ -419,6 +453,170 @@ void SecuritySettingsScreen::cancel_change_pin()
     lv_label_set_text(status_label_, "PIN change cancelled");
 }
 
+void SecuritySettingsScreen::begin_duress_pin_setup()
+{
+    mode_ = Mode::SettingDuressPin;
+    duress_step_ = DuressPinStep::CurrentPin;
+    duress_current_pin_.clear();
+    duress_new_pin_.clear();
+    show_duress_pin_step();
+}
+
+void SecuritySettingsScreen::show_duress_pin_step(const char* error /* = nullptr */)
+{
+    lv_obj_clean(content_parent_);
+    status_label_ = nullptr; // object just got destroyed above -- honestly null it out
+
+    const theme::Palette& pal = theme::current();
+    lv_obj_t* header = lv_label_create(content_parent_);
+    lv_obj_set_style_text_color(header, pal.secondary_text, 0);
+
+    const char* text = "";
+    switch (duress_step_) {
+        case DuressPinStep::CurrentPin: text = "Enter current PIN"; break;
+        case DuressPinStep::EnterNew:   text = "Enter duress PIN"; break;
+        case DuressPinStep::Confirm:    text = "Confirm duress PIN"; break;
+    }
+    lv_label_set_text(header, text);
+    lv_obj_align(header, LV_ALIGN_TOP_MID, 0, 4);
+
+    if (error != nullptr) {
+        lv_obj_t* err = lv_label_create(content_parent_);
+        lv_obj_set_style_text_color(err, pal.warning, 0);
+        lv_label_set_text(err, error);
+        lv_obj_align(err, LV_ALIGN_TOP_MID, 0, 24);
+    }
+
+    // Fixed at the CURRENT regular PIN's length for all three steps
+    // -- "same length as the current PIN" is the whole point, unlike
+    // Change PIN's New/Confirm steps, which allow a flexible 4-6
+    // length since you're choosing a length there.
+    widgets::PinEntry::Config cfg{};
+    cfg.length = settings::all().security.pin_length;
+    if (cfg.length < 4 || cfg.length > 6) {
+        cfg.length = 6;
+    }
+    cfg.min_length = cfg.length;
+    cfg.finish_on_short = true;
+
+    pin_entry_.init(content_parent_, cfg);
+}
+
+void SecuritySettingsScreen::handle_duress_pin_step_complete()
+{
+    switch (duress_step_) {
+        case DuressPinStep::CurrentPin:
+            // Collected, not verified yet -- see security_settings_screen.hpp's
+            // file comment for why (verification happens once, inside
+            // the single async set_duress_pin() call at Confirm).
+            duress_current_pin_ = pin_entry_.pin();
+            pin_entry_.reset();
+            duress_step_ = DuressPinStep::EnterNew;
+            show_duress_pin_step();
+            return;
+
+        case DuressPinStep::EnterNew:
+            duress_new_pin_ = pin_entry_.pin();
+            pin_entry_.reset();
+            duress_step_ = DuressPinStep::Confirm;
+            show_duress_pin_step();
+            return;
+
+        case DuressPinStep::Confirm: {
+            const std::string confirm_pin = pin_entry_.pin();
+            pin_entry_.reset();
+
+            if (confirm_pin != duress_new_pin_) {
+                duress_current_pin_.clear();
+                duress_new_pin_.clear();
+                mode_ = Mode::Browse;
+                lv_obj_clean(content_parent_);
+                build_rows();
+                lv_label_set_text(status_label_, "Duress PINs did not match");
+                return;
+            }
+
+            checking_ = true;
+            show_duress_pin_step("Checking...");
+            async_check_.start_set_duress_pin(duress_new_pin_.c_str(), duress_current_pin_.c_str(),
+                                               &SecuritySettingsScreen::on_duress_set_done, this);
+            return;
+        }
+    }
+}
+
+void SecuritySettingsScreen::on_duress_set_done(security::pin::VerifyResult result, void* ctx)
+{
+    static_cast<SecuritySettingsScreen*>(ctx)->handle_duress_set_result(result);
+}
+
+void SecuritySettingsScreen::handle_duress_set_result(security::pin::VerifyResult result)
+{
+    checking_ = false;
+
+    const bool ok = (result == security::pin::VerifyResult::Success);
+
+    duress_current_pin_.clear();
+    duress_new_pin_.clear();
+    mode_ = Mode::Browse;
+    lv_obj_clean(content_parent_);
+    build_rows();
+
+    if (ok) {
+        ESP_LOGI(TAG, "Duress PIN configured");
+        lv_label_set_text(status_label_, "Duress PIN set");
+    } else {
+        // Covers both "current PIN was wrong" and "duress PIN equals
+        // the regular PIN" (set_duress_pin() rejects both, see
+        // pin_manager.cpp) -- deliberately one generic message rather
+        // than distinguishing them, so a wrong-current-PIN attempt
+        // here doesn't leak useful timing/feedback beyond "it failed".
+        ESP_LOGW(TAG, "Duress PIN setup failed");
+        lv_label_set_text(status_label_, "Duress PIN setup failed");
+    }
+}
+
+void SecuritySettingsScreen::cancel_duress_pin_setup()
+{
+    duress_current_pin_.clear();
+    duress_new_pin_.clear();
+    mode_ = Mode::Browse;
+    lv_obj_clean(content_parent_);
+    build_rows();
+    lv_label_set_text(status_label_, "Duress PIN setup cancelled");
+}
+
+void SecuritySettingsScreen::perform_factory_reset()
+{
+    ESP_LOGW(TAG, "Factory reset requested from Security Settings");
+
+    // Same order as the automatic brute-force wipe (LockScreen's
+    // WipeRequired case): vault first, then the PIN, only proceeding
+    // if the previous step succeeded.
+    const bool vault_wiped = vault::repository::wipe();
+    const bool pin_wiped = vault_wiped && security::pin::wipe();
+    const bool settings_reset = pin_wiped && settings::reset_to_defaults();
+
+    if (!settings_reset) {
+        factory_reset_confirm_pending_ = false;
+        ESP_LOGE(TAG, "Factory reset failed (vault=%d, pin=%d, settings=%d)", vault_wiped ? 1 : 0,
+                  pin_wiped ? 1 : 0, settings_reset ? 1 : 0);
+        lv_label_set_text(status_label_, "Factory reset failed");
+        render_rows();
+        return;
+    }
+
+    // settings::reset_to_defaults() only rewrites the STORED WiFi
+    // config back to Disabled -- it doesn't stop an already-running
+    // radio. apply_settings() re-reads that stored config and acts
+    // on it immediately, matching WifiSettingsScreen's own Save.
+    wifi::apply_settings();
+
+    ESP_LOGW(TAG, "Factory reset complete -- restarting");
+    lv_label_set_text(status_label_, "Reset complete. Restarting...");
+    esp_restart(); // does not return -- same pattern as BackupScreen's Restore, no delay needed
+}
+
 bool SecuritySettingsScreen::on_input(InputAction action)
 {
     if (checking_) {
@@ -436,6 +634,20 @@ bool SecuritySettingsScreen::on_input(InputAction action)
             // BackShort with nothing typed at this step -- cancel the
             // whole change-PIN flow, not just this one step.
             cancel_change_pin();
+            return true;
+        }
+        return true;
+    }
+
+    if (mode_ == Mode::SettingDuressPin) {
+        const bool consumed = pin_entry_.on_input(action);
+
+        if (pin_entry_.is_complete()) {
+            handle_duress_pin_step_complete();
+            return true;
+        }
+        if (!consumed) {
+            cancel_duress_pin_setup();
             return true;
         }
         return true;

@@ -5,6 +5,8 @@
 #include "security/pin_manager.hpp"
 #include "settings/settings.hpp"
 #include "wifi/wifi_service.hpp"
+#include "web_json_helpers.hpp"
+#include "web_vault_routes.hpp"
 
 #include "cJSON.h"
 #include "esp_http_server.h"
@@ -28,38 +30,6 @@ void publish(WebEventId id)
         return;
     }
     event_bus::publish(event_bus::Category::Web, static_cast<uint32_t>(id));
-}
-
-// -----------------------------------------------------------------
-// JSON response helpers -- {"status":"ok","data":{...}} /
-// {"status":"error","message":"..."}, per docs/WEB.md section 7.
-// -----------------------------------------------------------------
-
-void respond_ok(httpd_req_t* req, cJSON* data)
-{
-    cJSON* root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "status", "ok");
-    cJSON_AddItemToObject(root, "data", (data != nullptr) ? data : cJSON_CreateObject());
-
-    char* text = cJSON_PrintUnformatted(root);
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, text, HTTPD_RESP_USE_STRLEN);
-    cJSON_free(text);
-    cJSON_Delete(root);
-}
-
-void respond_error(httpd_req_t* req, const char* http_status_line, const char* message)
-{
-    cJSON* root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "status", "error");
-    cJSON_AddStringToObject(root, "message", message);
-
-    char* text = cJSON_PrintUnformatted(root);
-    httpd_resp_set_status(req, http_status_line);
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_send(req, text, HTTPD_RESP_USE_STRLEN);
-    cJSON_free(text);
-    cJSON_Delete(root);
 }
 
 // -----------------------------------------------------------------
@@ -243,6 +213,13 @@ bool start()
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    // Default max_uri_handlers is 8 -- root/login/status (3) + the 5
+    // vault CRUD routes registered by register_vault_routes() already
+    // hits that exactly, with zero room for anything added later
+    // (search, backup/restore/settings endpoints). Bump it with real
+    // headroom rather than relying on an unverified off-by-one at the
+    // boundary.
+    config.max_uri_handlers = 16;
 
     if (httpd_start(&server, &config) != ESP_OK) {
         ESP_LOGE(TAG, "httpd_start() failed");
@@ -271,6 +248,8 @@ bool start()
     httpd_register_uri_handler(server, &root_uri);
     httpd_register_uri_handler(server, &login_uri);
     httpd_register_uri_handler(server, &status_uri);
+
+    register_vault_routes(server);
 
     ESP_LOGI(TAG, "HTTP server started");
     publish(WebEventId::ServerStarted);

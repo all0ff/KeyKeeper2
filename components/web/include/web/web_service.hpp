@@ -3,12 +3,13 @@
 #include <cstdint>
 
 // =============================================================================
-// web -- WebService (docs/WEB.md, Phase B step 1)
+// web -- WebService (docs/WEB.md, Phase B)
 //
-// This first increment is deliberately narrow: an HTTP server plus
-// PIN-based login. NOT built yet: any REST endpoint for the vault
-// itself (list/view/create/edit/delete/search/backup/restore/
-// settings -- see WEB.md section 7's "Supported Operations"),
+// This component: an HTTP server, PIN-based login (this file), and
+// REST CRUD for individual vault entries (web_vault_routes.cpp, an
+// implementation-internal file -- see its own comment for the exact
+// routes). NOT built yet: search over REST, backup/restore/settings
+// over REST (WEB.md section 7's full "Supported Operations" list),
 // serving a real Web UI beyond the bare login page, or Captive
 // Portal. Those are separate, later increments.
 //

@@ -77,6 +77,14 @@ CONFIG_ESP_CONSOLE_UART_DEFAULT=y
 # Display driver configuration is implemented by components/display/.
 # ST7789 configuration belongs to the display component/BSP.
 
+# widgets::PinEntry (keyboard.cpp) explicitly uses Montserrat 16/18 --
+# neither was previously listed here explicitly (16 apparently came
+# from whatever LVGL's own Kconfig defaults enable). Making both
+# explicit so the font used in code is never left to an unconfirmed
+# default.
+CONFIG_LV_FONT_MONTSERRAT_16=y
+CONFIG_LV_FONT_MONTSERRAT_18=y
+
 
 # ------------------------------------------------------------
 # Partition table

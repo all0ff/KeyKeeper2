@@ -160,6 +160,33 @@ pin::VerifyResult unlock(const char* pin_guess)
         return pin::VerifyResult::NoPinSet;
     }
 
+    // Duress check runs FIRST, before the regular one, and only costs
+    // anything (an extra PBKDF2 pass) when a duress PIN is actually
+    // configured -- for everyone who hasn't set one up, unlock timing
+    // is completely unchanged. This does mean that, for someone who
+    // HAS configured a duress PIN, every WRONG regular-PIN attempt
+    // now takes roughly twice as long (duress check + regular
+    // check) as it did before -- a real, deliberate trade-off: making
+    // both checks always run unconditionally (constant-time
+    // regardless of outcome) would close a theoretical timing
+    // side-channel (an adversary who knows the normal ~10s unlock
+    // time could in principle notice a duress-configured device
+    // taking longer on a wrong guess), but would double every
+    // ordinary unlock's ~10s wait permanently, which directly
+    // contradicts what prompted making PIN checks async in the first
+    // place. Not implemented; flagged, not a silent decision.
+    if (pin::has_duress_pin() && pin::verify_duress(pin_guess)) {
+        // The actual vault wipe happens one layer up
+        // (ui::screens::LockScreen), which is allowed to depend on
+        // vault:: -- security:: must not (see vault.hpp's own file
+        // comment on the dependency direction). Transitioning to
+        // Unlocked HERE, exactly like a real success, is the whole
+        // point -- see pin_manager.hpp's DuressTriggered comment.
+        transition_to_unlocked();
+        ESP_LOGW(TAG, "Duress PIN entered -- proceeding as a normal unlock; caller must wipe the vault");
+        return pin::VerifyResult::DuressTriggered;
+    }
+
     const pin::VerifyResult result = pin::verify(pin_guess);
 
     if (result == pin::VerifyResult::Success) {

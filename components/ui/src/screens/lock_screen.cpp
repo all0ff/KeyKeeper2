@@ -104,6 +104,17 @@ void LockScreen::handle_result(security::pin::VerifyResult result)
     checking_ = false;
 
     switch (result) {
+        case security::pin::VerifyResult::DuressTriggered:
+            // Wipes the vault ONLY -- deliberately NOT the PIN (see
+            // pin_manager.hpp's DuressTriggered comment: the device
+            // must go on behaving completely normally afterward, same
+            // PIN still works, just an empty vault). Falls straight
+            // through to the exact same path as a real Success --
+            // same log line even -- no visible difference on screen.
+            ESP_LOGW(TAG, "Duress PIN triggered -- wiping vault silently");
+            vault::repository::wipe();
+            [[fallthrough]];
+
         case security::pin::VerifyResult::Success:
             ESP_LOGI(TAG, "Unlock successful");
             manager().replace(std::make_unique<MainMenu>());
