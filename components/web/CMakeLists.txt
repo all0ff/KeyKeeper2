@@ -7,11 +7,10 @@ idf_component_register(
 
     REQUIRES
         security
-        vault
+        settings
+        wifi
         event_bus
         esp_http_server
-        freertos
-        esp_system
         log
 
     # cJSON comes from espressif/cjson (see idf_component.yml) --

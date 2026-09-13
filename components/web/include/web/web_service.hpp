@@ -31,10 +31,16 @@
 //     auto-lock timeout) already ends the session everywhere, since
 //     it's the same global state.
 //   - A wrong PIN via the web login counts against the SAME staged
-//     lockout/wipe counter as on-device attempts (security::pin) --
-//     including the automatic wipe at the failure threshold. See
-//     web_service.cpp's login handler for why that's mirrored here
-//     rather than just reporting an error.
+//     lockout/wipe counter as on-device attempts (security::pin).
+//     Reaching the threshold via THIS endpoint does NOT trigger the
+//     vault/PIN wipe ui::screens::LockScreen performs for an
+//     on-device failure -- it disables Wi-Fi instead (persisted via
+//     settings::set_wifi(), so it stays off across reboots until
+//     re-enabled from WifiSettingsScreen). A remote brute-force
+//     attempt doesn't need a destructive, irreversible response the
+//     way repeated physical-device guesses might; cutting off the
+//     remote attack surface is proportionate and reversible. See
+//     web_service.cpp's login handler.
 //
 // SECURITY NOTE: the login endpoint sends the PIN in a plain HTTP
 // POST body -- no TLS. WEB.md's own Authentication & Security section

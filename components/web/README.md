@@ -8,7 +8,9 @@ same call the on-device LockScreen makes -- confirmed with the project
 owner as the intended design, including its consequences: an already-
 Unlocked device is reachable to any web client with no separate PIN
 check, there's no logout endpoint, and a wrong web PIN counts toward
-the same lockout/wipe threshold as on-device attempts).
+the same failure counter as on-device attempts, but reaching the
+threshold via web disables WiFi instead of wiping the vault -- see
+"What's here" below).
 
 ## What's here
 
@@ -16,10 +18,12 @@ the same lockout/wipe threshold as on-device attempts).
   inline CSS/JS, no framework). Not the real Web UI -- just enough to
   exercise the login endpoint from a browser without curl/Postman.
 - `POST /api/v1/auth/login` -- body `{"pin":"123456"}` ->
-  `security::lock::unlock()`. On `VerifyResult::WipeRequired`, mirrors
-  `ui::screens::LockScreen`'s wipe-and-restart exactly (same
-  `vault::repository::wipe()` + `security::pin::wipe()` sequence, then
-  `esp_restart()`).
+  `security::lock::unlock()`. On `VerifyResult::WipeRequired`,
+  deliberately does NOT mirror `ui::screens::LockScreen`'s
+  vault/PIN wipe -- instead disables WiFi (persisted via
+  `settings::set_wifi()`, stays off across reboots) since a remote
+  brute-force attempt doesn't warrant a destructive, irreversible
+  response the way repeated on-device guesses might.
 - `GET /api/v1/auth/status` -- `{"status":"ok","data":{"authenticated":bool}}`,
   reading `security::lock::state()` directly (shared session, no
   separate token to check).

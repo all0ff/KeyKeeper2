@@ -3,15 +3,12 @@
 #include "event_bus/event_bus.hpp"
 #include "security/lock_manager.hpp"
 #include "security/pin_manager.hpp"
-#include "vault/vault_repository.hpp"
+#include "settings/settings.hpp"
+#include "wifi/wifi_service.hpp"
 
 #include "cJSON.h"
 #include "esp_http_server.h"
 #include "esp_log.h"
-#include "esp_system.h"
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
 #include <algorithm>
 #include <cstring>
@@ -177,21 +174,26 @@ esp_err_t handle_login(httpd_req_t* req)
         }
 
         case security::pin::VerifyResult::WipeRequired: {
-            // Same threshold, same consequence, regardless of which
-            // door the 17th wrong guess came through -- see
-            // ui::screens::LockScreen's identical handling.
-            ESP_LOGW(TAG, "Automatic wipe requested after PIN failure threshold (web login)");
-            const bool vault_wiped = vault::repository::wipe();
-            const bool pin_wiped = vault_wiped && security::pin::wipe();
+            // Deliberately NOT the same response as
+            // ui::screens::LockScreen's WipeRequired case. A remote
+            // brute-force attempt over the network doesn't need a
+            // destructive, irreversible response the way repeated
+            // physical-device guesses might -- disabling Wi-Fi cuts
+            // off the remote attack surface entirely (reversibly: the
+            // owner can re-enable it from WifiSettingsScreen) without
+            // touching the vault or the PIN at all. This still shares
+            // pin_manager's single failure counter with on-device
+            // attempts -- whichever channel happens to receive the
+            // 17th failure decides the outcome (wipe if on-device,
+            // Wi-Fi disabled if via this endpoint).
+            ESP_LOGW(TAG, "PIN failure threshold reached via web login -- disabling WiFi instead of wiping");
 
-            if (pin_wiped) {
-                respond_error(req, "403 Forbidden", "Too many failed attempts -- device wiped, restarting");
-                vTaskDelay(pdMS_TO_TICKS(200)); // let the response actually go out first
-                esp_restart();
-            } else {
-                ESP_LOGE(TAG, "Automatic wipe failed (vault=%d, pin=%d)", vault_wiped ? 1 : 0, pin_wiped ? 1 : 0);
-                respond_error(req, "500 Internal Server Error", "Wipe failed");
-            }
+            settings::WifiSettings disabled = settings::all().wifi;
+            disabled.mode = settings::WifiMode::Disabled;
+            settings::set_wifi(disabled); // persisted -- stays off across reboots until re-enabled on-device
+            wifi::apply_settings();       // stop the radio right away, don't wait for a reboot
+
+            respond_error(req, "403 Forbidden", "Too many failed attempts -- WiFi disabled");
             return ESP_OK;
         }
 
