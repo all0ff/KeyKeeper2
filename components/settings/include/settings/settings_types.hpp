@@ -54,6 +54,19 @@ enum WebUiPermission : uint32_t
     WEB_UI_CHANGE_SETTINGS = 1u << 3,
 };
 
+/// REQUIREMENTS 11.1 lists Access Point / Station / Captive Portal
+/// support without specifying settings fields -- placeholder, see
+/// README.md. sta_password/ap_password sit in NVS in plaintext, same
+/// exposure as everything else in this project pre-Flash-Encryption
+/// (see components/security's scope note) -- not a separate, smaller
+/// risk.
+enum class WifiMode : uint8_t
+{
+    Disabled,
+    AccessPoint,
+    Station,
+};
+
 /// Which section changed -- carried as the payload of a
 /// SystemEventId::SettingsChanged event_bus event.
 enum class Section : uint8_t
@@ -62,6 +75,7 @@ enum class Section : uint8_t
     Usb,
     Security,
     Gui,
+    Wifi,
 };
 
 struct GeneralSettings
@@ -101,12 +115,22 @@ struct GuiSettings
     bool hints_enabled = true;
 };
 
+struct WifiSettings
+{
+    WifiMode mode = WifiMode::Disabled;
+    char sta_ssid[33] = "";     // 802.11 SSID: max 32 bytes + null terminator
+    char sta_password[65] = ""; // WPA2 passphrase: max 63 chars + null terminator
+    char ap_ssid[33] = "KeyKeeper2";
+    char ap_password[65] = ""; // empty = open AP
+};
+
 struct AllSettings
 {
     GeneralSettings general;
     UsbSettings usb;
     SecuritySettings security;
     GuiSettings gui;
+    WifiSettings wifi;
 };
 
 } // namespace settings

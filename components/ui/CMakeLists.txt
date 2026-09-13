@@ -21,6 +21,7 @@ idf_component_register(
         "src/screens/security_settings_screen.cpp"
         "src/screens/usb_settings_screen.cpp"
         "src/screens/system_info_screen.cpp"
+        "src/screens/wifi_settings_screen.cpp"
         "src/widgets/keyboard.cpp"
         "src/widgets/text_entry.cpp"
 
@@ -36,6 +37,7 @@ idf_component_register(
         storage
         vault
         usb
+        wifi
         esp_app_format
         efuse
         lvgl

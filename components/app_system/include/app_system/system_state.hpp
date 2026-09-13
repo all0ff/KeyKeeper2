@@ -38,6 +38,7 @@ enum class BootStage : uint8_t
     Storage,
     EventBus,
     Settings,
+    Wifi,
     Security,
     Vault,
     Usb,

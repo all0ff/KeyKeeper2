@@ -15,6 +15,7 @@
 #include "vault/vault.hpp"
 #include "ui/ui.hpp"
 #include "usb/usb_service.hpp"
+#include "wifi/wifi_service.hpp"
 
 #include "esp_log.h"
 
@@ -263,6 +264,33 @@ bool initialize_settings()
     return true;
 }
 
+bool initialize_wifi()
+{
+    state::set_boot_stage(state::BootStage::Wifi);
+    logger::boot_stage("Wifi");
+
+    if (!wifi::init()) {
+        report_failure(
+            state::BootStage::Wifi,
+            0,
+            "WiFi initialization failed"
+        );
+        return false;
+    }
+
+    // Brings up whatever mode was saved from a previous session
+    // (Disabled by default on first boot) -- not a hard failure if
+    // this doesn't succeed (e.g. a saved network is out of range):
+    // wifi::init() itself already succeeded, and the user can retry
+    // or change settings from the WiFi settings screen once one
+    // exists.
+    if (!wifi::apply_settings()) {
+        logger::error("WiFi apply_settings() did not start the configured mode");
+    }
+
+    return true;
+}
+
 bool initialize_security()
 {
     state::set_boot_stage(state::BootStage::Security);
@@ -401,6 +429,17 @@ bool init()
      * Settings
      */
     if (!initialize_settings()) {
+        return false;
+    }
+
+    /*
+     * WiFi -- needs settings:: (mode/credentials) and event_bus::
+     * (state-change publishing), both already up by this point.
+     * Deliberately NOT a hard failure gate for anything after it: a
+     * failed connection attempt shouldn't prevent the rest of the
+     * device from working (see initialize_wifi()'s own comment).
+     */
+    if (!initialize_wifi()) {
         return false;
     }
 

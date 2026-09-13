@@ -4,6 +4,7 @@
 #include "ui/screens/security_settings_screen.hpp"
 #include "ui/screens/system_info_screen.hpp"
 #include "ui/screens/usb_settings_screen.hpp"
+#include "ui/screens/wifi_settings_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -16,7 +17,7 @@ namespace {
 constexpr lv_coord_t ITEM_Y_START = 4;
 constexpr lv_coord_t ITEM_SPACING = 20;
 
-constexpr const char* ITEM_NAMES[] = {"General", "USB", "Security", "System"};
+constexpr const char* ITEM_NAMES[] = {"General", "USB", "Security", "System", "WiFi"};
 
 } // namespace
 
@@ -101,6 +102,10 @@ void SettingsScreen::activate()
 
         case Item::System:
             manager().push(std::make_unique<SystemInfoScreen>());
+            return;
+
+        case Item::Wifi:
+            manager().push(std::make_unique<WifiSettingsScreen>());
             return;
     }
 }

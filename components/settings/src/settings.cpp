@@ -84,6 +84,9 @@ bool init()
     if (!load_section("gui", current.gui)) {
         ESP_LOGI(TAG, "Using default GUI settings");
     }
+    if (!load_section("wifi", current.wifi)) {
+        ESP_LOGI(TAG, "Using default WiFi settings");
+    }
 
     initialized = true;
     ESP_LOGI(TAG, "Settings initialized (brightness=%u%%, pin_length=%u, language=%d)",
@@ -160,6 +163,20 @@ bool set_gui(const GuiSettings& value)
     return true;
 }
 
+bool set_wifi(const WifiSettings& value)
+{
+    if (!initialized) {
+        return false;
+    }
+    if (!save_section("wifi", value)) {
+        ESP_LOGE(TAG, "Failed to persist WiFi settings");
+        return false;
+    }
+    current.wifi = value;
+    publish_changed(Section::Wifi);
+    return true;
+}
+
 bool reset_to_defaults()
 {
     if (!initialized) {
@@ -171,6 +188,7 @@ bool reset_to_defaults()
     if (!set_usb(UsbSettings{})) ok = false;
     if (!set_security(SecuritySettings{})) ok = false;
     if (!set_gui(GuiSettings{})) ok = false;
+    if (!set_wifi(WifiSettings{})) ok = false;
 
     return ok;
 }

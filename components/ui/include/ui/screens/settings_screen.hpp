@@ -9,8 +9,14 @@
 // sections -- General, USB, Security, System. This screen is just the
 // hub list; each section is its own screen.
 //
+// WiFi added as a fifth section -- not in GUI.md 14's own list at
+// all (that document predates the Wi-Fi/Web subsystem entirely), but
+// there's nowhere better for it to live, and it follows the exact
+// same "list of settings sections" pattern as the other four.
+//
 // Each item pushes its own screen: GeneralSettingsScreen,
-// UsbSettingsScreen, SecuritySettingsScreen, SystemInfoScreen.
+// UsbSettingsScreen, SecuritySettingsScreen, SystemInfoScreen,
+// WifiSettingsScreen.
 // =============================================================================
 
 namespace ui::screens {
@@ -32,8 +38,9 @@ private:
         Usb,
         Security,
         System,
+        Wifi,
     };
-    static constexpr size_t ITEM_COUNT = 4;
+    static constexpr size_t ITEM_COUNT = 5;
 
     void render();
     void move_selection(int32_t delta);

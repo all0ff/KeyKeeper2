@@ -58,6 +58,7 @@ bool set_general(const GeneralSettings& value);
 bool set_usb(const UsbSettings& value);
 bool set_security(const SecuritySettings& value);
 bool set_gui(const GuiSettings& value);
+bool set_wifi(const WifiSettings& value);
 
 /**
  * @brief Reset every section to its default values and persist all

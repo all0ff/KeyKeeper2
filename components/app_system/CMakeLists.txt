@@ -19,6 +19,7 @@ idf_component_register(
         security
         vault
         usb
+        wifi
         ui
         esp_timer
         log
