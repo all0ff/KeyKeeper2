@@ -6,6 +6,7 @@
 
 #include "display/lvgl_port.hpp"
 #include "input/input.hpp"
+#include "security/lock_manager.hpp"
 #include "security/pin_manager.hpp"
 
 #include "esp_log.h"
@@ -70,6 +71,33 @@ void ui_task(void* /*arg*/)
     }
 }
 
+/**
+ * @brief On any transition to Locked -- however it happens (Main
+ *        Menu's explicit Lock action, auto-lock's idle timeout, a
+ *        wipe-triggered re-lock, ...) -- force the navigation stack
+ *        back down to the root screen (QuickScreen).
+ *
+ * security::lock::lock() only flips internal state and fires
+ * callbacks; nothing was subscribed to those callbacks before this,
+ * so no screen transition ever happened on its own -- this was the
+ * real reason auto-lock looked like it "did nothing".
+ *
+ * May run on a different task than ui_task (auto-lock's own task
+ * calls lock() directly) -- lvgl_port::lock() is a recursive mutex,
+ * so this is safe either way, including when it fires synchronously
+ * from within an already-lvgl_port::lock()-held call chain.
+ */
+void on_lock_state_changed(security::lock::State new_state, void* /*ctx*/)
+{
+    if (new_state != security::lock::State::Locked) {
+        return;
+    }
+
+    lvgl_port::lock();
+    manager.reset_to_root();
+    lvgl_port::unlock();
+}
+
 } // namespace
 
 bool init()
@@ -110,6 +138,8 @@ bool init()
         ESP_LOGE(TAG, "Failed to create ui task");
         return false;
     }
+
+    security::lock::register_callback(on_lock_state_changed, nullptr);
 
     initialized = true;
     ESP_LOGI(TAG, "UI initialized");

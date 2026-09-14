@@ -53,6 +53,18 @@ public:
     /// Main Menu shouldn't return to the Lock screen).
     void replace(std::unique_ptr<Screen> screen);
 
+    /**
+     * @brief Pop everything down to (and re-show) the root screen --
+     *        same Destroy semantics as pop(), just repeated until
+     *        only one screen is left. A no-op if already at the root.
+     *
+     * Used by ui.cpp's security::lock callback to force the screen
+     * back to QuickScreen on any transition to Locked, however it
+     * happened (auto-lock in particular has no other way to make
+     * itself visible -- see that callback's own comment).
+     */
+    void reset_to_root();
+
     Screen* active() const;
 
     /**

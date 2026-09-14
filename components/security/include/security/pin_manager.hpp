@@ -53,6 +53,19 @@ bool has_pin();
 bool set_pin(const char* new_pin, const char* old_pin);
 
 /**
+ * @brief Set a new PIN WITHOUT verifying the old one -- for callers
+ *        who have ALREADY proven it themselves, separately, in the
+ *        same logical flow (see set_pin() -- calling that here would
+ *        cost a second, entirely redundant ~10s PBKDF2 pass to
+ *        re-check something already confirmed). NOT a general
+ *        bypass -- only call this immediately after independently
+ *        verifying the caller is authorized. Returns false (no-op)
+ *        if no PIN exists yet -- this is specifically for the
+ *        change-PIN case, not first-time setup.
+ */
+bool set_pin_after_verify(const char* new_pin);
+
+/**
  * @brief Remove the stored PIN and reset PIN failure state.
  *
  * Intended for the completed automatic-wipe path. This does not modify
@@ -119,6 +132,17 @@ bool has_duress_pin();
  * every normal unlock, which defeats the entire point.
  */
 bool set_duress_pin(const char* duress_pin, const char* current_pin);
+
+/**
+ * @brief Set the duress PIN WITHOUT re-verifying current_pin -- for
+ *        callers who have ALREADY verified it themselves, separately
+ *        (see set_duress_pin() -- calling that here would cost a
+ *        second, entirely redundant ~10s PBKDF2 pass). NOT a general
+ *        bypass. current_pin's actual VALUE (not just proof of it) is
+ *        still required, for the length-match and distinctness
+ *        checks.
+ */
+bool set_duress_pin_after_verify(const char* duress_pin, const char* current_pin);
 
 /**
  * @brief Clear the stored duress PIN, if any.

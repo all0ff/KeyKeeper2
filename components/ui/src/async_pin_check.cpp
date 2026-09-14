@@ -1,5 +1,6 @@
 #include "ui/async_pin_check.hpp"
 
+#include "power/power.hpp"
 #include "security/lock_manager.hpp"
 
 #include "esp_log.h"
@@ -63,8 +64,20 @@ void AsyncPinCheck::task_entry(void* arg)
             break;
         }
 
+        case Kind::SetPinAfterVerify: {
+            const bool ok = security::pin::set_pin_after_verify(state->pin);
+            result = ok ? security::pin::VerifyResult::Success : security::pin::VerifyResult::WrongPin;
+            break;
+        }
+
         case Kind::SetDuressPin: {
             const bool ok = security::pin::set_duress_pin(state->pin, state->old_pin);
+            result = ok ? security::pin::VerifyResult::Success : security::pin::VerifyResult::WrongPin;
+            break;
+        }
+
+        case Kind::SetDuressPinAfterVerify: {
+            const bool ok = security::pin::set_duress_pin_after_verify(state->pin, state->old_pin);
             result = ok ? security::pin::VerifyResult::Success : security::pin::VerifyResult::WrongPin;
             break;
         }
@@ -93,6 +106,13 @@ void AsyncPinCheck::timer_callback(lv_timer_t* timer)
 {
     AsyncPinCheck* self = static_cast<AsyncPinCheck*>(lv_timer_get_user_data(timer));
     SharedState* state = self->state_;
+
+    // Keep the idle/screen-timeout timer from thinking the device has
+    // gone idle just because no BUTTON was pressed during the ~10-20s
+    // PBKDF2 wait. Ping every poll (100ms) the check is still
+    // running, not just once, so even a short display_off_timeout_s
+    // can't fire mid-check.
+    power::notify_activity();
 
     if (state == nullptr || !state->done) {
         return;
@@ -170,6 +190,22 @@ void AsyncPinCheck::start_set_pin(const char* new_pin, const char* old_pin, Resu
     launch(state, on_done, ctx);
 }
 
+void AsyncPinCheck::start_set_pin_after_verify(const char* new_pin, ResultCallback on_done, void* ctx)
+{
+    if (running_) {
+        ESP_LOGW(TAG, "start_set_pin_after_verify() called while a check is already running -- ignoring");
+        return;
+    }
+
+    auto* state = new SharedState();
+    state->kind = Kind::SetPinAfterVerify;
+    std::strncpy(state->pin, new_pin, sizeof(state->pin) - 1);
+    // No old_pin needed at all -- security::pin::set_pin_after_verify()
+    // doesn't take one.
+
+    launch(state, on_done, ctx);
+}
+
 void AsyncPinCheck::start_set_duress_pin(const char* duress_pin, const char* current_pin, ResultCallback on_done,
                                           void* ctx)
 {
@@ -181,6 +217,27 @@ void AsyncPinCheck::start_set_duress_pin(const char* duress_pin, const char* cur
     auto* state = new SharedState();
     state->kind = Kind::SetDuressPin;
     std::strncpy(state->pin, duress_pin, sizeof(state->pin) - 1);
+    state->has_old_pin = true;
+    std::strncpy(state->old_pin, current_pin, sizeof(state->old_pin) - 1);
+
+    launch(state, on_done, ctx);
+}
+
+void AsyncPinCheck::start_set_duress_pin_after_verify(const char* duress_pin, const char* current_pin,
+                                                       ResultCallback on_done, void* ctx)
+{
+    if (running_) {
+        ESP_LOGW(TAG, "start_set_duress_pin_after_verify() called while a check is already running -- ignoring");
+        return;
+    }
+
+    auto* state = new SharedState();
+    state->kind = Kind::SetDuressPinAfterVerify;
+    std::strncpy(state->pin, duress_pin, sizeof(state->pin) - 1);
+    // current_pin's VALUE is still needed (length-match/distinctness
+    // checks inside store_duress_pin()), just not re-verified -- same
+    // old_pin field, different Kind changes what pin_manager does
+    // with it.
     state->has_old_pin = true;
     std::strncpy(state->old_pin, current_pin, sizeof(state->old_pin) - 1);
 

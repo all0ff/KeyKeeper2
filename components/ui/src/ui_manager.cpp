@@ -144,6 +144,25 @@ void UiManager::replace(std::unique_ptr<Screen> screen)
     show_active();
 }
 
+void UiManager::reset_to_root()
+{
+    if (!initialized_ || stack_.size() <= 1) {
+        return;
+    }
+
+    hide_active();
+
+    while (stack_.size() > 1) {
+        Screen* leaving = stack_.back().get();
+        if (leaving->root() != nullptr) {
+            lv_obj_del(leaving->root());
+        }
+        stack_.pop_back();
+    }
+
+    show_active();
+}
+
 Screen* UiManager::active() const
 {
     return stack_.empty() ? nullptr : stack_.back().get();

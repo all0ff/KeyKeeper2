@@ -171,7 +171,19 @@ void set_backlight(bool enabled)
         return;
     }
 
-    internal::lcd().setBrightness(enabled ? current_brightness : 0);
+    if (enabled) {
+        // Reuse set_brightness()'s own percent -> 0-255 duty scaling.
+        // This used to call setBrightness(current_brightness) directly,
+        // passing current_brightness on its NATIVE 0-100 percent scale
+        // where LovyanGFX's setBrightness() expects 0-255 (see
+        // set_brightness()'s own comment) -- wrong by roughly 2.5x.
+        set_brightness(current_brightness);
+    } else {
+        // 0 means "off" on the SAME 0-255 scale set_brightness() uses
+        // -- correct regardless of the panel's invert wiring, since
+        // LovyanGFX's cfg.invert handles that translation internally.
+        internal::lcd().setBrightness(0);
+    }
 }
 
 void set_brightness(uint8_t percent)

@@ -374,17 +374,10 @@ bool has_pin()
     return pin_set;
 }
 
-bool set_pin(const char* new_pin, const char* old_pin)
+bool store_new_pin(const char* new_pin)
 {
-    if (!initialized || !pin_length_ok(new_pin)) {
+    if (!pin_length_ok(new_pin)) {
         return false;
-    }
-
-    if (pin_set) {
-        if (old_pin == nullptr || verify(old_pin) != VerifyResult::Success) {
-            ESP_LOGW(TAG, "set_pin: old PIN verification failed");
-            return false;
-        }
     }
 
     StoredPin next{};
@@ -392,7 +385,7 @@ bool set_pin(const char* new_pin, const char* old_pin)
     next.version = PIN_BLOB_VERSION;
     generate_salt(next.salt);
     if (!compute_hash(next.salt, new_pin, next.hash)) {
-        ESP_LOGE(TAG, "set_pin: PBKDF2 computation failed");
+        ESP_LOGE(TAG, "store_new_pin: PBKDF2 computation failed");
         return false;
     }
 
@@ -419,6 +412,48 @@ bool set_pin(const char* new_pin, const char* old_pin)
 
     ESP_LOGI(TAG, "PIN changed");
     return true;
+}
+
+bool set_pin(const char* new_pin, const char* old_pin)
+{
+    if (!initialized) {
+        return false;
+    }
+
+    if (pin_set) {
+        if (old_pin == nullptr || verify(old_pin) != VerifyResult::Success) {
+            ESP_LOGW(TAG, "set_pin: old PIN verification failed");
+            return false;
+        }
+    }
+
+    return store_new_pin(new_pin);
+}
+
+/**
+ * @brief Set a new PIN WITHOUT verifying the old one -- for callers
+ *        who have ALREADY proven it themselves, separately (e.g.
+ *        SecuritySettingsScreen's Change-PIN flow, which verifies the
+ *        old PIN as its own explicit first step before ever asking
+ *        for a new one). set_pin() re-verifying old_pin again right
+ *        before hashing new_pin would cost a second, entirely
+ *        redundant ~10s PBKDF2 pass for a foregone conclusion -- same
+ *        reasoning as security::lock::unlock_after_pin_set().
+ *
+ * NOT a general bypass -- only call this immediately after
+ * independently confirming the caller is authorized to change the
+ * PIN. Still enforces the same format/length rule as set_pin()
+ * (pin_length_ok()). Returns false (no-op) if no PIN exists yet --
+ * this is specifically for the change-PIN case, not first-time setup
+ * (use set_pin(new_pin, nullptr) for that).
+ */
+bool set_pin_after_verify(const char* new_pin)
+{
+    if (!initialized || !pin_set) {
+        return false;
+    }
+
+    return store_new_pin(new_pin);
 }
 
 bool wipe()
@@ -520,26 +555,17 @@ bool has_duress_pin()
     return duress_pin_set;
 }
 
-bool set_duress_pin(const char* duress_pin, const char* current_pin)
+bool store_duress_pin(const char* duress_pin, const char* current_pin)
 {
-    if (!initialized || !pin_set) {
-        ESP_LOGW(TAG, "set_duress_pin: no regular PIN configured yet");
-        return false;
-    }
-    if (current_pin == nullptr || verify(current_pin) != VerifyResult::Success) {
-        ESP_LOGW(TAG, "set_duress_pin: current PIN verification failed");
-        return false;
-    }
     if (!pin_format_ok(duress_pin)) {
         return false;
     }
     if (strlen(duress_pin) != strlen(current_pin)) {
-        // Must match the REGULAR pin's actual, just-verified length --
-        // deliberately NOT settings::all().security.pin_length (used
-        // to be), which could disagree with the real stored PIN for
-        // reasons that have nothing to do with the PIN itself. See
-        // pin_format_ok()'s comment for the same reasoning applied
-        // elsewhere.
+        // Must match the REGULAR pin's actual length -- deliberately
+        // NOT settings::all().security.pin_length, which could
+        // disagree with the real stored PIN for reasons that have
+        // nothing to do with the PIN itself. See pin_format_ok()'s
+        // comment for the same reasoning applied elsewhere.
         ESP_LOGW(TAG, "set_duress_pin: duress PIN must be the same length as the current PIN");
         return false;
     }
@@ -569,6 +595,47 @@ bool set_duress_pin(const char* duress_pin, const char* current_pin)
     duress_pin_set = true;
     ESP_LOGI(TAG, "Duress PIN configured");
     return true;
+}
+
+bool set_duress_pin(const char* duress_pin, const char* current_pin)
+{
+    if (!initialized || !pin_set) {
+        ESP_LOGW(TAG, "set_duress_pin: no regular PIN configured yet");
+        return false;
+    }
+    if (current_pin == nullptr || verify(current_pin) != VerifyResult::Success) {
+        ESP_LOGW(TAG, "set_duress_pin: current PIN verification failed");
+        return false;
+    }
+
+    return store_duress_pin(duress_pin, current_pin);
+}
+
+/**
+ * @brief Set the duress PIN WITHOUT re-verifying current_pin -- for
+ *        callers who have ALREADY verified it themselves, separately,
+ *        in the same logical flow (e.g. SecuritySettingsScreen's
+ *        Duress-PIN setup, which verifies the current PIN as its own
+ *        explicit first step). set_duress_pin() re-verifying it again
+ *        right before hashing the new duress PIN would cost a second,
+ *        entirely redundant ~10s PBKDF2 pass -- same reasoning as
+ *        security::pin::set_pin_after_verify(). The duress hash
+ *        itself is fast (SHA-256, see compute_duress_hash()), so this
+ *        cuts a duress-setup flow's final step from ~10s down to
+ *        near-instant.
+ *
+ * NOT a general bypass -- only call this immediately after
+ * independently verifying current_pin. current_pin is still required
+ * (its VALUE, not just proof of it) for the length-match and
+ * distinctness checks store_duress_pin() performs.
+ */
+bool set_duress_pin_after_verify(const char* duress_pin, const char* current_pin)
+{
+    if (!initialized || !pin_set || current_pin == nullptr) {
+        return false;
+    }
+
+    return store_duress_pin(duress_pin, current_pin);
 }
 
 bool clear_duress_pin()

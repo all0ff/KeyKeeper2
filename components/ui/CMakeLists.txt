@@ -41,6 +41,7 @@ idf_component_register(
         usb
         wifi
         web
+        power
         esp_app_format
         efuse
         lvgl

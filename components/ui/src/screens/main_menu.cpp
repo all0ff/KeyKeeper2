@@ -133,16 +133,16 @@ bool MainMenu::on_input(InputAction action)
             /*
              * Long BACK is the explicit "lock now" action.
              *
-             * security::lock::lock() publishes DeviceLocked and
-             * ends the current session. The UI will receive the
-             * corresponding state through the existing security/UI
-             * flow. For now we return to the QuickScreen immediately.
+             * security::lock::lock() publishes DeviceLocked and ends
+             * the current session. Navigation back to QuickScreen
+             * happens via ui.cpp's security::lock callback
+             * (on_lock_state_changed -> reset_to_root()), not an
+             * explicit pop() here -- that callback covers every path
+             * to Locked uniformly.
              */
             security::lock::lock();
 
             ESP_LOGI(TAG, "Device locked from Main Menu");
-
-            manager().pop();
             return true;
 
         default:
@@ -230,13 +230,11 @@ void MainMenu::activate()
             break;
 
         case Item::Lock:
+            // Navigation back to QuickScreen happens via ui.cpp's
+            // security::lock callback now -- see BackLong's identical
+            // comment above.
             security::lock::lock();
             ESP_LOGI(TAG, "Device locked from Main Menu");
-            /*
-             * MainMenu is removed from the stack. QuickScreen becomes
-             * active and reflects the Locked security state.
-             */
-            manager().pop();
             break;
 
         case Item::About:

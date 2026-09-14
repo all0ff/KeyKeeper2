@@ -57,7 +57,11 @@ struct SpiBus
  */
 struct Backlight
 {
-    static constexpr bool invert = true;
+    static constexpr bool invert = false; // was true -- confirmed wrong: with invert=true, increasing
+                                           // brightness% made the panel DIMMER and 100% turned it fully
+                                           // off (LovyanGFX double-negates against non-inverted hardware).
+                                           // This is the actual hardware polarity, not a guess -- inferred
+                                           // directly from the reported inverted brightness curve.
     static constexpr uint32_t pwm_freq_hz = 12'000;
 
     /**

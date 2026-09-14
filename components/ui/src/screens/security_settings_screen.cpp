@@ -22,9 +22,32 @@ constexpr char TAG[] = "ui.security_settings";
 constexpr lv_coord_t ROW_Y_START = 4;
 constexpr lv_coord_t ROW_SPACING = 20;
 
-constexpr int32_t TIMEOUT_STEP_S = 5;
-constexpr uint32_t TIMEOUT_MIN_S = 0;
-constexpr uint32_t TIMEOUT_MAX_S = 300; // placeholder range, not spec'd anywhere
+// Auto Lock's allowed timeout values -- off, then 1/3/5 min, then
+// 5-minute steps up to 100 min. Not a simple linear range (1/3/5 min
+// are irregular before the steady 5-min cadence kicks in), so this is
+// a lookup table cycled by index, not arithmetic on raw seconds.
+constexpr uint32_t AUTO_LOCK_VALUES_S[] = {
+    0, // off
+    60, 180, 300, // 1, 3, 5 min
+    600, 900, 1200, 1500, 1800, 2100, 2400, 2700, 3000, // 10..50 min, step 5
+    3300, 3600, 3900, 4200, 4500, 4800, 5100, 5400, 5700, 6000, // 55..100 min, step 5
+};
+constexpr size_t AUTO_LOCK_VALUES_COUNT = sizeof(AUTO_LOCK_VALUES_S) / sizeof(AUTO_LOCK_VALUES_S[0]);
+
+size_t find_closest_auto_lock_index(uint32_t seconds)
+{
+    size_t best = 0;
+    uint32_t best_diff = 0xFFFFFFFFu;
+    for (size_t i = 0; i < AUTO_LOCK_VALUES_COUNT; ++i) {
+        const uint32_t diff = (AUTO_LOCK_VALUES_S[i] > seconds) ? (AUTO_LOCK_VALUES_S[i] - seconds)
+                                                                  : (seconds - AUTO_LOCK_VALUES_S[i]);
+        if (diff < best_diff) {
+            best_diff = diff;
+            best = i;
+        }
+    }
+    return best;
+}
 
 } // namespace
 
@@ -123,9 +146,9 @@ void SecuritySettingsScreen::render_rows()
                 } else {
                     lv_label_set_text_fmt(
                         row_labels_[i],
-                        "%sAuto Lock: %lus",
+                        "%sAuto Lock: %lu min",
                         prefix,
-                        static_cast<unsigned long>(auto_lock_timeout_s_));
+                        static_cast<unsigned long>(auto_lock_timeout_s_ / 60));
                 }
                 break;
 
@@ -174,21 +197,15 @@ void SecuritySettingsScreen::adjust_value(int32_t delta)
     switch (static_cast<Row>(selected_row_)) {
         
         case Row::AutoLock: {
-            int32_t v = static_cast<int32_t>(auto_lock_timeout_s_);
-            // до 30 с шаг 5, дальше шаг 15
-            const int32_t step = (v >= 30) ? 15 * delta : 5 * delta;    // или + delta * TIMEOUT_STEP_S
-            v += step;
-
-            if (v < static_cast<int32_t>(TIMEOUT_MIN_S)) {
-                v = static_cast<int32_t>(TIMEOUT_MIN_S);
+            const size_t idx = find_closest_auto_lock_index(auto_lock_timeout_s_);
+            int32_t new_idx = static_cast<int32_t>(idx) + delta;
+            if (new_idx < 0) {
+                new_idx = 0;
             }
-
-            if (v > static_cast<int32_t>(TIMEOUT_MAX_S)) {
-                v = static_cast<int32_t>(TIMEOUT_MAX_S);
+            if (new_idx >= static_cast<int32_t>(AUTO_LOCK_VALUES_COUNT)) {
+                new_idx = static_cast<int32_t>(AUTO_LOCK_VALUES_COUNT) - 1;
             }
-
-            auto_lock_timeout_s_ = static_cast<uint32_t>(v);
-            ///auto_lock_enabled_   = auto_lock_timeout_s_ > 0;
+            auto_lock_timeout_s_ = AUTO_LOCK_VALUES_S[new_idx];
             break;
         }
 
@@ -287,19 +304,18 @@ void SecuritySettingsScreen::show_pin_step(const char* error /* = nullptr */)
     widgets::PinEntry::Config cfg{};
 
     if (change_step_ == ChangePinStep::Old) {
-        // Deliberately NOT tied to settings::all().security.pin_length
-        // -- that setting can drift from the ACTUAL stored PIN's real
-        // length (a settings-storage layout change can silently fall
-        // back to defaults), and PinEntry hard-caps entry at
-        // cfg.length -- a too-short length here would make it
-        // impossible to even TYPE a longer real PIN. Full 4-6 range +
-        // OkLong to finish early always works regardless of what the
-        // setting currently says. This exact fix has reverted twice
-        // now from a git-sync mismatch between local and pushed
-        // state -- please commit/push after applying this before any
-        // further changes, so it sticks this time.
-        cfg.length = 6;
-        cfg.min_length = 4;
+        // Box count = settings::all().security.pin_length exactly, at
+        // the project owner's explicit request -- see
+        // ui::screens::LockScreen::initialize()'s identical comment
+        // for the full reasoning (this reintroduces the risk a
+        // flexible range was added to prevent, but the specific cause
+        // that triggered it once is a one-time migration hazard
+        // that's already behind this project).
+        cfg.length = settings::all().security.pin_length;
+        if (cfg.length < 4 || cfg.length > 6) {
+            cfg.length = 6;
+        }
+        cfg.min_length = cfg.length;
         cfg.finish_on_short = true;
     } else {
         cfg.length = 6;
@@ -375,8 +391,22 @@ void SecuritySettingsScreen::handle_pin_step_complete()
 
             checking_ = true;
             show_pin_step("Checking...");
-            async_check_.start_set_pin(new_pin_.c_str(), old_pin_.empty() ? nullptr : old_pin_.c_str(),
-                                        &SecuritySettingsScreen::on_set_pin_done, this);
+            if (!old_pin_.empty()) {
+                // Normal case -- Old-PIN step already verified it
+                // (async), so set_pin() re-verifying it a second time
+                // right here would just be a redundant ~10s PBKDF2
+                // pass. See set_pin_after_verify()'s own doc comment.
+                async_check_.start_set_pin_after_verify(new_pin_.c_str(), &SecuritySettingsScreen::on_set_pin_done,
+                                                          this);
+            } else {
+                // Defensive fallback for change_step_ starting at New
+                // (no old PIN to verify at all) -- shouldn't happen in
+                // practice, since this screen requires has_pin() to be
+                // reachable at all, but keeps the old, safe behavior
+                // if it somehow does.
+                async_check_.start_set_pin(new_pin_.c_str(), nullptr, &SecuritySettingsScreen::on_set_pin_done,
+                                            this);
+            }
             return;
         }
     }
@@ -513,8 +543,15 @@ void SecuritySettingsScreen::show_duress_pin_step(const char* error /* = nullptr
     widgets::PinEntry::Config cfg{};
 
     if (duress_step_ == DuressPinStep::CurrentPin) {
-        cfg.length = 6;
-        cfg.min_length = 4;
+        // Box count = settings::all().security.pin_length exactly,
+        // same as LockScreen/Change PIN's Old step now -- see
+        // ui::screens::LockScreen::initialize()'s comment for the
+        // full reasoning.
+        cfg.length = settings::all().security.pin_length;
+        if (cfg.length < 4 || cfg.length > 6) {
+            cfg.length = 6;
+        }
+        cfg.min_length = cfg.length;
         cfg.finish_on_short = true;
     } else {
         uint8_t len = static_cast<uint8_t>(duress_current_pin_.length());
@@ -569,8 +606,13 @@ void SecuritySettingsScreen::handle_duress_pin_step_complete()
 
             checking_ = true;
             show_duress_pin_step("Checking...");
-            async_check_.start_set_duress_pin(duress_new_pin_.c_str(), duress_current_pin_.c_str(),
-                                               &SecuritySettingsScreen::on_duress_set_done, this);
+            // CurrentPin step already verified duress_current_pin_
+            // (async) -- set_duress_pin() re-verifying it again here
+            // would be a redundant ~10s PBKDF2 pass for nothing
+            // (the duress hash itself is fast SHA-256, not PBKDF2).
+            // See set_duress_pin_after_verify()'s own doc comment.
+            async_check_.start_set_duress_pin_after_verify(duress_new_pin_.c_str(), duress_current_pin_.c_str(),
+                                                             &SecuritySettingsScreen::on_duress_set_done, this);
             return;
         }
     }
