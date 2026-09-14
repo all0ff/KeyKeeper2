@@ -14,9 +14,14 @@ wiping the vault -- see "What's here" below).
 
 ## What's here
 
-- `GET /` -- a bare-bones login page (PIN field + Unlock button,
-  inline CSS/JS, no framework). Not the real Web UI -- just enough to
-  exercise the login endpoint from a browser without curl/Postman.
+- `GET /` -- the full single-page Web UI (`web_app_html.hpp`): PIN
+  login, then a flat list of accounts, tap one to view its fields
+  (password/TOTP secret masked behind a "Show" toggle), Edit/Delete,
+  and a "+ New" button for creating an entry. No framework, one
+  embedded HTML/CSS/JS page, calling the REST endpoints below via
+  relative `fetch()` paths (so it keeps working whether or not a
+  secret-word prefix is active). Checks `GET api/v1/auth/status` on
+  load and goes straight to the account list if already Unlocked.
 - `POST /api/v1/auth/login` -- body `{"pin":"123456"}` ->
   `security::lock::unlock()`. On `VerifyResult::WipeRequired`,
   deliberately does NOT mirror `ui::screens::LockScreen`'s
@@ -67,13 +72,11 @@ wiping the vault -- see "What's here" below).
 ## Explicitly NOT here yet
 
 - Search over REST (the on-device `SearchScreen`'s substring-match
-  logic isn't exposed as an endpoint).
+  logic isn't exposed as an endpoint, and the Web UI's account list
+  has no search/filter box yet either).
 - Backup/restore/settings over REST -- WEB.md section 7's full
   "Supported Operations" list also includes these; only entry CRUD is
-  done.
-- The real Web UI (a proper page beyond the bare login form) -- the
-  REST API above has no browser-facing UI yet, it's callable but
-  nothing in this component renders it.
+  done, and the Web UI only covers what REST exposes.
 - Captive Portal.
 - HTTPS -- see the security note below and web_service.hpp's file
   comment.

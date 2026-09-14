@@ -5,13 +5,14 @@
 // =============================================================================
 // web -- WebService (docs/WEB.md, Phase B)
 //
-// This component: an HTTP server, PIN-based login (this file), and
-// REST CRUD for individual vault entries (web_vault_routes.cpp, an
-// implementation-internal file -- see its own comment for the exact
-// routes). NOT built yet: search over REST, backup/restore/settings
-// over REST (WEB.md section 7's full "Supported Operations" list),
-// serving a real Web UI beyond the bare login page, or Captive
-// Portal. Those are separate, later increments.
+// This component: an HTTP server, PIN-based login, REST CRUD for
+// individual vault entries (web_vault_routes.cpp -- see its own
+// comment for the exact routes), and a real single-page Web UI on top
+// of that CRUD (web_app_html.hpp -- see its own comment: list/view/
+// create/edit/delete entries, no framework, one embedded HTML/CSS/JS
+// page). NOT built yet: search over REST, backup/restore/settings
+// over REST (WEB.md section 7's full "Supported Operations" list), or
+// Captive Portal. Those are separate, later increments.
 //
 // SHARED SESSION MODEL (a deliberate choice, not a default): logging
 // in via the web calls security::lock::unlock() directly -- the SAME

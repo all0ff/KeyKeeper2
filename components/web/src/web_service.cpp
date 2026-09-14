@@ -5,6 +5,7 @@
 #include "security/pin_manager.hpp"
 #include "settings/settings.hpp"
 #include "wifi/wifi_service.hpp"
+#include "web_app_html.hpp"
 #include "web_json_helpers.hpp"
 #include "web_vault_routes.hpp"
 
@@ -32,64 +33,10 @@ void publish(WebEventId id)
     event_bus::publish(event_bus::Category::Web, static_cast<uint32_t>(id));
 }
 
-// -----------------------------------------------------------------
-// Minimal login page -- just enough to exercise the login endpoint
-// from a browser without needing curl/Postman. Not the real Web UI
-// (see web_service.hpp's file comment) -- that's a separate,
-// later increment.
-// -----------------------------------------------------------------
-
-constexpr char LOGIN_PAGE[] = R"HTML(<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>KeyKeeper2</title>
-<style>
-  body { font-family: sans-serif; max-width: 320px; margin: 48px auto; padding: 0 16px; }
-  input, button { width: 100%; padding: 10px; margin: 8px 0; font-size: 1rem; box-sizing: border-box; }
-  #msg { min-height: 1.4em; font-size: 0.9rem; }
-</style>
-</head>
-<body>
-  <h2>KeyKeeper2</h2>
-  <p id="msg"></p>
-  <input id="pin" type="password" inputmode="numeric" placeholder="PIN" autofocus>
-  <button onclick="login()">Unlock</button>
-  <script>
-    async function login() {
-      const pin = document.getElementById('pin').value;
-      const msg = document.getElementById('msg');
-      msg.style.color = '#000';
-      msg.textContent = 'Checking...';
-      try {
-        const res = await fetch('api/v1/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pin: pin })
-        });
-        const body = await res.json();
-        if (res.ok) {
-          msg.style.color = '#080';
-          msg.textContent = 'Unlocked.';
-        } else {
-          msg.style.color = '#c00';
-          msg.textContent = body.message || ('Error ' + res.status);
-        }
-      } catch (e) {
-        msg.style.color = '#c00';
-        msg.textContent = 'Request failed: ' + e;
-      }
-    }
-  </script>
-</body>
-</html>
-)HTML";
-
 esp_err_t handle_root(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "text/html");
-    httpd_resp_send(req, LOGIN_PAGE, HTTPD_RESP_USE_STRLEN);
+    httpd_resp_send(req, APP_PAGE, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
