@@ -45,6 +45,7 @@ constexpr size_t HASH_LEN = 32;
 constexpr uint32_t PBKDF2_ITERATIONS = 100'000;
 constexpr uint32_t PIN_BLOB_MAGIC = 0x4B4B5032; // "KKP2"
 constexpr uint8_t PIN_BLOB_VERSION = 1;
+constexpr uint8_t DURESS_PIN_BLOB_VERSION = 2;
 
 struct StoredPin
 {
@@ -59,11 +60,10 @@ bool initialized = false;
 bool pin_set = false;
 StoredPin stored{};
 
-// Duress PIN -- same StoredPin shape, different NVS key. See
-// pin_manager.hpp's VerifyResult::DuressTriggered doc comment for the
-// full design; kept as a plain duplicate of the regular PIN's storage
-// rather than generalized into a template/helper, since there are
-// exactly two of these and both are small.
+// Duress PIN -- same StoredPin shape, different NVS key. The regular
+// PIN uses PBKDF2, while the duress PIN intentionally uses a single
+// salted SHA-256 pass because it is only a trigger for the duress
+// action, not a secret protecting the vault.
 constexpr char NVS_DURESS_KEY[] = "duress_pin";
 bool duress_pin_set = false;
 StoredPin stored_duress{};
@@ -119,6 +119,31 @@ bool compute_hash(const uint8_t* salt, const char* pin_digits, uint8_t out_hash[
     return true;
 }
 
+bool compute_duress_hash(const uint8_t* salt, const char* pin_digits,
+                         uint8_t out_hash[HASH_LEN])
+{
+    const size_t pin_len = strlen(pin_digits);
+    uint8_t input[SALT_LEN + 6]{};
+
+    std::memcpy(input, salt, SALT_LEN);
+    std::memcpy(input + SALT_LEN, pin_digits, pin_len);
+
+    size_t hash_len = 0;
+    const psa_status_t status = psa_hash_compute(
+        PSA_ALG_SHA_256, input, SALT_LEN + pin_len,
+        out_hash, HASH_LEN, &hash_len);
+
+    std::memset(input, 0, sizeof(input));
+
+    if (status != PSA_SUCCESS || hash_len != HASH_LEN) {
+        ESP_LOGE(TAG, "Duress SHA-256 failed (status %d)", static_cast<int>(status));
+        std::memset(out_hash, 0, HASH_LEN);
+        return false;
+    }
+
+    return true;
+}
+
 void generate_salt(uint8_t out_salt[SALT_LEN])
 {
     esp_fill_random(out_salt, SALT_LEN);
@@ -149,6 +174,11 @@ bool pin_length_ok(const char* pin)
 bool stored_pin_valid(const StoredPin& value)
 {
     return value.magic == PIN_BLOB_MAGIC && value.version == PIN_BLOB_VERSION;
+}
+
+bool stored_duress_pin_valid(const StoredPin& value)
+{
+    return value.magic == PIN_BLOB_MAGIC && value.version == DURESS_PIN_BLOB_VERSION;
 }
 
 Checkpoint load_checkpoint_from_flash()
@@ -261,7 +291,7 @@ bool init()
 
     size_t duress_len = sizeof(stored_duress);
     if (storage::nvs::get_blob(NVS_NAMESPACE, NVS_DURESS_KEY, &stored_duress, duress_len) &&
-        duress_len == sizeof(stored_duress) && stored_pin_valid(stored_duress)) {
+        duress_len == sizeof(stored_duress) && stored_duress_pin_valid(stored_duress)) {
         duress_pin_set = true;
         ESP_LOGI(TAG, "Duress PIN loaded from NVS");
     } else {
@@ -475,10 +505,10 @@ bool set_duress_pin(const char* duress_pin, const char* current_pin)
 
     StoredPin next{};
     next.magic = PIN_BLOB_MAGIC;
-    next.version = PIN_BLOB_VERSION;
+    next.version = DURESS_PIN_BLOB_VERSION;
     generate_salt(next.salt);
-    if (!compute_hash(next.salt, duress_pin, next.hash)) {
-        ESP_LOGE(TAG, "set_duress_pin: PBKDF2 computation failed");
+    if (!compute_duress_hash(next.salt, duress_pin, next.hash)) {
+        ESP_LOGE(TAG, "set_duress_pin: SHA-256 computation failed");
         return false;
     }
 
@@ -520,7 +550,7 @@ bool verify_duress(const char* pin)
     }
 
     uint8_t candidate_hash[HASH_LEN]{};
-    if (!compute_hash(stored_duress.salt, pin, candidate_hash)) {
+    if (!compute_duress_hash(stored_duress.salt, pin, candidate_hash)) {
         return false;
     }
 
@@ -530,10 +560,21 @@ bool verify_duress(const char* pin)
     }
     std::memset(candidate_hash, 0, sizeof(candidate_hash));
 
-    // Deliberately NOT constant-time relative to a wrong-PIN
-    // verify() call in terms of overall unlock duration -- see
-    // security::lock::unlock()'s own comment on that tradeoff.
     return diff == 0;
+}
+
+void consume_pbkdf2_time()
+{
+    // Fixed throwaway salt/input -- only the CPU cost matters here,
+    // not the result, so nothing about this needs to be random or
+    // secret. Calls the same compute_hash() the regular PIN path
+    // uses (PBKDF2, PBKDF2_ITERATIONS) so the cost tracks whatever
+    // that's currently configured to, automatically, without a
+    // separate hardcoded delay to keep in sync.
+    uint8_t dummy_salt[SALT_LEN]{};
+    uint8_t dummy_hash[HASH_LEN]{};
+    compute_hash(dummy_salt, "000000", dummy_hash);
+    std::memset(dummy_hash, 0, sizeof(dummy_hash));
 }
 
 } // namespace security::pin

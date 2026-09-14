@@ -506,13 +506,17 @@ void SecuritySettingsScreen::handle_duress_pin_step_complete()
 {
     switch (duress_step_) {
         case DuressPinStep::CurrentPin:
-            // Collected, not verified yet -- see security_settings_screen.hpp's
-            // file comment for why (verification happens once, inside
-            // the single async set_duress_pin() call at Confirm).
             duress_current_pin_ = pin_entry_.pin();
             pin_entry_.reset();
-            duress_step_ = DuressPinStep::EnterNew;
-            show_duress_pin_step();
+
+            // Verify the current regular PIN immediately after it is entered.
+            // This keeps the first step honest: an incorrect current PIN
+            // cannot advance to Duress PIN configuration. The check is
+            // asynchronous so the UI remains responsive during PBKDF2.
+            checking_ = true;
+            show_duress_pin_step("Checking...");
+            async_check_.start(AsyncPinCheck::Kind::Verify, duress_current_pin_.c_str(),
+                               &SecuritySettingsScreen::on_duress_current_pin_check_done, this);
             return;
 
         case DuressPinStep::EnterNew:
@@ -543,6 +547,42 @@ void SecuritySettingsScreen::handle_duress_pin_step_complete()
             return;
         }
     }
+}
+
+void SecuritySettingsScreen::on_duress_current_pin_check_done(security::pin::VerifyResult result, void* ctx)
+{
+    static_cast<SecuritySettingsScreen*>(ctx)->handle_duress_current_pin_result(result);
+}
+
+void SecuritySettingsScreen::handle_duress_current_pin_result(security::pin::VerifyResult result)
+{
+    checking_ = false;
+
+    if (result != security::pin::VerifyResult::Success) {
+        duress_current_pin_.clear();
+
+        if (result == security::pin::VerifyResult::LockedOut) {
+            show_duress_pin_step("Locked out, try later");
+        } else if (result == security::pin::VerifyResult::WipeRequired) {
+            show_duress_pin_step("Too many failed attempts");
+        } else {
+            const uint8_t remaining = security::pin::attempts_remaining();
+            char buf[48];
+            if (remaining > 0) {
+                std::snprintf(buf, sizeof(buf), "Wrong current PIN, %u left",
+                              static_cast<unsigned>(remaining));
+            } else {
+                const uint8_t until_wipe = security::pin::attempts_until_wipe();
+                std::snprintf(buf, sizeof(buf), "Wrong PIN! %u attempts until vault wipe",
+                              static_cast<unsigned>(until_wipe));
+            }
+            show_duress_pin_step(buf);
+        }
+        return;
+    }
+
+    duress_step_ = DuressPinStep::EnterNew;
+    show_duress_pin_step();
 }
 
 void SecuritySettingsScreen::on_duress_set_done(security::pin::VerifyResult result, void* ctx)

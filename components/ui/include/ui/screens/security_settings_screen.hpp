@@ -52,16 +52,14 @@
 // pin_manager.hpp's VerifyResult::DuressTriggered) that silently
 // wipes the vault on the Unlock screen instead of granting access.
 // Flow: current PIN -> new duress PIN -> confirm, each via
-// widgets::PinEntry -- collected across three plain PinEntry steps
-// with NO verification in between (unlike Change PIN's Old-PIN step,
-// which verifies immediately). Only the FINAL step runs anything
-// async: a single security::pin::set_duress_pin() call, which
-// verifies the current PIN AND hashes the new duress PIN internally
-// (two PBKDF2 passes, ~20s) -- collecting all three PINs first and
-// validating everything in one async call avoids a second redundant
-// ~10s verify pass that a separate up-front "verify current PIN"
-// step would have cost. Deliberately kept as separate state
-// (Mode::SettingDuressPin, DuressPinStep, duress_*_ members) rather
+// widgets::PinEntry. The CURRENT PIN is verified immediately after
+// the first step via AsyncPinCheck, so an incorrect current PIN cannot
+// advance to Duress PIN configuration. The final step still calls
+// security::pin::set_duress_pin(), which verifies the current PIN again
+// before storing the new fast-hash Duress PIN. This keeps the existing
+// security::pin API unchanged and makes the user-facing current-PIN
+// step behave correctly. Deliberately kept as separate state
+// (Mode::SettingDuressPin, DuressPinStep, duress_* members) rather
 // than reusing ChangePin's, to avoid any chance of the two flows'
 // state bleeding into each other. Only ever REPLACES the duress PIN,
 // no separate "remove" action in this UI yet --
@@ -110,7 +108,7 @@ private:
 
     enum class DuressPinStep : uint8_t
     {
-        CurrentPin, // collects the current PIN -- NOT verified yet here; see security_settings_screen.cpp
+        CurrentPin,
         EnterNew,
         Confirm,
     };
@@ -135,6 +133,8 @@ private:
     void begin_duress_pin_setup();
     void show_duress_pin_step(const char* error = nullptr);
     void handle_duress_pin_step_complete();
+    void handle_duress_current_pin_result(security::pin::VerifyResult result);
+    static void on_duress_current_pin_check_done(security::pin::VerifyResult result, void* ctx);
     void handle_duress_set_result(security::pin::VerifyResult result);
     static void on_duress_set_done(security::pin::VerifyResult result, void* ctx);
     void cancel_duress_pin_setup();

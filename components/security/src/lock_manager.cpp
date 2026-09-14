@@ -160,22 +160,24 @@ pin::VerifyResult unlock(const char* pin_guess)
         return pin::VerifyResult::NoPinSet;
     }
 
-    // Duress check runs FIRST, before the regular one, and only costs
-    // anything (an extra PBKDF2 pass) when a duress PIN is actually
-    // configured -- for everyone who hasn't set one up, unlock timing
-    // is completely unchanged. This does mean that, for someone who
-    // HAS configured a duress PIN, every WRONG regular-PIN attempt
-    // now takes roughly twice as long (duress check + regular
-    // check) as it did before -- a real, deliberate trade-off: making
-    // both checks always run unconditionally (constant-time
-    // regardless of outcome) would close a theoretical timing
-    // side-channel (an adversary who knows the normal ~10s unlock
-    // time could in principle notice a duress-configured device
-    // taking longer on a wrong guess), but would double every
-    // ordinary unlock's ~10s wait permanently, which directly
-    // contradicts what prompted making PIN checks async in the first
-    // place. Not implemented; flagged, not a silent decision.
+    // Duress check runs FIRST, before the regular one. It is a fast
+    // salted SHA-256 pass, not PBKDF2, because the duress PIN is only
+    // a trigger for the duress action and does not protect the vault.
+    // Therefore, when a duress PIN is configured, a wrong regular PIN
+    // adds only the cost of one SHA-256 pass before the normal PBKDF2
+    // check, which is negligible compared with the regular PIN cost.
+    // On a MATCH, though, that same speed would make this path finish
+    // almost instantly next to every other outcome (~10s) unless
+    // something evens it back out -- see consume_pbkdf2_time() below.
     if (pin::has_duress_pin() && pin::verify_duress(pin_guess)) {
+        // verify_duress() is deliberately fast (SHA-256, not PBKDF2)
+        // -- without this, a triggered duress PIN would complete
+        // almost instantly compared to every other unlock attempt
+        // (~10s), which is exactly the kind of observable difference
+        // this feature exists to avoid. See
+        // pin::consume_pbkdf2_time()'s own doc comment.
+        pin::consume_pbkdf2_time();
+
         // The actual vault wipe happens one layer up
         // (ui::screens::LockScreen), which is allowed to depend on
         // vault:: -- security:: must not (see vault.hpp's own file

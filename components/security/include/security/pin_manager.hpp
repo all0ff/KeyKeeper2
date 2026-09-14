@@ -137,4 +137,23 @@ bool clear_duress_pin();
 /// treated specially).
 bool verify_duress(const char* pin);
 
+/**
+ * @brief Burn roughly one PBKDF2 pass' worth of wall-clock time,
+ *        without touching any stored state or the failure counter.
+ *
+ * Used only by security::lock::unlock() right after a duress-PIN
+ * match, to keep VerifyResult::DuressTriggered's timing
+ * indistinguishable from Success/WrongPin. verify_duress() is
+ * deliberately fast (salted SHA-256, not PBKDF2 -- see
+ * pin_manager.cpp) since the duress PIN itself doesn't need
+ * brute-force resistance, but that speed difference would otherwise
+ * make a triggered duress PIN complete almost instantly compared to
+ * every other unlock attempt (~10s) -- exactly the kind of observable
+ * difference the whole feature exists to avoid (someone coercing the
+ * owner could notice "that was unusually fast"). Calling this after
+ * a duress match closes that gap without slowing down the duress
+ * CHECK itself or affecting security::pin's lockout/wipe counter.
+ */
+void consume_pbkdf2_time();
+
 } // namespace security::pin
