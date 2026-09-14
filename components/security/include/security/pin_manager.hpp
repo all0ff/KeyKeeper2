@@ -112,8 +112,9 @@ bool has_duress_pin();
  *
  * current_pin must verify successfully against the REGULAR PIN first
  * (same "prove you already know it" gate set_pin() uses for its own
- * old_pin parameter). duress_pin must pass the same length rule as
- * the regular PIN (pin_length_ok()) and must NOT equal current_pin --
+ * old_pin parameter). duress_pin must be the same length as
+ * current_pin's actual, verified length (not settings::all().security.pin_length,
+ * which could disagree with it) and must NOT equal current_pin --
  * an identical duress/regular PIN would silently wipe the vault on
  * every normal unlock, which defeats the entire point.
  */

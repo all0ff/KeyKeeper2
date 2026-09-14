@@ -1,7 +1,9 @@
 #include "power_manager.hpp"
 
 #include "bsp/pins.hpp"
+#include "display/display.hpp"
 #include "input/input.hpp"
+#include "settings/settings.hpp"
 
 #include "driver/gpio.h"
 #include "esp_log.h"
@@ -77,14 +79,27 @@ void Manager::task()
         vTaskDelay(pdMS_TO_TICKS(TASK_POLL_MS));
 
         const uint32_t input_activity = input::last_activity_ms();
-        if (input_activity > last_activity_ms_) {
+        const bool activity_advanced = input_activity > last_activity_ms_;
+        if (activity_advanced) {
             last_activity_ms_ = input_activity;
         }
 
-        if (cfg_.idle_timeout_ms > 0 && state_ == State::Active) {
+        // Screen-off-on-idle -- see power.hpp's file comment for why
+        // this is a plain backlight action (no power::State change,
+        // no esp_sleep involvement) rather than the automatic light
+        // sleep this used to trigger. Read live every poll, not
+        // captured once at init(), so a settings change takes effect
+        // immediately without needing to reinitialize this component.
+        const uint32_t display_off_timeout_s = settings::all().general.display_off_timeout_s;
+
+        if (activity_advanced && backlight_off_) {
+            display::set_backlight(true);
+            backlight_off_ = false;
+        } else if (!backlight_off_ && display_off_timeout_s > 0) {
             const uint32_t idle_for = now_ms() - last_activity_ms_;
-            if (idle_for >= cfg_.idle_timeout_ms) {
-                transition_to_light_sleep();
+            if (idle_for >= display_off_timeout_s * 1000u) {
+                display::set_backlight(false);
+                backlight_off_ = true;
             }
         }
     }
@@ -93,6 +108,11 @@ void Manager::task()
 void Manager::notify_activity()
 {
     last_activity_ms_ = now_ms();
+
+    if (backlight_off_) {
+        display::set_backlight(true);
+        backlight_off_ = false;
+    }
 }
 
 int Manager::register_callback(Callback cb, void* ctx)

@@ -11,6 +11,8 @@ idf_component_register(
 
     REQUIRES
         bsp
+        display
+        settings
         input
         driver
         esp_driver_gpio

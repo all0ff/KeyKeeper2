@@ -162,6 +162,14 @@ void WifiSettingsScreen::render_rows()
                 break;
         }
     }
+
+    // 7 rows don't all fit in the visible content area at once --
+    // keep the selected one scrolled into view as it moves (this
+    // used to be missing entirely, which is exactly what caused Save
+    // to render mostly hidden behind status_label_ at the bottom).
+    if (row_labels_[selected_row_] != nullptr) {
+        lv_obj_scroll_to_view(row_labels_[selected_row_], LV_ANIM_ON);
+    }
 }
 
 void WifiSettingsScreen::move_selection(int32_t delta)

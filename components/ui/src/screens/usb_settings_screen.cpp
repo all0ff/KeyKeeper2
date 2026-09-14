@@ -127,6 +127,12 @@ void UsbSettingsScreen::render_rows()
                 break;
         }
     }
+
+    // Same fix as WifiSettingsScreen/SecuritySettingsScreen -- keep
+    // the selected row scrolled into view.
+    if (row_labels_[selected_row_] != nullptr) {
+        lv_obj_scroll_to_view(row_labels_[selected_row_], LV_ANIM_ON);
+    }
 }
 
 void UsbSettingsScreen::move_selection(int32_t delta)

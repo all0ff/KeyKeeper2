@@ -5,16 +5,34 @@
 // =============================================================================
 // power
 //
-// Public power-management API: current power state, idle-driven light
-// sleep, explicit shutdown (deep sleep), and a callback registry so
-// other components (display, vault, ...) can react to state changes --
-// e.g. turn the backlight off before sleeping, or re-lock the vault
-// after waking.
+// Public power-management API: current power state, explicit sleep/
+// shutdown (light/deep sleep, both manual-only now -- see below), and
+// a callback registry so other components (display, vault, ...) can
+// react to state changes -- e.g. re-lock the vault after waking.
 //
-// The actual orchestration (idle timer task, esp_sleep configuration,
-// wake sources) lives in power_manager.hpp/.cpp (private to this
-// component). power.hpp/.cpp is a thin public-facing wrapper around
-// that internal singleton.
+// AUTOMATIC LIGHT SLEEP WAS REMOVED. It used to trigger on its own
+// after an idle timeout via esp_light_sleep_start(), which turned out
+// not to coexist reliably with the USB HID peripheral on this board:
+// light sleep visibly disrupted the USB connection (the host would
+// report "unknown USB device"), didn't reliably recover on wake, and
+// the failure mode varied device to device -- confirmed as a real,
+// reported problem, not a hypothetical. KeyKeeper 1.90's own approach
+// was to cleanly detach USB before any real sleep; here the simpler
+// and more robust fix is to not put the MCU to sleep for routine
+// screen-timeout at all. request_sleep()/request_shutdown() (actual
+// esp_light_sleep_start()/esp_deep_sleep_start()) still exist for
+// explicit, deliberate use -- they're just no longer triggered
+// automatically by inactivity.
+//
+// SCREEN TIMEOUT is now a separate, automatic mechanism this
+// component still owns (same idle-tracking task, doesn't need a
+// second one): after settings::all().general.display_off_timeout_s
+// (read live every poll, 0 = disabled) of no input activity, it calls
+// display::set_backlight(false) -- backlight only, MCU/USB/LVGL/every
+// other task keep running completely normally. The next input turns
+// the backlight back on. This is NOT a power::State transition (state
+// stays Active throughout) -- it's purely a display action, with none
+// of light sleep's peripheral-suspension side effects.
 //
 // Activity tracking: this component polls input::last_activity_ms()
 // (a non-consuming timestamp) in its own background task, so
@@ -47,9 +65,14 @@ using Callback = void (*)(State new_state, void* ctx);
 struct Config
 {
     /**
-     * Milliseconds of no input activity before automatically entering
-     * LightSleep. Set to 0 to disable automatic light sleep entirely
-     * (only request_sleep() / request_shutdown() will change state).
+     * Reserved -- no longer drives anything automatically. Screen-off
+     * timing now comes directly from
+     * settings::all().general.display_off_timeout_s (read live, 0 =
+     * disabled), not from a value captured once at init() time -- see
+     * this header's file comment for why automatic light sleep itself
+     * was removed. Kept as a field (rather than deleted outright) only
+     * so existing callers passing a Config don't fail to compile;
+     * assign it if you like, nothing reads it.
      */
     uint32_t idle_timeout_ms = 30'000;
 };

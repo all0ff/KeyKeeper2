@@ -19,7 +19,7 @@ constexpr lv_coord_t ROW_SPACING = 20;
 
 constexpr int32_t BRIGHTNESS_STEP = 5;
 constexpr int32_t TIMEOUT_STEP_S = 5;
-constexpr uint32_t TIMEOUT_MIN_S = 5;
+constexpr uint32_t TIMEOUT_MIN_S = 0; // 0 = off (never times out)
 constexpr uint32_t TIMEOUT_MAX_S = 300; // placeholder range, not spec'd anywhere
 
 } // namespace
@@ -107,13 +107,23 @@ void GeneralSettingsScreen::render()
                                        static_cast<unsigned>(brightness_));
                 break;
             case Row::ScreenTimeout:
-                lv_label_set_text_fmt(row_labels_[i], "%sScreen Timeout: %lus", prefix,
-                                       static_cast<unsigned long>(screen_timeout_s_));
+                if (screen_timeout_s_ == 0) {
+                    lv_label_set_text_fmt(row_labels_[i], "%sScreen Timeout: off", prefix);
+                } else {
+                    lv_label_set_text_fmt(row_labels_[i], "%sScreen Timeout: %lus", prefix,
+                                           static_cast<unsigned long>(screen_timeout_s_));
+                }
                 break;
             case Row::Save:
                 lv_label_set_text_fmt(row_labels_[i], "%sSave", prefix);
                 break;
         }
+    }
+
+    // Same fix as WifiSettingsScreen/SecuritySettingsScreen/
+    // UsbSettingsScreen -- keep the selected row scrolled into view.
+    if (row_labels_[selected_row_] != nullptr) {
+        lv_obj_scroll_to_view(row_labels_[selected_row_], LV_ANIM_ON);
     }
 }
 

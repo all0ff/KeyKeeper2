@@ -88,6 +88,14 @@ struct GeneralSettings
 
 struct UsbSettings
 {
+    // "Quick password without PIN" (KeyKeeper 1.90's own
+    // "Быстрый пароль без PIN-кода" / quickpass) -- deliberately
+    // reachable from QuickScreen's BackLong WITHOUT unlocking (see
+    // that screen's own file comment). A real secret typed in the
+    // clear via USB HID without any authentication -- this is an
+    // intentional convenience/security trade-off the person configuring
+    // it is choosing to accept, not an oversight. Anyone who can hold
+    // BackLong on a locked device can have this typed for them.
     char default_password[32] = "";
     TypingOrder typing_order = TypingOrder::LoginTabPasswordEnter;
     uint16_t delay_before_typing_ms = 500;

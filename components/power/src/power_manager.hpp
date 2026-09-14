@@ -55,9 +55,12 @@ private:
      * @brief Fire callbacks, enter light sleep, block until woken, fire
      *        callbacks for the return to Active.
      *
-     * Serialized by transition_mutex_ so a request_sleep() call from
-     * one task can never overlap with the background task's own
-     * idle-timeout-triggered sleep.
+     * Only reachable via request_sleep() now -- see power.hpp's file
+     * comment: this is no longer triggered automatically by the idle
+     * timer (that now just turns the backlight off, a much lighter
+     * action with none of light sleep's USB-disrupting side effects).
+     * transition_mutex_ still guards against two request_sleep() calls
+     * overlapping.
      */
     void transition_to_light_sleep();
 
@@ -70,6 +73,7 @@ private:
     State state_ = State::Active;
 
     uint32_t last_activity_ms_ = 0;
+    bool backlight_off_ = false; // screen-timeout state -- see power.hpp's file comment
 
     CallbackSlot callbacks_[MAX_CALLBACKS]{};
 

@@ -7,7 +7,6 @@
 
 #include "security/lock_manager.hpp"
 #include "security/pin_manager.hpp"
-#include "settings/settings.hpp"
 #include "vault/vault_repository.hpp"
 
 #include "esp_log.h"
@@ -31,20 +30,32 @@ const char* LockScreen::footer_hint() const
     if (checking_) {
         return "Checking...";
     }
-    return "OK Next  BACK Erase / Cancel";
+    return "ROTATE Digit  OK Next  Hold OK Done  BACK Erase";
 }
 
 void LockScreen::initialize(lv_obj_t* content_parent)
 {
+    // Deliberately NOT tied rigidly to settings::all().security.pin_length
+    // the way this used to be (cfg.length = pin_length; cfg.min_length =
+    // cfg.length -- i.e. exactly one length, no slack at all). That
+    // setting can drift from the ACTUAL stored PIN's real length for
+    // reasons that have nothing to do with the PIN itself (e.g. a
+    // settings-storage layout change silently falling back to
+    // defaults, see settings.cpp's load_section() and
+    // pin_manager.cpp's pin_format_ok() comment) -- when it does, a
+    // rigid single-length entry screen would have no way to even TYPE
+    // the real PIN, let alone submit it, permanently locking the
+    // device. Using the full 4-6 range here instead, with OkLong to
+    // finish early (same mechanism SetupPinScreen already relies on),
+    // means the real PIN can always be entered regardless of what
+    // pin_length currently says -- and now that pin::verify() no
+    // longer compares length against that setting either (same fix),
+    // it will be accepted.
     widgets::PinEntry::Config cfg{};
-    cfg.length = settings::all().security.pin_length;
-    if (cfg.length < 4 || cfg.length > 6) {
-        cfg.length = 6;
-    }
-
-    cfg.min_length = cfg.length;
+    cfg.length = 6;
+    cfg.min_length = 4;
     cfg.finish_on_short = true;
-    
+
     pin_entry_.init(content_parent, cfg);
 
     const theme::Palette& pal = theme::current();

@@ -6,7 +6,6 @@
 #include "ui/screens/main_menu.hpp"
 
 #include "security/lock_manager.hpp"
-#include "security/permission_manager.hpp"
 #include "settings/settings.hpp"
 #include "usb/usb_service.hpp"
 #include "wifi/wifi_service.hpp"
@@ -82,21 +81,15 @@ bool QuickScreen::on_input(InputAction action)
             return true; // QuickScreen is always stack-bottom; pop() is a no-op anyway
 
         case InputAction::BackLong: {
-            const security::permission::Result perm =
-                security::permission::check(security::permission::Operation::PrintPassword);
-
-            if (perm != security::permission::Result::Allowed) {
-                // Print the default/first password (Quick Mode)
-                // In Quick Mode we type the "current" password from settings
-                // or the last-used account. For now, we type a placeholder
-                // until Quick Mode account selection is implemented.
-                ESP_LOGI(TAG, "Print Password denied (%d)", static_cast<int>(perm));
-                lv_label_set_text(status_label_, locked ? "Unlock first" : "Not allowed");
-                return true;
-            }
-
-            const char* password =
-                settings::all().usb.default_password;
+            // Deliberately NOT gated behind security::permission::check()
+            // -- matches KeyKeeper 1.90's own "quick password without
+            // PIN" feature exactly (see settings::UsbSettings::default_password's
+            // doc comment for the trade-off this represents). Unlike
+            // Print Password on a real vault entry (which stays gated
+            // elsewhere), this is a single, separately-configured field
+            // the person explicitly set up to be reachable without
+            // unlocking.
+            const char* password = settings::all().usb.default_password;
 
             if (password == nullptr || password[0] == '\0') {
                 ESP_LOGI(TAG, "Password Shortcut is empty");
@@ -104,8 +97,8 @@ bool QuickScreen::on_input(InputAction action)
                 return true;
             }
 
-    usb::type_string(password);
-    lv_label_set_text(status_label_, usb::last_status());
+            usb::type_string(password);
+            lv_label_set_text(status_label_, usb::last_status());
             return true;
         }
 

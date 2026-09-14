@@ -149,16 +149,35 @@ void generate_salt(uint8_t out_salt[SALT_LEN])
     esp_fill_random(out_salt, SALT_LEN);
 }
 
-bool pin_length_ok(const char* pin)
+/**
+ * @brief Loose format check: 4-6 numeric digits, nothing else.
+ *        Deliberately does NOT compare against
+ *        settings::all().security.pin_length -- see pin_length_ok()
+ *        for the stricter check used only when SETTING a new PIN.
+ *
+ * verify()/verify_duress() use THIS, not pin_length_ok(): the stored
+ * hash was computed at set-time against whatever length was chosen
+ * then, and verifying should only depend on that hash actually
+ * matching -- never on a SEPARATELY mutable setting also still
+ * agreeing. This is a real fix, not a hypothetical: settings::
+ * SecuritySettings once grew a new field (secret_word), which changed
+ * its stored blob's size; settings.cpp's load_section() correctly
+ * refuses to reinterpret a differently-shaped blob and falls back to
+ * defaults (pin_length=6) -- but a 4-digit PIN's hash was completely
+ * unaffected by any of that, and the OLD length-matching check here
+ * would have permanently locked that PIN out even though it was still
+ * the right PIN. Loosening this check to format-only fixes that
+ * class of problem going forward, regardless of what causes the
+ * setting and the actual stored PIN to disagree.
+ */
+bool pin_format_ok(const char* pin)
 {
     if (pin == nullptr) {
         return false;
     }
 
     const size_t len = strlen(pin);
-    const uint8_t configured_length = settings::all().security.pin_length;
-
-    if (len != configured_length || len < 4 || len > 6) {
+    if (len < 4 || len > 6) {
         return false;
     }
 
@@ -169,6 +188,25 @@ bool pin_length_ok(const char* pin)
     }
 
     return true;
+}
+
+/**
+ * @brief Stricter check used only when SETTING a NEW pin (set_pin(),
+ *        set_duress_pin()) -- the new value must match the currently
+ *        configured length preference. Callers are expected to update
+ *        that preference immediately before calling set_pin() (see
+ *        ui::screens::SetupPinScreen/SecuritySettingsScreen), so this
+ *        should already agree by construction; kept as a safety net
+ *        for that one path. See pin_format_ok() for the check used
+ *        everywhere else (verification), which does NOT do this
+ *        comparison.
+ */
+bool pin_length_ok(const char* pin)
+{
+    if (!pin_format_ok(pin)) {
+        return false;
+    }
+    return strlen(pin) == settings::all().security.pin_length;
 }
 
 bool stored_pin_valid(const StoredPin& value)
@@ -414,7 +452,7 @@ VerifyResult verify(const char* pin)
         return VerifyResult::LockedOut;
     }
 
-    if (!pin_length_ok(pin)) {
+    if (!pin_format_ok(pin)) {
         register_failure();
         if (consecutive_failures >= WIPE_THRESHOLD) {
             ESP_LOGE(TAG, "PIN failure threshold %u reached: wipe required",
@@ -492,7 +530,17 @@ bool set_duress_pin(const char* duress_pin, const char* current_pin)
         ESP_LOGW(TAG, "set_duress_pin: current PIN verification failed");
         return false;
     }
-    if (!pin_length_ok(duress_pin)) {
+    if (!pin_format_ok(duress_pin)) {
+        return false;
+    }
+    if (strlen(duress_pin) != strlen(current_pin)) {
+        // Must match the REGULAR pin's actual, just-verified length --
+        // deliberately NOT settings::all().security.pin_length (used
+        // to be), which could disagree with the real stored PIN for
+        // reasons that have nothing to do with the PIN itself. See
+        // pin_format_ok()'s comment for the same reasoning applied
+        // elsewhere.
+        ESP_LOGW(TAG, "set_duress_pin: duress PIN must be the same length as the current PIN");
         return false;
     }
     if (std::strcmp(duress_pin, current_pin) == 0) {
@@ -545,7 +593,7 @@ bool clear_duress_pin()
 
 bool verify_duress(const char* pin)
 {
-    if (!initialized || !duress_pin_set || !pin_length_ok(pin)) {
+    if (!initialized || !duress_pin_set || !pin_format_ok(pin)) {
         return false;
     }
 

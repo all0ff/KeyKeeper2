@@ -140,6 +140,14 @@ void SecuritySettingsScreen::render_rows()
                 break;
         }
     }
+
+    // 6 rows sit right at the edge of what fits in the visible
+    // content area -- keep the selected one scrolled into view (see
+    // WifiSettingsScreen's identical fix; that screen hit this first
+    // at 7 rows, but the same gap existed here too).
+    if (row_labels_[selected_row_] != nullptr) {
+        lv_obj_scroll_to_view(row_labels_[selected_row_], LV_ANIM_ON);
+    }
 }
 
 void SecuritySettingsScreen::move_selection(int32_t delta)
