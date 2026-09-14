@@ -287,20 +287,25 @@ void SecuritySettingsScreen::show_pin_step(const char* error /* = nullptr */)
     widgets::PinEntry::Config cfg{};
 
     if (change_step_ == ChangePinStep::Old) {
-        cfg.length = settings::all().security.pin_length;
-
-        if (cfg.length < 4 || cfg.length > 6) {
-            cfg.length = 6;
-        }
-
-        cfg.min_length = cfg.length;
+        // Deliberately NOT tied to settings::all().security.pin_length
+        // -- that setting can drift from the ACTUAL stored PIN's real
+        // length (a settings-storage layout change can silently fall
+        // back to defaults), and PinEntry hard-caps entry at
+        // cfg.length -- a too-short length here would make it
+        // impossible to even TYPE a longer real PIN. Full 4-6 range +
+        // OkLong to finish early always works regardless of what the
+        // setting currently says. This exact fix has reverted twice
+        // now from a git-sync mismatch between local and pushed
+        // state -- please commit/push after applying this before any
+        // further changes, so it sticks this time.
+        cfg.length = 6;
+        cfg.min_length = 4;
         cfg.finish_on_short = true;
     } else {
         cfg.length = 6;
         cfg.min_length = 4;
         cfg.finish_on_short = false;
     }
-
 
     pin_entry_.init(content_parent_, cfg);
 }
@@ -495,17 +500,31 @@ void SecuritySettingsScreen::show_duress_pin_step(const char* error /* = nullptr
         lv_obj_align(err, LV_ALIGN_TOP_MID, 0, 24);
     }
 
-    // Fixed at the CURRENT regular PIN's length for all three steps
-    // -- "same length as the current PIN" is the whole point, unlike
-    // Change PIN's New/Confirm steps, which allow a flexible 4-6
-    // length since you're choosing a length there.
+    // Deliberately NOT fixed at settings::all().security.pin_length
+    // for the CurrentPin step -- that setting can drift from the
+    // actual stored PIN's real length, and PinEntry hard-caps entry
+    // at cfg.length, so a too-short value there would make it
+    // impossible to even type a longer real PIN. For EnterNew/Confirm,
+    // by then duress_current_pin_ has already been verified
+    // successfully, so ITS length is the real, true regular-PIN
+    // length -- an exact box count there is both correct UX and safe,
+    // since it's derived from a just-verified fact, not a setting
+    // that could disagree with reality.
     widgets::PinEntry::Config cfg{};
-    cfg.length = settings::all().security.pin_length;
-    if (cfg.length < 4 || cfg.length > 6) {
+
+    if (duress_step_ == DuressPinStep::CurrentPin) {
         cfg.length = 6;
+        cfg.min_length = 4;
+        cfg.finish_on_short = true;
+    } else {
+        uint8_t len = static_cast<uint8_t>(duress_current_pin_.length());
+        if (len < 4 || len > 6) {
+            len = 6; // shouldn't happen (already verified), just a safe fallback
+        }
+        cfg.length = len;
+        cfg.min_length = len;
+        cfg.finish_on_short = true;
     }
-    cfg.min_length = cfg.length;
-    cfg.finish_on_short = true;
 
     pin_entry_.init(content_parent_, cfg);
 }
