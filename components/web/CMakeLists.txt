@@ -12,6 +12,7 @@ idf_component_register(
         settings
         wifi
         vault
+        display
         event_bus
         esp_http_server
         log

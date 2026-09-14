@@ -173,8 +173,32 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
       <input id="set-auto-lock-enabled" type="checkbox">
       Auto Lock enabled
     </label>
-    <div class="field-label">Auto Lock timeout (seconds)</div>
-    <input id="set-auto-lock-timeout" type="number" min="0">
+    <div class="field-label">Auto Lock timeout</div>
+    <select id="set-auto-lock-timeout">
+      <option value="0">Off</option>
+      <option value="60">1 min</option>
+      <option value="180">3 min</option>
+      <option value="300">5 min</option>
+      <option value="600">10 min</option>
+      <option value="900">15 min</option>
+      <option value="1200">20 min</option>
+      <option value="1500">25 min</option>
+      <option value="1800">30 min</option>
+      <option value="2100">35 min</option>
+      <option value="2400">40 min</option>
+      <option value="2700">45 min</option>
+      <option value="3000">50 min</option>
+      <option value="3300">55 min</option>
+      <option value="3600">60 min</option>
+      <option value="3900">65 min</option>
+      <option value="4200">70 min</option>
+      <option value="4500">75 min</option>
+      <option value="4800">80 min</option>
+      <option value="5100">85 min</option>
+      <option value="5400">90 min</option>
+      <option value="5700">95 min</option>
+      <option value="6000">100 min</option>
+    </select>
     <div id="set-security-msg"></div>
     <button onclick="saveSettings('security')" style="margin-top:8px">Save Security</button>
 

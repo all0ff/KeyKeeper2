@@ -4,6 +4,7 @@
 #include "security/lock_manager.hpp"
 #include "settings/settings.hpp"
 #include "wifi/wifi_service.hpp"
+#include "display/display.hpp"
 
 #include "cJSON.h"
 #include "esp_log.h"
@@ -194,6 +195,19 @@ esp_err_t handle_put_general(httpd_req_t* req)
         respond_error(req, "500 Internal Server Error", "Failed to save");
         return ESP_OK;
     }
+
+    // settings::set_general() only persists the value -- it doesn't
+    // touch the LIVE display. On-device, GeneralSettingsScreen's own
+    // Save doesn't call display::set_brightness() either, but that's
+    // invisible there because its brightness ROW already applies
+    // changes live as you adjust it (see that screen's "// live
+    // preview" comment) -- by the time you hit Save, the display
+    // already shows the new value. There's no equivalent live-preview
+    // step over the web, so this call is what actually applies the
+    // change here instead of leaving the display showing a stale
+    // brightness until something else (e.g. next boot, or touching
+    // the on-device slider) happens to call this.
+    display::set_brightness(updated.display_brightness);
 
     respond_ok(req, general_to_json(updated));
     return ESP_OK;
