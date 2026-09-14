@@ -304,14 +304,11 @@ void SecuritySettingsScreen::show_pin_step(const char* error /* = nullptr */)
     widgets::PinEntry::Config cfg{};
 
     if (change_step_ == ChangePinStep::Old) {
-        // Box count = settings::all().security.pin_length exactly, at
-        // the project owner's explicit request -- see
-        // ui::screens::LockScreen::initialize()'s identical comment
-        // for the full reasoning (this reintroduces the risk a
-        // flexible range was added to prevent, but the specific cause
-        // that triggered it once is a one-time migration hazard
-        // that's already behind this project).
-        cfg.length = settings::all().security.pin_length;
+        // Box count = the ACTUAL stored PIN's length
+        // (security::pin::stored_pin_length()), not
+        // settings::all().security.pin_length -- see that function's
+        // own doc comment; same reasoning as LockScreen.
+        cfg.length = security::pin::stored_pin_length();
         if (cfg.length < 4 || cfg.length > 6) {
             cfg.length = 6;
         }
@@ -543,11 +540,10 @@ void SecuritySettingsScreen::show_duress_pin_step(const char* error /* = nullptr
     widgets::PinEntry::Config cfg{};
 
     if (duress_step_ == DuressPinStep::CurrentPin) {
-        // Box count = settings::all().security.pin_length exactly,
-        // same as LockScreen/Change PIN's Old step now -- see
-        // ui::screens::LockScreen::initialize()'s comment for the
-        // full reasoning.
-        cfg.length = settings::all().security.pin_length;
+        // Box count = the ACTUAL stored PIN's length
+        // (security::pin::stored_pin_length()), same as
+        // LockScreen/Change PIN's Old step.
+        cfg.length = security::pin::stored_pin_length();
         if (cfg.length < 4 || cfg.length > 6) {
             cfg.length = 6;
         }

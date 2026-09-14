@@ -7,7 +7,6 @@
 
 #include "security/lock_manager.hpp"
 #include "security/pin_manager.hpp"
-#include "settings/settings.hpp"
 #include "vault/vault_repository.hpp"
 
 #include "esp_log.h"
@@ -36,21 +35,15 @@ const char* LockScreen::footer_hint() const
 
 void LockScreen::initialize(lv_obj_t* content_parent)
 {
-    // Box count = settings::all().security.pin_length exactly, at the
-    // project owner's explicit request (better UX: matches what you
-    // actually typed when you set your PIN, not a padded 4-6 range).
-    // Confirmed aware this reintroduces the risk the flexible range
-    // was added to prevent (if this setting ever disagrees with the
-    // ACTUAL stored PIN's length, PinEntry hard-caps entry at
-    // cfg.length, making the real PIN impossible to type) -- but the
-    // specific cause that triggered that once (a settings-storage
-    // layout change silently reverting to defaults) is a one-time
-    // migration hazard, already behind this project, not a standing
-    // risk. verify() itself no longer requires this to match anyway
-    // (see pin_manager.cpp's pin_format_ok()) -- only entry is capped
-    // by it, not verification.
+    // Box count = the ACTUAL stored PIN's length (security::pin::stored_pin_length(),
+    // written atomically alongside the PIN hash itself), not
+    // settings::all().security.pin_length (a separate, independently
+    // mutable struct that could in principle disagree with it -- see
+    // that function's own doc comment for the full reasoning, and why
+    // this is safe against the specific failure mode that motivated
+    // the earlier flexible-range version of this code).
     widgets::PinEntry::Config cfg{};
-    cfg.length = settings::all().security.pin_length;
+    cfg.length = security::pin::stored_pin_length();
     if (cfg.length < 4 || cfg.length > 6) {
         cfg.length = 6;
     }

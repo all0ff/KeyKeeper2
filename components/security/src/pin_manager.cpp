@@ -51,7 +51,22 @@ struct StoredPin
 {
     uint32_t magic;
     uint8_t version;
-    uint8_t reserved[3];
+    // Length of the PIN this hash was computed for -- written
+    // atomically in the SAME blob as the hash itself (same set_pin()
+    // call, same NVS write), so it can never disagree with what's
+    // actually stored the way a value kept in a SEPARATE, independently-
+    // mutable settings struct could. This is what
+    // ui::screens::LockScreen etc. now use for their PinEntry box
+    // count, instead of settings::all().security.pin_length.
+    //
+    // Reused one of the previously-unused reserved bytes -- doesn't
+    // change sizeof(StoredPin) at all, so blobs written before this
+    // field existed still pass the size check in init() and load
+    // normally; pin_length just reads as 0 for those until the next
+    // successful set_pin() (see init()'s loading code for the
+    // fallback used for the one load where it's still 0).
+    uint8_t pin_length;
+    uint8_t reserved[2];
     uint8_t salt[SALT_LEN];
     uint8_t hash[HASH_LEN];
 };
@@ -322,6 +337,20 @@ bool init()
         len == sizeof(stored) && stored_pin_valid(stored)) {
         pin_set = true;
         ESP_LOGI(TAG, "PIN loaded from NVS");
+
+        if (stored.pin_length < 4 || stored.pin_length > 6) {
+            // Either an old blob written before StoredPin::pin_length
+            // existed (reads as 0, since that byte used to be part of
+            // "reserved") or something else implausible -- either way,
+            // fall back to the settings value for THIS session only.
+            // The next successful set_pin() call populates the real
+            // field properly; not rewriting it here avoids an NVS
+            // write during init() just to backfill a cosmetic default.
+            const uint8_t fallback = settings::all().security.pin_length;
+            stored.pin_length = (fallback >= 4 && fallback <= 6) ? fallback : 6;
+            ESP_LOGI(TAG, "PIN blob predates pin_length -- using %u for this session",
+                     static_cast<unsigned>(stored.pin_length));
+        }
     } else {
         pin_set = false;
         ESP_LOGI(TAG, "No valid PIN set yet (first boot or old PIN format)");
@@ -374,6 +403,20 @@ bool has_pin()
     return pin_set;
 }
 
+uint8_t stored_pin_length()
+{
+    if (!pin_set) {
+        return 6; // no PIN yet -- same fallback default used elsewhere for "unknown"
+    }
+    if (stored.pin_length < 4 || stored.pin_length > 6) {
+        // Shouldn't happen -- init() already backfills this on load
+        // (see its own comment) -- but stay safe rather than return
+        // something PinEntry can't use.
+        return 6;
+    }
+    return stored.pin_length;
+}
+
 bool store_new_pin(const char* new_pin)
 {
     if (!pin_length_ok(new_pin)) {
@@ -383,6 +426,7 @@ bool store_new_pin(const char* new_pin)
     StoredPin next{};
     next.magic = PIN_BLOB_MAGIC;
     next.version = PIN_BLOB_VERSION;
+    next.pin_length = static_cast<uint8_t>(std::strlen(new_pin));
     generate_salt(next.salt);
     if (!compute_hash(next.salt, new_pin, next.hash)) {
         ESP_LOGE(TAG, "store_new_pin: PBKDF2 computation failed");

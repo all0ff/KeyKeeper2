@@ -45,6 +45,19 @@ bool is_initialized();
 bool has_pin();
 
 /**
+ * @brief The ACTUAL length (4-6) of the currently stored PIN --
+ *        written atomically in the same NVS blob as the PIN's hash
+ *        itself (same set_pin() call), so it can never disagree with
+ *        what's really stored the way settings::all().security.pin_length
+ *        (a separate, independently-mutable settings struct) could.
+ *
+ * Use this, not settings::all().security.pin_length, anywhere the
+ * exact number of digits matters for real (e.g. how many
+ * widgets::PinEntry boxes to show) -- returns 6 if no PIN is set yet.
+ */
+uint8_t stored_pin_length();
+
+/**
  * @brief Set or replace the PIN.
  *
  * new_pin must contain only digits and have the configured PIN length.
