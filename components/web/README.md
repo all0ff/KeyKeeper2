@@ -55,6 +55,20 @@ wiping the vault -- see "What's here" below).
     before persisting, same as every other path into the vault.
 - JSON response shape follows docs/WEB.md section 7 exactly:
   `{"status":"ok","data":{...}}` / `{"status":"error","message":"..."}`.
+- `web_settings_routes.cpp` -- REST for device settings: `GET /api/v1/settings`
+  (all sections at once), `PUT /api/v1/settings/<section>` for
+  `general`/`usb`/`security`/`wifi`, each a read-modify-write of that
+  whole section (a field missing from the PUT body keeps its current
+  value, matching the on-device Settings screens' own Save).
+  Deliberately NOT exposed, even though they exist on-device: PIN
+  length/changing the PIN itself (stays a device-only action --
+  remote PIN changes over plain HTTP are a materially different risk
+  than e.g. auto-lock timing), `secret_word` (changing it via the web
+  would immediately break the CURRENT web session's own routing --
+  see `web_settings_routes.hpp`'s file comment), and Factory Reset
+  (destructive, no reason to expose remotely). `PUT .../wifi` also
+  calls `wifi::apply_settings()` afterward, matching
+  `WifiSettingsScreen`'s own Save.
 - Optional secret-word URL path prefix, from KeyKeeper 1.90's own
   "secretword" feature -- `settings::SecuritySettings::secret_word`,
   edited from `WifiSettingsScreen` (grouped there, not in Security
@@ -74,9 +88,9 @@ wiping the vault -- see "What's here" below).
 - Search over REST (the on-device `SearchScreen`'s substring-match
   logic isn't exposed as an endpoint, and the Web UI's account list
   has no search/filter box yet either).
-- Backup/restore/settings over REST -- WEB.md section 7's full
-  "Supported Operations" list also includes these; only entry CRUD is
-  done, and the Web UI only covers what REST exposes.
+- Backup/restore over REST -- WEB.md section 7's full "Supported
+  Operations" list also includes these; entry CRUD and settings are
+  done, backup/restore isn't yet.
 - Captive Portal.
 - HTTPS -- see the security note below and web_service.hpp's file
   comment.

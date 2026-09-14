@@ -2,6 +2,7 @@ idf_component_register(
     SRCS
         "src/web_service.cpp"
         "src/web_vault_routes.cpp"
+        "src/web_settings_routes.cpp"
 
     INCLUDE_DIRS
         "include"

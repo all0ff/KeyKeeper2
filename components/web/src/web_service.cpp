@@ -7,6 +7,7 @@
 #include "wifi/wifi_service.hpp"
 #include "web_app_html.hpp"
 #include "web_json_helpers.hpp"
+#include "web_settings_routes.hpp"
 #include "web_vault_routes.hpp"
 
 #include "cJSON.h"
@@ -160,13 +161,12 @@ bool start()
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    // Default max_uri_handlers is 8 -- root/login/status (3) + the 5
-    // vault CRUD routes registered by register_vault_routes() already
-    // hits that exactly, with zero room for anything added later
-    // (search, backup/restore/settings endpoints). Bump it with real
-    // headroom rather than relying on an unverified off-by-one at the
-    // boundary.
-    config.max_uri_handlers = 16;
+    // Default max_uri_handlers is 8. root/login/status (3) + 5 vault
+    // CRUD routes + 5 settings routes (register_settings_routes()) =
+    // 13 already -- bumped well past that for real headroom against
+    // whatever's added next (search, backup/restore over REST), not
+    // just enough for what exists today.
+    config.max_uri_handlers = 24;
 
     // Default stack_size (4096 bytes on this ESP-IDF version) turned
     // out to be too tight once handlers do real work -- a 2KB
@@ -217,6 +217,7 @@ bool start()
     httpd_register_uri_handler(server, &status_uri);
 
     register_vault_routes(server);
+    register_settings_routes(server);
 
     ESP_LOGI(TAG, "HTTP server started");
     publish(WebEventId::ServerStarted);

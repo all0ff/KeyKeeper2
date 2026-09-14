@@ -7,8 +7,9 @@
 //
 // A plain single-page app: no framework, no build step, just one HTML
 // string with inline CSS/JS, calling the REST endpoints
-// web_vault_routes.cpp already exposes (GET /api/v1/entries,
-// GET/PUT/DELETE /api/v1/entry?id=N, POST /api/v1/entry) plus
+// web_vault_routes.cpp exposes (GET /api/v1/entries, GET/PUT/DELETE
+// /api/v1/entry?id=N, POST /api/v1/entry), web_settings_routes.cpp
+// exposes (GET /api/v1/settings, PUT /api/v1/settings/<section>), and
 // web_service.cpp's own auth endpoints. All fetch() paths here are
 // RELATIVE (e.g. 'api/v1/entries', not '/api/v1/entries') so they
 // resolve correctly whether or not a secret-word prefix is active --
@@ -20,12 +21,16 @@
 // entries -> tap one to view its fields (password/TOTP secret masked
 // behind a reveal toggle) -> Edit opens the same form used for
 // creating a new entry. Delete requires a second confirmation tap,
-// matching the on-device UI's own press-twice pattern.
+// matching the on-device UI's own press-twice pattern. A Settings
+// button opens General/USB/Security/WiFi sections, each with its own
+// Save button (matches web_settings_routes.hpp's per-section PUT
+// shape) -- see that file's own comment for which fields are
+// deliberately NOT here (PIN length/change, secret word, Factory
+// Reset).
 //
-// NOT here: search, backup/restore, settings over the web (see
+// NOT here: search, backup/restore over the web (see
 // components/web/README.md's "Explicitly NOT here yet" list -- still
-// accurate). This is entry CRUD only, matching what the REST layer
-// underneath it actually supports right now.
+// accurate).
 // =============================================================================
 
 namespace web {
@@ -91,7 +96,10 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
   <div id="list-view">
     <div class="topbar">
       <h2>Accounts</h2>
-      <button class="small" onclick="openEdit(null)">+ New</button>
+      <div style="display:flex; gap:8px">
+        <button class="small secondary" onclick="openSettings()">Settings</button>
+        <button class="small" onclick="openEdit(null)">+ New</button>
+      </div>
     </div>
     <div id="msg"></div>
     <div id="entry-list"></div>
@@ -134,6 +142,61 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     <button onclick="saveEntry()" style="margin-top:12px">Save</button>
   </div>
 
+  <div id="settings-view" class="hidden">
+    <div class="topbar">
+      <button class="small secondary" onclick="showView('list-view')">&larr; Back</button>
+      <span></span>
+    </div>
+    <h2>Settings</h2>
+
+    <h3>General</h3>
+    <div class="field-label">Language</div>
+    <select id="set-language">
+      <option value="english">English</option>
+      <option value="russian">Russian</option>
+    </select>
+    <div class="field-label">Display Brightness (0-100)</div>
+    <input id="set-brightness" type="number" min="0" max="100">
+    <div class="field-label">Screen Timeout (seconds, 0 = off)</div>
+    <input id="set-screen-timeout" type="number" min="0">
+    <div id="set-general-msg"></div>
+    <button onclick="saveSettings('general')" style="margin-top:8px">Save General</button>
+
+    <h3 style="margin-top:24px">USB</h3>
+    <div class="field-label">Quick Password (no PIN required)</div>
+    <input id="set-default-password" type="text">
+    <div id="set-usb-msg"></div>
+    <button onclick="saveSettings('usb')" style="margin-top:8px">Save USB</button>
+
+    <h3 style="margin-top:24px">Security</h3>
+    <label class="checkbox">
+      <input id="set-auto-lock-enabled" type="checkbox">
+      Auto Lock enabled
+    </label>
+    <div class="field-label">Auto Lock timeout (seconds)</div>
+    <input id="set-auto-lock-timeout" type="number" min="0">
+    <div id="set-security-msg"></div>
+    <button onclick="saveSettings('security')" style="margin-top:8px">Save Security</button>
+
+    <h3 style="margin-top:24px">WiFi</h3>
+    <div class="field-label">Mode</div>
+    <select id="set-wifi-mode">
+      <option value="disabled">Disabled</option>
+      <option value="station">Station</option>
+      <option value="access_point">Access Point</option>
+    </select>
+    <div class="field-label">Station SSID</div>
+    <input id="set-sta-ssid" type="text">
+    <div class="field-label">Station Password</div>
+    <input id="set-sta-password" type="text">
+    <div class="field-label">AP SSID</div>
+    <input id="set-ap-ssid" type="text">
+    <div class="field-label">AP Password</div>
+    <input id="set-ap-password" type="text">
+    <div id="set-wifi-msg"></div>
+    <button onclick="saveSettings('wifi')" style="margin-top:8px">Save WiFi</button>
+  </div>
+
 </div>
 
 <script>
@@ -143,7 +206,7 @@ let editingId = null;
 let deleteConfirmPending = false;
 
 function showView(id) {
-  ['list-view', 'detail-view', 'edit-view'].forEach(v => {
+  ['list-view', 'detail-view', 'edit-view', 'settings-view'].forEach(v => {
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -384,6 +447,86 @@ async function saveEntry() {
 
   showView('list-view');
   loadList();
+}
+
+// ---------- Settings ----------
+
+async function openSettings() {
+  const { ok, body } = await api('api/v1/settings');
+  if (!ok) {
+    alert(body.message || 'Failed to load settings');
+    return;
+  }
+
+  const d = body.data;
+  document.getElementById('set-language').value = d.general.language;
+  document.getElementById('set-brightness').value = d.general.display_brightness;
+  document.getElementById('set-screen-timeout').value = d.general.display_off_timeout_s;
+
+  document.getElementById('set-default-password').value = d.usb.default_password;
+
+  document.getElementById('set-auto-lock-enabled').checked = !!d.security.auto_lock_enabled;
+  document.getElementById('set-auto-lock-timeout').value = d.security.auto_lock_timeout_s;
+
+  document.getElementById('set-wifi-mode').value = d.wifi.mode;
+  document.getElementById('set-sta-ssid').value = d.wifi.sta_ssid;
+  document.getElementById('set-sta-password').value = d.wifi.sta_password;
+  document.getElementById('set-ap-ssid').value = d.wifi.ap_ssid;
+  document.getElementById('set-ap-password').value = d.wifi.ap_password;
+
+  ['general', 'usb', 'security', 'wifi'].forEach(s => {
+    document.getElementById('set-' + s + '-msg').textContent = '';
+  });
+
+  showView('settings-view');
+}
+
+async function saveSettings(section) {
+  const msg = document.getElementById('set-' + section + '-msg');
+  let payload = {};
+
+  if (section === 'general') {
+    payload = {
+      language: document.getElementById('set-language').value,
+      display_brightness: parseInt(document.getElementById('set-brightness').value, 10) || 0,
+      display_off_timeout_s: parseInt(document.getElementById('set-screen-timeout').value, 10) || 0
+    };
+  } else if (section === 'usb') {
+    payload = {
+      default_password: document.getElementById('set-default-password').value
+    };
+  } else if (section === 'security') {
+    payload = {
+      auto_lock_enabled: document.getElementById('set-auto-lock-enabled').checked,
+      auto_lock_timeout_s: parseInt(document.getElementById('set-auto-lock-timeout').value, 10) || 0
+    };
+  } else if (section === 'wifi') {
+    payload = {
+      mode: document.getElementById('set-wifi-mode').value,
+      sta_ssid: document.getElementById('set-sta-ssid').value,
+      sta_password: document.getElementById('set-sta-password').value,
+      ap_ssid: document.getElementById('set-ap-ssid').value,
+      ap_password: document.getElementById('set-ap-password').value
+    };
+  }
+
+  msg.style.color = '#000';
+  msg.textContent = 'Saving...';
+
+  const { ok, body } = await api('api/v1/settings/' + section, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!ok) {
+    msg.style.color = '#c00';
+    msg.textContent = body.message || 'Save failed';
+    return;
+  }
+
+  msg.style.color = '#080';
+  msg.textContent = 'Saved.';
 }
 
 checkAuth();

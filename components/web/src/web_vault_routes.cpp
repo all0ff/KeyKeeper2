@@ -23,12 +23,6 @@ constexpr char TAG[] = "web.vault";
 // for a personal vault's realistic size, not a considered limit.
 constexpr size_t MAX_LIST_ENTRIES = 256;
 
-// Comfortably fits a maximal entry as JSON: MAX_LOGIN_LEN(128) +
-// MAX_PASSWORD_LEN(128) + MAX_URL_LEN(256) + MAX_NOTES_LEN(512) +
-// MAX_TOTP_SECRET_LEN(128) + MAX_CATEGORY_LEN(64) = 1216 chars of
-// field content alone, plus JSON keys/quoting/escaping overhead.
-constexpr size_t MAX_BODY_LEN = 2048;
-
 bool require_unlocked(httpd_req_t* req)
 {
     if (security::lock::state() != security::lock::State::Unlocked) {
@@ -52,48 +46,7 @@ bool get_id_from_query(httpd_req_t* req, uint32_t& out_id)
     return true;
 }
 
-bool read_body(httpd_req_t* req, std::string& out)
-{
-    if (req->content_len == 0 || req->content_len >= MAX_BODY_LEN) {
-        return false;
-    }
 
-    // Heap-allocated, NOT a stack-local char[MAX_BODY_LEN] (2048
-    // bytes) -- that used to sit on the httpd worker task's own
-    // stack, which is a modest, fixed size (see web_service.cpp's
-    // start(), which now sets it explicitly rather than trusting the
-    // default). Combined with cJSON's own parsing frames and several
-    // vault::VaultEntry std::string members further up this same call
-    // chain, a 2KB stack buffer here was a real, confirmed cause of a
-    // stack overflow -> panic -> full device reboot on save, not a
-    // hypothetical.
-    std::vector<char> buf(MAX_BODY_LEN);
-    int total = 0;
-    while (total < static_cast<int>(req->content_len)) {
-        const int ret = httpd_req_recv(req, buf.data() + total, req->content_len - total);
-        if (ret <= 0) {
-            return false;
-        }
-        total += ret;
-    }
-    out.assign(buf.data(), static_cast<size_t>(total));
-    return true;
-}
-
-const char* json_get_string(const cJSON* root, const char* key)
-{
-    const cJSON* item = cJSON_GetObjectItemCaseSensitive(root, key);
-    if (item != nullptr && cJSON_IsString(item) && item->valuestring != nullptr) {
-        return item->valuestring;
-    }
-    return "";
-}
-
-bool json_get_bool(const cJSON* root, const char* key)
-{
-    const cJSON* item = cJSON_GetObjectItemCaseSensitive(root, key);
-    return (item != nullptr) && cJSON_IsBool(item) && cJSON_IsTrue(item);
-}
 
 cJSON* entry_to_json_full(const vault::VaultEntry& e)
 {
