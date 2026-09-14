@@ -168,6 +168,20 @@ bool start()
     // boundary.
     config.max_uri_handlers = 16;
 
+    // Default stack_size (4096 bytes on this ESP-IDF version) turned
+    // out to be too tight once handlers do real work -- a 2KB
+    // stack-local buffer in web_vault_routes.cpp's read_body() (now
+    // fixed to be heap-allocated instead, see that file) combined
+    // with cJSON's own parsing frames and vault::VaultEntry's several
+    // std::string members caused a genuine stack overflow -> panic ->
+    // full device reboot when saving an entry from the Web UI.
+    // Fixing read_body() alone removes the single biggest contributor,
+    // but bumping this too gives real headroom against whatever
+    // handler needs more stack next (search, import/export, ...),
+    // rather than relying on an unverified default staying just
+    // barely enough.
+    config.stack_size = 8192;
+
     if (httpd_start(&server, &config) != ESP_OK) {
         ESP_LOGE(TAG, "httpd_start() failed");
         server = nullptr;

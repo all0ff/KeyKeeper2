@@ -58,16 +58,25 @@ bool read_body(httpd_req_t* req, std::string& out)
         return false;
     }
 
-    char buf[MAX_BODY_LEN];
+    // Heap-allocated, NOT a stack-local char[MAX_BODY_LEN] (2048
+    // bytes) -- that used to sit on the httpd worker task's own
+    // stack, which is a modest, fixed size (see web_service.cpp's
+    // start(), which now sets it explicitly rather than trusting the
+    // default). Combined with cJSON's own parsing frames and several
+    // vault::VaultEntry std::string members further up this same call
+    // chain, a 2KB stack buffer here was a real, confirmed cause of a
+    // stack overflow -> panic -> full device reboot on save, not a
+    // hypothetical.
+    std::vector<char> buf(MAX_BODY_LEN);
     int total = 0;
     while (total < static_cast<int>(req->content_len)) {
-        const int ret = httpd_req_recv(req, buf + total, req->content_len - total);
+        const int ret = httpd_req_recv(req, buf.data() + total, req->content_len - total);
         if (ret <= 0) {
             return false;
         }
         total += ret;
     }
-    out.assign(buf, static_cast<size_t>(total));
+    out.assign(buf.data(), static_cast<size_t>(total));
     return true;
 }
 
