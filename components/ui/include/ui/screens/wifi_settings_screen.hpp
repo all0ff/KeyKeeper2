@@ -29,6 +29,17 @@
 // purely a settings::set_*() call and nothing about the running
 // firmware changes until next boot, here the whole point is to
 // (re)connect right away.
+//
+// Secret Word row: from KeyKeeper 1.90's own "secretword" feature
+// (see settings::SecuritySettings::secret_word's doc comment) -- an
+// optional URL path-prefix requirement for the Web UI/REST API.
+// Grouped here (not in SecuritySettingsScreen, which is already
+// large) because it's fundamentally about WEB access, even though the
+// underlying field lives in settings::SecuritySettings, not
+// settings::WifiSettings -- Save writes BOTH sections and also calls
+// web::restart() so a changed word takes effect immediately (routes
+// bake the current word in as a literal path prefix at registration
+// time).
 // =============================================================================
 
 namespace ui::screens {
@@ -51,9 +62,10 @@ private:
         StaPassword,
         ApSsid,
         ApPassword,
+        SecretWord,
         Save,
     };
-    static constexpr size_t ROW_COUNT = 6;
+    static constexpr size_t ROW_COUNT = 7;
 
     enum class Mode : uint8_t
     {
@@ -89,6 +101,7 @@ private:
     char sta_password_[65]{};
     char ap_ssid_[33]{};
     char ap_password_[65]{};
+    char secret_word_[33]{};
 
     widgets::TextEntry text_entry_;
 };

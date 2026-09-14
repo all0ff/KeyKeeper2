@@ -63,7 +63,7 @@ constexpr char LOGIN_PAGE[] = R"HTML(<!DOCTYPE html>
       msg.style.color = '#000';
       msg.textContent = 'Checking...';
       try {
-        const res = await fetch('/api/v1/auth/login', {
+        const res = await fetch('api/v1/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pin: pin })
@@ -228,19 +228,25 @@ bool start()
     }
 
     static httpd_uri_t root_uri{};
-    root_uri.uri = "/";
+    static char root_path[48];
+    build_prefixed_path(root_path, sizeof(root_path), "/");
+    root_uri.uri = root_path;
     root_uri.method = HTTP_GET;
     root_uri.handler = handle_root;
     root_uri.user_ctx = nullptr;
 
     static httpd_uri_t login_uri{};
-    login_uri.uri = "/api/v1/auth/login";
+    static char login_path[64];
+    build_prefixed_path(login_path, sizeof(login_path), "/api/v1/auth/login");
+    login_uri.uri = login_path;
     login_uri.method = HTTP_POST;
     login_uri.handler = handle_login;
     login_uri.user_ctx = nullptr;
 
     static httpd_uri_t status_uri{};
-    status_uri.uri = "/api/v1/auth/status";
+    static char status_path[64];
+    build_prefixed_path(status_path, sizeof(status_path), "/api/v1/auth/status");
+    status_uri.uri = status_path;
     status_uri.method = HTTP_GET;
     status_uri.handler = handle_auth_status;
     status_uri.user_ctx = nullptr;
@@ -270,6 +276,12 @@ void stop()
 bool is_running()
 {
     return server != nullptr;
+}
+
+bool restart()
+{
+    stop();
+    return start();
 }
 
 } // namespace web

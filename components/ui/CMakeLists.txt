@@ -40,6 +40,7 @@ idf_component_register(
         vault
         usb
         wifi
+        web
         esp_app_format
         efuse
         lvgl

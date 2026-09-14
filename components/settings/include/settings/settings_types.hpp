@@ -101,6 +101,17 @@ struct SecuritySettings
     bool auto_lock_enabled = true;
     uint32_t auto_lock_timeout_s = 30;
     uint32_t web_ui_permissions = WEB_UI_VIEW_ACCOUNTS;
+
+    // From KeyKeeper 1.90's own "secretword" feature: an optional
+    // path-prefix all Web UI/REST routes require
+    // (http://IP/<secret_word>/...) when non-empty -- a low-effort
+    // deterrent, not real authentication (still no TLS, still visible
+    // to anyone who captures the traffic; see components/web's own
+    // security note). Empty means disabled -- matches 1.90's own
+    // "" == no secret word convention. QuickScreen's OkShort
+    // ("Print URL") types the resulting full address, prefix included,
+    // via USB HID -- also matching 1.90's Main-button-click behavior.
+    char secret_word[33]{};
 };
 
 struct GuiSettings

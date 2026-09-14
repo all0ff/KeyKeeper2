@@ -13,29 +13,22 @@
 // Quick Actions per GUI.md 7: Short BACK -> Unlock, Long BACK -> Print
 // Password, Short OK -> Print URL.
 //
-// OPEN SPEC CONFLICT (not resolved here, see components/ui/README.md):
-// GUI.md's own mockup shows these Print actions as hints on the
-// LOCKED state of this screen (implying a "quick print without fully
-// unlocking" convenience), but REQUIREMENTS.md 9.3 gates
-// Print Password behind SecurityService, and PermissionManager (as
-// already built and confirmed) requires Unlocked + an active session
-// for every gated operation, no exception for this screen. As
-// implemented here, both actions call permission::check() as-is and
-// will therefore be denied while Locked -- the safer default (never
-// leak stored data from a locked device), but possibly not what
-// GUI.md's mockup intended. Revisit once LockScreen exists and this
-// is actually end-to-end testable.
+// RESOLVED SPEC CONFLICT: GUI.md's own mockup shows these Print
+// actions as hints on the LOCKED state of this screen (implying a
+// "quick print without fully unlocking" convenience), while
+// REQUIREMENTS.md 9.3 gates Print Password behind SecurityService.
+// Print URL and Print Password are handled differently here on
+// purpose: Print URL (OkShort) is NOT permission-gated -- it only
+// types the Web UI's network address, not stored vault data, and
+// KeyKeeper 1.90's own reference implementation confirms this was
+// meant to work whether or not a PIN had been entered yet. Print
+// Password (BackLong) stays gated behind permission::check() --
+// unlike a URL, it reveals a real stored secret.
 //
-// PLACEHOLDERS (not yet built):
-//   - Print URL/Print Password need a concrete USB HID
-//     OutputChannel (interfaces::channels has only the abstract
-//     contract) -- the permission check runs for real, the actual USB
-//     typing is a logged no-op.
-//   - There is no separate "Print URL" permission operation in
-//     PermissionManager (REQUIREMENTS 9.3 only lists Print Password/
-//     Print OTP among the print-related gated ops) -- Print URL is
-//     mapped to the same Operation::PrintPassword check here as a
-//     placeholder, not a considered decision.
+// PLACEHOLDER (not yet built):
+//   - Print Password's "Quick Mode account" is still a fixed
+//     settings::all().usb.default_password, not a selectable specific
+//     vault entry.
 // =============================================================================
 
 namespace ui::screens {

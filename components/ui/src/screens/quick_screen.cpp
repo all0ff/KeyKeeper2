@@ -9,6 +9,7 @@
 #include "security/permission_manager.hpp"
 #include "settings/settings.hpp"
 #include "usb/usb_service.hpp"
+#include "wifi/wifi_service.hpp"
 
 #include "esp_log.h"
 
@@ -109,15 +110,34 @@ bool QuickScreen::on_input(InputAction action)
         }
 
         case InputAction::OkShort: {
-            const security::permission::Result perm =
-                security::permission::check(security::permission::Operation::PrintPassword);
-            if (perm == security::permission::Result::Allowed) {
-                usb::type_string("https://example.com"); // TODO: use actual Quick Mode account URL
-                lv_label_set_text(status_label_, usb::last_status());
-            } else {
-                ESP_LOGI(TAG, "Print URL denied (%d)", static_cast<int>(perm));
-                lv_label_set_text(status_label_, locked ? "Unlock first" : "Not allowed");
+            // Deliberately NOT gated behind security::permission::check()
+            // -- this resolves the OPEN SPEC CONFLICT this file used to
+            // flag (see the updated header comment): unlike Print
+            // Password, this types the Web UI's network address, not any
+            // stored secret. Confirmed against KeyKeeper 1.90's own
+            // reference behavior, where the equivalent action (Main
+            // button click while idle) worked identically whether or not
+            // a PIN had been entered yet.
+            const char* ip = wifi::ip_address();
+            if (ip[0] == '\0') {
+                ESP_LOGI(TAG, "Print URL: WiFi not connected");
+                lv_label_set_text(status_label_, "WiFi not connected");
+                return true;
             }
+
+            // secret_word matches KeyKeeper 1.90's own "secretword"
+            // feature -- see settings::SecuritySettings::secret_word's
+            // doc comment. Empty means no prefix, same as 1.90.
+            const settings::SecuritySettings& sec = settings::all().security;
+            char url[96];
+            if (sec.secret_word[0] != '\0') {
+                std::snprintf(url, sizeof(url), "http://%s/%s/", ip, sec.secret_word);
+            } else {
+                std::snprintf(url, sizeof(url), "http://%s/", ip);
+            }
+
+            usb::type_string(url);
+            lv_label_set_text(status_label_, usb::last_status());
             return true;
         }
 

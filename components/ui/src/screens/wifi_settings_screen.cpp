@@ -4,6 +4,7 @@
 #include "ui/ui_manager.hpp"
 
 #include "settings/settings.hpp"
+#include "web/web_service.hpp"
 #include "wifi/wifi_service.hpp"
 
 #include "esp_log.h"
@@ -48,6 +49,7 @@ void WifiSettingsScreen::initialize(lv_obj_t* content_parent)
     std::strncpy(sta_password_, w.sta_password, sizeof(sta_password_) - 1);
     std::strncpy(ap_ssid_, w.ap_ssid, sizeof(ap_ssid_) - 1);
     std::strncpy(ap_password_, w.ap_password, sizeof(ap_password_) - 1);
+    std::strncpy(secret_word_, settings::all().security.secret_word, sizeof(secret_word_) - 1);
 
     build_rows(content_parent_);
 }
@@ -151,6 +153,10 @@ void WifiSettingsScreen::render_rows()
                 lv_label_set_text_fmt(row_labels_[i], "%sAP Password: %s", prefix,
                                        ap_password_[0] == '\0' ? "(open)" : "********");
                 break;
+            case Row::SecretWord:
+                lv_label_set_text_fmt(row_labels_[i], "%sSecret Word: %s", prefix,
+                                       secret_word_[0] == '\0' ? "(disabled)" : secret_word_);
+                break;
             case Row::Save:
                 lv_label_set_text_fmt(row_labels_[i], "%sSave & Apply", prefix);
                 break;
@@ -226,6 +232,7 @@ void WifiSettingsScreen::enter_edit_text(Row row)
         case Row::StaPassword: current_value = sta_password_; label_text = "Editing: Station Password"; break;
         case Row::ApSsid:      current_value = ap_ssid_;       label_text = "Editing: AP SSID"; break;
         case Row::ApPassword:  current_value = ap_password_;   label_text = "Editing: AP Password"; break;
+        case Row::SecretWord:  current_value = secret_word_;   label_text = "Editing: Secret Word"; break;
         default: break;
     }
     lv_label_set_text(header, label_text);
@@ -250,6 +257,7 @@ void WifiSettingsScreen::exit_edit_text(bool commit)
             case Row::StaPassword: target = sta_password_; target_size = sizeof(sta_password_); break;
             case Row::ApSsid:      target = ap_ssid_;       target_size = sizeof(ap_ssid_); break;
             case Row::ApPassword:  target = ap_password_;   target_size = sizeof(ap_password_); break;
+            case Row::SecretWord:  target = secret_word_;   target_size = sizeof(secret_word_); break;
             default: break;
         }
         if (target != nullptr) {
@@ -277,11 +285,28 @@ void WifiSettingsScreen::save()
         return;
     }
 
+    // secret_word lives in settings::SecuritySettings, not
+    // settings::WifiSettings -- see this screen's own file comment
+    // for why it's edited here anyway. Only that one field is
+    // touched; everything else in SecuritySettings is carried over
+    // as-is.
+    settings::SecuritySettings sec = settings::all().security;
+    std::strncpy(sec.secret_word, secret_word_, sizeof(sec.secret_word) - 1);
+    if (!settings::set_security(sec)) {
+        lv_label_set_text(status_label_, "Save failed");
+        return;
+    }
+
     ESP_LOGI(TAG, "WiFi settings saved, applying...");
     if (!wifi::apply_settings()) {
         lv_label_set_text(status_label_, "Saved, but failed to apply");
         return;
     }
+
+    // Routes bake the current secret word in as a literal path
+    // prefix at registration time -- restart so a changed word takes
+    // effect immediately rather than only on next boot.
+    web::restart();
 
     refresh_status();
 }

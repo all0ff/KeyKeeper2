@@ -305,32 +305,38 @@ esp_err_t handle_delete_entry(httpd_req_t* req)
 
 void register_vault_routes(httpd_handle_t server)
 {
+    static char entries_path[64];
+    build_prefixed_path(entries_path, sizeof(entries_path), "/api/v1/entries");
+
+    static char entry_path[64];
+    build_prefixed_path(entry_path, sizeof(entry_path), "/api/v1/entry");
+
     static httpd_uri_t list_uri{};
-    list_uri.uri = "/api/v1/entries";
+    list_uri.uri = entries_path;
     list_uri.method = HTTP_GET;
     list_uri.handler = handle_list_entries;
     list_uri.user_ctx = nullptr;
 
     static httpd_uri_t get_uri{};
-    get_uri.uri = "/api/v1/entry";
+    get_uri.uri = entry_path;
     get_uri.method = HTTP_GET;
     get_uri.handler = handle_get_entry;
     get_uri.user_ctx = nullptr;
 
     static httpd_uri_t create_uri{};
-    create_uri.uri = "/api/v1/entry";
+    create_uri.uri = entry_path;
     create_uri.method = HTTP_POST;
     create_uri.handler = handle_create_entry;
     create_uri.user_ctx = nullptr;
 
     static httpd_uri_t update_uri{};
-    update_uri.uri = "/api/v1/entry";
+    update_uri.uri = entry_path;
     update_uri.method = HTTP_PUT;
     update_uri.handler = handle_update_entry;
     update_uri.user_ctx = nullptr;
 
     static httpd_uri_t delete_uri{};
-    delete_uri.uri = "/api/v1/entry";
+    delete_uri.uri = entry_path;
     delete_uri.method = HTTP_DELETE;
     delete_uri.handler = handle_delete_entry;
     delete_uri.user_ctx = nullptr;

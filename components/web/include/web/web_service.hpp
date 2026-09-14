@@ -88,6 +88,18 @@ bool start();
 
 void stop();
 
+/**
+ * @brief Stop and restart the server, re-registering every route.
+ *
+ * Needed whenever something that routes were built FROM changes --
+ * currently just settings::SecuritySettings::secret_word (routes bake
+ * the current secret word in as a literal path prefix at registration
+ * time, see web_json_helpers.hpp's build_prefixed_path()). Call this
+ * right after saving a new secret word so it takes effect immediately
+ * rather than only on next boot.
+ */
+bool restart();
+
 bool is_running();
 
 } // namespace web

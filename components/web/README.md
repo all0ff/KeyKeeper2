@@ -50,6 +50,19 @@ wiping the vault -- see "What's here" below).
     before persisting, same as every other path into the vault.
 - JSON response shape follows docs/WEB.md section 7 exactly:
   `{"status":"ok","data":{...}}` / `{"status":"error","message":"..."}`.
+- Optional secret-word URL path prefix, from KeyKeeper 1.90's own
+  "secretword" feature -- `settings::SecuritySettings::secret_word`,
+  edited from `WifiSettingsScreen` (grouped there, not in Security
+  Settings, even though the field lives in `SecuritySettings` -- see
+  that screen's own file comment). When set, every route here is
+  registered as `/<secret_word>/<path>` instead of `/<path>` --
+  `web_json_helpers.hpp`'s `build_prefixed_path()` builds these at
+  registration time in `web::start()`. Changing the word calls the new
+  `web::restart()` (stop + start) so it takes effect immediately.
+  `ui::screens::QuickScreen`'s `OkShort` ("Print URL") types the
+  resulting full address via USB HID, matching 1.90's own behavior
+  exactly (including working while Locked -- a URL isn't sensitive
+  vault data the way Print Password is).
 
 ## Explicitly NOT here yet
 
