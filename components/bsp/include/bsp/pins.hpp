@@ -73,12 +73,24 @@ inline constexpr gpio_num_t HEADER_GPIO13 = GPIO_NUM_13;
 // -----------------------------------------------------------------------
 //
 // 4-bit SDMMC interface.
-
+//
+// D1/D2 were swapped here for a long time (D1=17, D2=18) -- flagged
+// early in this project as an unresolved discrepancy against a
+// third-party reference (USBArmyKnife) and never actually checked
+// against Waveshare's own documentation until a real, physically
+// inserted, freshly FAT-formatted 2GB card still wasn't detected at
+// all. Confirmed directly against Waveshare's own wiki for this board
+// family (waveshare.com/wiki/ESP32-S3-LCD-1.47 -- same TF card slot
+// hardware as the -1.47B this project targets): SD_D1=GPIO18,
+// SD_D2=GPIO17. With these swapped, the 4-bit bus's data-line
+// assignment was wrong at the protocol level -- card init would fail
+// regardless of format, size, or content, which matches the report
+// exactly (format wasn't the problem).
 inline constexpr gpio_num_t SD_CLK  = GPIO_NUM_14;
 inline constexpr gpio_num_t SD_CMD  = GPIO_NUM_15;
 inline constexpr gpio_num_t SD_D0   = GPIO_NUM_16;
-inline constexpr gpio_num_t SD_D1   = GPIO_NUM_17;
-inline constexpr gpio_num_t SD_D2   = GPIO_NUM_18;
+inline constexpr gpio_num_t SD_D1   = GPIO_NUM_18;
+inline constexpr gpio_num_t SD_D2   = GPIO_NUM_17;
 inline constexpr gpio_num_t SD_D3   = GPIO_NUM_21;
 
 // -----------------------------------------------------------------------
