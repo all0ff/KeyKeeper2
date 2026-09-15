@@ -3,6 +3,7 @@
 #include "ui/screens/about_screen.hpp"
 #include "ui/screens/accounts_screen.hpp"
 #include "ui/screens/backup_screen.hpp"
+#include "ui/screens/font_test_screen.hpp"
 #include "ui/screens/settings_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
@@ -26,6 +27,7 @@ constexpr const char* ITEM_NAMES[] = {
     "Backup",
     "Lock",
     "About",
+    "Font Test",
 };
 
 constexpr lv_coord_t FIRST_ITEM_Y = 8;
@@ -93,11 +95,6 @@ void MainMenu::initialize(lv_obj_t* content_parent)
 
 void MainMenu::on_show()
 {
-    /*
-     * A MainMenu instance is normally shown immediately after it is
-     * created by LockScreen::try_unlock(). Resetting selection here
-     * keeps the menu deterministic whenever it becomes active again.
-     */
     selected_ = Item::Accounts;
 
     if (status_label_ != nullptr) {
@@ -123,25 +120,10 @@ bool MainMenu::on_input(InputAction action)
             return true;
 
         case InputAction::BackShort:
-            /*
-             * Returning from MainMenu to QuickScreen is allowed.
-             * QuickScreen remains underneath MainMenu in the stack.
-             */
             return false;
 
         case InputAction::BackLong:
-            /*
-             * Long BACK is the explicit "lock now" action.
-             *
-             * security::lock::lock() publishes DeviceLocked and ends
-             * the current session. Navigation back to QuickScreen
-             * happens via ui.cpp's security::lock callback
-             * (on_lock_state_changed -> reset_to_root()), not an
-             * explicit pop() here -- that callback covers every path
-             * to Locked uniformly.
-             */
             security::lock::lock();
-
             ESP_LOGI(TAG, "Device locked from Main Menu");
             return true;
 
@@ -230,9 +212,6 @@ void MainMenu::activate()
             break;
 
         case Item::Lock:
-            // Navigation back to QuickScreen happens via ui.cpp's
-            // security::lock callback now -- see BackLong's identical
-            // comment above.
             security::lock::lock();
             ESP_LOGI(TAG, "Device locked from Main Menu");
             break;
@@ -240,6 +219,11 @@ void MainMenu::activate()
         case Item::About:
             manager().push(std::make_unique<AboutScreen>());
             ESP_LOGI(TAG, "About selected");
+            break;
+
+        case Item::FontTest:
+            manager().push(std::make_unique<FontTestScreen>());
+            ESP_LOGI(TAG, "Font Test selected");
             break;
 
         case Item::Count:
