@@ -1,6 +1,7 @@
 #include "ui/screens/settings_screen.hpp"
 
 #include "ui/screens/general_settings_screen.hpp"
+#include "ui/screens/password_gen_settings_screen.hpp"
 #include "ui/screens/security_settings_screen.hpp"
 #include "ui/screens/system_info_screen.hpp"
 #include "ui/screens/usb_settings_screen.hpp"
@@ -17,7 +18,7 @@ namespace {
 constexpr lv_coord_t ITEM_Y_START = 4;
 constexpr lv_coord_t ITEM_SPACING = 20;
 
-constexpr const char* ITEM_NAMES[] = {"General", "USB", "Security", "System", "WiFi"};
+constexpr const char* ITEM_NAMES[] = {"General", "USB", "Security", "System", "WiFi", "Password Gen"};
 
 } // namespace
 
@@ -65,6 +66,14 @@ void SettingsScreen::render()
         lv_obj_set_style_text_color(item_labels_[i], is_selected ? pal.accent : pal.primary_text, 0);
         lv_label_set_text_fmt(item_labels_[i], "%s%s", is_selected ? "> " : "", ITEM_NAMES[i]);
     }
+
+    // 6 items no longer reliably fit the visible content area at once
+    // -- same fix as the settings SUB-screens already have (WiFi/
+    // Security/USB/General), just missing here on the hub list itself
+    // until now.
+    if (item_labels_[selected_] != nullptr) {
+        lv_obj_scroll_to_view(item_labels_[selected_], LV_ANIM_ON);
+    }
 }
 
 void SettingsScreen::move_selection(int32_t delta)
@@ -106,6 +115,10 @@ void SettingsScreen::activate()
 
         case Item::Wifi:
             manager().push(std::make_unique<WifiSettingsScreen>());
+            return;
+
+        case Item::PasswordGen:
+            manager().push(std::make_unique<PasswordGenSettingsScreen>());
             return;
     }
 }

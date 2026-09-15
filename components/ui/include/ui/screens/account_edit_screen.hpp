@@ -38,6 +38,14 @@
 // ("GUI does not save data itself"), this screen never touches
 // storage directly, only vault::.
 //
+// OK-long on the Password row specifically, WITHOUT entering edit
+// mode first, generates a fresh random password in place
+// (password_gen::generate(), using settings::PasswordGenSettings --
+// see ui::screens::PasswordGenSettingsScreen) and overwrites the
+// field directly. Still shown masked in the row list either way, same
+// as normal -- reveal it via AccountViewScreen after saving if you
+// need to actually see it.
+//
 // BACK from the row list (nothing being edited) leaves the screen
 // WITHOUT saving, discarding any changes made so far -- there is no
 // confirmation dialog (none exists yet), so this is a real, silent
@@ -87,6 +95,7 @@ private:
     void apply_edited_field();
     void move_selection(int32_t delta);
     void try_save();
+    void generate_password();
 
     const char* field_label(FieldId field) const;
     size_t field_max_length(FieldId field) const;

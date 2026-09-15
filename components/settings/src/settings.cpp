@@ -87,6 +87,9 @@ bool init()
     if (!load_section("wifi", current.wifi)) {
         ESP_LOGI(TAG, "Using default WiFi settings");
     }
+    if (!load_section("password_gen", current.password_gen)) {
+        ESP_LOGI(TAG, "Using default password generator settings");
+    }
 
     initialized = true;
     ESP_LOGI(TAG, "Settings initialized (brightness=%u%%, pin_length=%u, language=%d)",
@@ -177,6 +180,20 @@ bool set_wifi(const WifiSettings& value)
     return true;
 }
 
+bool set_password_gen(const PasswordGenSettings& value)
+{
+    if (!initialized) {
+        return false;
+    }
+    if (!save_section("password_gen", value)) {
+        ESP_LOGE(TAG, "Failed to persist password generator settings");
+        return false;
+    }
+    current.password_gen = value;
+    publish_changed(Section::PasswordGen);
+    return true;
+}
+
 bool reset_to_defaults()
 {
     if (!initialized) {
@@ -189,6 +206,7 @@ bool reset_to_defaults()
     if (!set_security(SecuritySettings{})) ok = false;
     if (!set_gui(GuiSettings{})) ok = false;
     if (!set_wifi(WifiSettings{})) ok = false;
+    if (!set_password_gen(PasswordGenSettings{})) ok = false;
 
     return ok;
 }

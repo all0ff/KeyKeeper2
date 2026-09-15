@@ -14,9 +14,13 @@
 // there's nowhere better for it to live, and it follows the exact
 // same "list of settings sections" pattern as the other four.
 //
+// Password Gen (sixth section) -- same reasoning, added later for
+// components/password_gen's settings (length + character-class
+// toggles).
+//
 // Each item pushes its own screen: GeneralSettingsScreen,
 // UsbSettingsScreen, SecuritySettingsScreen, SystemInfoScreen,
-// WifiSettingsScreen.
+// WifiSettingsScreen, PasswordGenSettingsScreen.
 // =============================================================================
 
 namespace ui::screens {
@@ -39,8 +43,9 @@ private:
         Security,
         System,
         Wifi,
+        PasswordGen,
     };
-    static constexpr size_t ITEM_COUNT = 5;
+    static constexpr size_t ITEM_COUNT = 6;
 
     void render();
     void move_selection(int32_t delta);

@@ -76,6 +76,7 @@ enum class Section : uint8_t
     Security,
     Gui,
     Wifi,
+    PasswordGen,
 };
 
 struct GeneralSettings
@@ -143,6 +144,22 @@ struct WifiSettings
     char ap_password[65] = ""; // empty = open AP
 };
 
+// From KeyKeeper 1.90's own password generator, redesigned: 1.90 used
+// a single free-text "allowed characters" string (passchars) typed in
+// via its web UI. On THIS device's encoder+PinEntry/TextEntry input
+// model, four independent toggles are a much better fit than typing
+// a custom character-set string one character-wheel spin at a time --
+// see components/password_gen's own README for the full comparison
+// and the character sets actually used.
+struct PasswordGenSettings
+{
+    uint8_t length = 16; // 4-64, see password_gen::MIN_LENGTH/MAX_LENGTH
+    bool include_uppercase = true;
+    bool include_lowercase = true;
+    bool include_digits = true;
+    bool include_symbols = true;
+};
+
 struct AllSettings
 {
     GeneralSettings general;
@@ -150,6 +167,7 @@ struct AllSettings
     SecuritySettings security;
     GuiSettings gui;
     WifiSettings wifi;
+    PasswordGenSettings password_gen;
 };
 
 } // namespace settings

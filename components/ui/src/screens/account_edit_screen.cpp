@@ -4,6 +4,8 @@
 #include "ui/ui_manager.hpp"
 
 #include "vault/vault.hpp"
+#include "password_gen/password_gen.hpp"
+#include "settings/settings.hpp"
 
 #include "esp_log.h"
 
@@ -57,6 +59,9 @@ const char* AccountEditScreen::footer_hint() const
 {
     if (mode_ == Mode::EditField) {
         return "OK  Add char    Hold OK  Done    BACK  Erase";
+    }
+    if (static_cast<FieldId>(selected_row_) == FieldId::Password) {
+        return "OK  Open    Hold OK  Generate    BACK  Cancel";
     }
     return "OK  Open    BACK  Cancel (unsaved changes lost)";
 }
@@ -304,6 +309,24 @@ void AccountEditScreen::try_save()
     }
 }
 
+void AccountEditScreen::generate_password()
+{
+    char buf[password_gen::MAX_LENGTH + 1];
+    if (!password_gen::generate(settings::all().password_gen, buf, sizeof(buf))) {
+        if (status_label_ != nullptr) {
+            lv_label_set_text(status_label_, "Password generation failed");
+        }
+        return;
+    }
+
+    entry_.password = buf;
+    render_rows();
+
+    if (status_label_ != nullptr) {
+        lv_label_set_text(status_label_, "Password generated");
+    }
+}
+
 bool AccountEditScreen::on_input(InputAction action)
 {
     if (mode_ == Mode::EditField) {
@@ -338,6 +361,13 @@ bool AccountEditScreen::on_input(InputAction action)
         case InputAction::OkShort:
             enter_edit_mode();
             return true;
+
+        case InputAction::OkLong:
+            if (static_cast<FieldId>(selected_row_) == FieldId::Password) {
+                generate_password();
+                return true;
+            }
+            return false;
 
         case InputAction::BackShort:
             return false; // pop, discarding unsaved changes -- see header comment

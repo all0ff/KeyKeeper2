@@ -20,6 +20,7 @@ idf_component_register(
         "src/screens/settings_screen.cpp"
         "src/screens/general_settings_screen.cpp"
         "src/screens/security_settings_screen.cpp"
+        "src/screens/password_gen_settings_screen.cpp"
         "src/screens/usb_settings_screen.cpp"
         "src/screens/system_info_screen.cpp"
         "src/screens/wifi_settings_screen.cpp"
@@ -35,6 +36,7 @@ idf_component_register(
         display
         input
         security
+        password_gen
         settings
         storage
         vault
