@@ -35,7 +35,7 @@ const char* UsbSettingsScreen::footer_hint() const
         case Mode::Adjust:
             return "ROTATE  Change    OK/BACK  Confirm";
         case Mode::EditText:
-            return "OK  Add char    Hold OK  Done    BACK  Erase";
+            return "OK  Add char    Hold OK  Done    BACK  Erase    Hold BACK  Switch set";
         default:
             return "OK  Open    BACK  Cancel";
     }

@@ -52,7 +52,7 @@ const char* SearchScreen::footer_hint() const
     if (mode_ == Mode::Browsing) {
         return "ROTATE  Select    OK  Open    BACK  Edit query";
     }
-    return "OK  Add char    Hold OK  Browse results    BACK  Erase";
+    return "OK  Add char    Hold OK  Browse results    BACK  Erase    Hold BACK  Switch set";
 }
 
 void SearchScreen::initialize(lv_obj_t* content_parent)

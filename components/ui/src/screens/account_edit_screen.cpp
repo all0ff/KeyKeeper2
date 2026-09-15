@@ -58,7 +58,7 @@ const char* AccountEditScreen::title() const
 const char* AccountEditScreen::footer_hint() const
 {
     if (mode_ == Mode::EditField) {
-        return "OK  Add char    Hold OK  Done    BACK  Erase";
+        return "OK  Add char    Hold OK  Done    BACK  Erase    Hold BACK  Switch set";
     }
     if (static_cast<FieldId>(selected_row_) == FieldId::Password) {
         return "OK  Open    Hold OK  Generate    BACK  Cancel";
