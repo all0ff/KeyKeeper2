@@ -146,8 +146,14 @@ void AccountEditScreen::render_rows()
                                        entry_.login.empty() ? "(empty)" : entry_.login.c_str());
                 break;
             case FieldId::Password:
-                lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, field_label(field),
-                                       entry_.password.empty() ? "(empty)" : "********");
+                if (entry_.password.empty()) {
+                    lv_label_set_text_fmt(row_labels_[i], "%s%s: (empty)", prefix, field_label(field));
+                } else if (password_revealed_) {
+                    lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, field_label(field),
+                                           entry_.password.c_str());
+                } else {
+                    lv_label_set_text_fmt(row_labels_[i], "%s%s: ********", prefix, field_label(field));
+                }
                 break;
             case FieldId::Url:
                 lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, field_label(field),
@@ -194,6 +200,10 @@ void AccountEditScreen::move_selection(int32_t delta)
     }
     selected_row_ = static_cast<size_t>(index);
 
+    if (static_cast<FieldId>(selected_row_) != FieldId::Password) {
+        password_revealed_ = false;
+    }
+
     if (status_label_ != nullptr) {
         lv_label_set_text(status_label_, "");
     }
@@ -207,6 +217,8 @@ void AccountEditScreen::enter_edit_mode()
         try_save();
         return;
     }
+
+    password_revealed_ = false; // re-mask -- TextEntry masks Password too, see below
 
     if (field == FieldId::Favorite) {
         // Plain boolean toggle -- no text entry involved, flip it in
@@ -320,6 +332,7 @@ void AccountEditScreen::generate_password()
     }
 
     entry_.password = buf;
+    password_revealed_ = true; // see this member's own comment
     render_rows();
 
     if (status_label_ != nullptr) {

@@ -42,9 +42,11 @@
 // mode first, generates a fresh random password in place
 // (password_gen::generate(), using settings::PasswordGenSettings --
 // see ui::screens::PasswordGenSettingsScreen) and overwrites the
-// field directly. Still shown masked in the row list either way, same
-// as normal -- reveal it via AccountViewScreen after saving if you
-// need to actually see it.
+// field directly. Shown UNMASKED right after generating (there would
+// be no way to ever see it otherwise -- the row list normally masks
+// Password as "********" and edit mode's widgets::TextEntry masks it
+// too) until the selection moves off the Password row, edit mode is
+// entered, or the screen is left -- see password_revealed_.
 //
 // BACK from the row list (nothing being edited) leaves the screen
 // WITHOUT saving, discarding any changes made so far -- there is no
@@ -102,6 +104,7 @@ private:
 
     uint32_t entry_id_;
     vault::VaultEntry entry_{}; // working copy, only touches vault:: on Save
+    bool password_revealed_ = false; // see generate_password()'s own comment
 
     Mode mode_ = Mode::SelectField;
     size_t selected_row_ = 0;
