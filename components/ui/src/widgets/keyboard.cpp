@@ -1,5 +1,6 @@
 #include "ui/widgets/keyboard.hpp"
 
+#include "display/fonts.hpp"
 #include "ui/theme.hpp"
 
 namespace ui::widgets {
@@ -42,7 +43,9 @@ void PinEntry::init(lv_obj_t* parent, const Config& cfg)
 
         lv_obj_t* label = lv_label_create(box);
         lv_obj_set_style_text_color(label, pal.primary_text, 0);
-        lv_obj_set_style_text_font(label, &lv_font_montserrat_18, 0); ///18 — увеличено с 16 по запросу; CONFIG_LV_FONT_MONTSERRAT_18 включён явно в sdkconfig.defaults, см. там
+        lv_obj_set_style_text_font(label, &keykeeper_cyrillic_18, 0); // see display/fonts.hpp -- same family as
+                                                                       // the app's default font, digits-only here
+                                                                       // but keeps one font family loaded, not two
         lv_obj_center(label);
         digit_labels_[i] = label;
     }

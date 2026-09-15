@@ -2,6 +2,7 @@
 
 #include "display/display.hpp"
 #include "display/display_config.hpp"
+#include "display/fonts.hpp"
 #include "display_panel.hpp"
 
 #include "esp_heap_caps.h"
@@ -173,6 +174,19 @@ bool init()
         ESP_LOGE(TAG, "lv_display_create() failed");
         return false;
     }
+
+    // Applies keykeeper_cyrillic_16 (see display/fonts.hpp) as the
+    // DEFAULT font for every label that doesn't set an explicit one
+    // of its own -- which is most of this app's screens. Without
+    // this, LVGL falls back to its own compiled-in LV_FONT_DEFAULT
+    // (Basic Latin only), and Cyrillic text renders as blank/missing
+    // glyphs everywhere. Color parameters here barely matter in
+    // practice: every screen sets its own text colors explicitly via
+    // ui::theme::current(), so this theme's colors are mostly
+    // invisible -- this call exists for the font parameter.
+    lv_theme_t* default_theme = lv_theme_default_init(
+        lv_disp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_GREY), true, &keykeeper_cyrillic_16);
+    lv_display_set_theme(lv_disp, default_theme);
 
     lv_display_set_color_format(lv_disp, LV_COLOR_FORMAT_RGB565);
     lv_display_set_flush_cb(lv_disp, flush_cb);

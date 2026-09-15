@@ -2,6 +2,8 @@ idf_component_register(
     SRCS
         "src/display.cpp"
         "src/lvgl_port.cpp"
+        "src/fonts/keykeeper_cyrillic_16.c"
+        "src/fonts/keykeeper_cyrillic_18.c"
 
     INCLUDE_DIRS
         "include"
