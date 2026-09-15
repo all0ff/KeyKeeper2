@@ -85,6 +85,11 @@ CONFIG_ESP_CONSOLE_UART_DEFAULT=y
 CONFIG_LV_FONT_MONTSERRAT_16=y
 CONFIG_LV_FONT_MONTSERRAT_18=y
 
+# The custom Cyrillic fonts are generated with LVGL bitmap compression
+# enabled (lv_font_conv defaults to compression). LVGL must have its
+# compressed-font decoder enabled for these fonts to render.
+CONFIG_LV_USE_FONT_COMPRESSED=y
+
 
 # ------------------------------------------------------------
 # Partition table
