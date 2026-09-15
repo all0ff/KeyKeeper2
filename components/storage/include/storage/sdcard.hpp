@@ -38,6 +38,15 @@ bool init();
 bool is_mounted();
 
 /**
+ * @brief Best-effort signal for whether the LAST failed mount attempt
+ *        looked like "a card is physically present but its
+ *        filesystem couldn't be read" rather than "no card responded
+ *        at all" -- see sdcard.cpp's own comment on why this can't be
+ *        fully precise. Meaningless if is_mounted() is currently true.
+ */
+bool mount_looked_unreadable();
+
+/**
  * @brief Unmount, then attempt to mount again.
  *
  * Use this after the user has inserted, removed, or swapped a card,
@@ -47,6 +56,23 @@ bool is_mounted();
  * @return true if a card is mounted after the attempt.
  */
 bool remount();
+
+/**
+ * @brief Unmount, then format the card as FAT32 and mount it.
+ *
+ * Destructive -- erases everything currently on the card. Unlike
+ * init()/remount() (which deliberately never auto-format, see
+ * sdcard.cpp's own comment: silently reformatting removable media the
+ * user may already have files on would be destructive), this is for
+ * an EXPLICIT, user-confirmed "Format SD Card" action -- e.g. a card
+ * that shows as unreadable because it shipped pre-formatted exFAT
+ * (common on cards 32GB and up; this project's FAT-only mount code,
+ * like most embedded FAT stacks, doesn't read exFAT at all) rather
+ * than genuinely being absent or faulty.
+ *
+ * @return true if the card was formatted and mounted successfully.
+ */
+bool format_and_mount();
 
 void unmount();
 

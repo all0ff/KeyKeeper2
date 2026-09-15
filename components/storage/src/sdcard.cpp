@@ -20,6 +20,15 @@ constexpr char TAG[] = "storage.sd";
 
 sdmmc_card_t* card = nullptr;
 bool mounted = false;
+// True when the last failed mount attempt looked like "a card is
+// physically present but its filesystem couldn't be read" (ESP_FAIL
+// from esp_vfs_fat_sdmmc_mount()) rather than "no card responded at
+// all". ESP-IDF's own error reporting doesn't cleanly separate these
+// two cases either (see do_mount()'s log messages) -- this is a
+// best-effort signal for the UI to phrase a more useful message
+// ("try Format") than a flat, possibly-wrong "not inserted" would,
+// not a guaranteed-precise diagnosis.
+bool last_mount_looked_unreadable = false;
 
 void ensure_dir(const char* path)
 {
@@ -40,7 +49,7 @@ void ensure_vault_dirs()
     ensure_dir(paths::VAULT_EXPORT_DIR);
 }
 
-bool do_mount()
+bool do_mount(bool format_if_mount_failed)
 {
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
 
@@ -58,11 +67,13 @@ bool do_mount()
     slot_config.flags |= SDMMC_SLOT_FLAG_INTERNAL_PULLUP;
 
     esp_vfs_fat_sdmmc_mount_config_t mount_config{};
-    // Deliberately false: this is removable media that may already
-    // contain the user's own files. Silently reformatting it on a
-    // mount failure would be destructive -- unlike the internal
-    // LittleFS partition, which is ours alone.
-    mount_config.format_if_mount_failed = false;
+    // Deliberately false for the ordinary init()/remount() path: this
+    // is removable media that may already contain the user's own
+    // files, and silently reformatting it on a mount failure would be
+    // destructive -- unlike the internal LittleFS partition, which is
+    // ours alone. format_and_mount() explicitly passes true for its
+    // one, user-confirmed attempt.
+    mount_config.format_if_mount_failed = format_if_mount_failed;
     mount_config.max_files = 5;
     mount_config.allocation_unit_size = 16 * 1024;
 
@@ -72,13 +83,16 @@ bool do_mount()
     if (err != ESP_OK) {
         if (err == ESP_FAIL) {
             ESP_LOGW(TAG, "SD card mount failed (bad filesystem or card absent)");
+            last_mount_looked_unreadable = true;
         } else {
             ESP_LOGI(TAG, "No SD card detected (%s)", esp_err_to_name(err));
+            last_mount_looked_unreadable = false;
         }
         card = nullptr;
         return false;
     }
 
+    last_mount_looked_unreadable = false;
     ESP_LOGI(TAG, "SD card mounted at %s", paths::SDCARD_MOUNT_POINT);
     ensure_vault_dirs();
     return true;
@@ -88,13 +102,18 @@ bool do_mount()
 
 bool init()
 {
-    mounted = do_mount();
+    mounted = do_mount(false);
     return mounted;
 }
 
 bool is_mounted()
 {
     return mounted;
+}
+
+bool mount_looked_unreadable()
+{
+    return last_mount_looked_unreadable;
 }
 
 void unmount()
@@ -112,7 +131,15 @@ void unmount()
 bool remount()
 {
     unmount();
-    mounted = do_mount();
+    mounted = do_mount(false);
+    return mounted;
+}
+
+bool format_and_mount()
+{
+    unmount();
+    ESP_LOGW(TAG, "Formatting SD card (user-requested)...");
+    mounted = do_mount(true);
     return mounted;
 }
 

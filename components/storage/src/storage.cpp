@@ -64,4 +64,10 @@ bool refresh_sdcard()
     return current_status.sdcard_present;
 }
 
+bool format_sdcard()
+{
+    current_status.sdcard_present = sd::format_and_mount();
+    return current_status.sdcard_present;
+}
+
 } // namespace storage

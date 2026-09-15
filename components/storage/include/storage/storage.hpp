@@ -56,4 +56,11 @@ const Status& status();
  */
 bool refresh_sdcard();
 
+/**
+ * @brief Format the SD card as FAT32 and mount it -- destructive, see
+ *        storage::sd::format_and_mount()'s own comment. Updates
+ *        status().sdcard_present afterward, same as refresh_sdcard().
+ */
+bool format_sdcard();
+
 } // namespace storage

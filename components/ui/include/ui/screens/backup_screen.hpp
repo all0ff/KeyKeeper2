@@ -12,6 +12,16 @@
 // docs/GUI.md section 15: Create Backup / Restore Backup / Export
 // Vault / Import Vault.
 //
+// Refresh SD Card / Format SD Card added at the project owner's
+// request, not part of GUI.md 15 -- this board has no card-detect
+// GPIO (see storage::sd's own file comment), so a card inserted
+// after boot never gets noticed on its own; Refresh calls
+// storage::refresh_sdcard() to retry. Format is for a card that LOOKS
+// present but shows as unreadable -- commonly because it shipped
+// pre-formatted exFAT (typical for 32GB+ cards) and this project's
+// FAT-only mount code can't read that. Destructive (erases the
+// card), press-twice confirm, same pattern as Restore Backup below.
+//
 // Create Backup and Restore Backup are REAL -- call
 // vault::backup::create_backup()/restore_backup(). Export Vault and
 // Import Vault are placeholders: they imply a different interchange
@@ -56,8 +66,10 @@ private:
         RestoreBackup,
         ExportVault,
         ImportVault,
+        RefreshSdCard,
+        FormatSdCard,
     };
-    static constexpr size_t ACTION_COUNT = 4;
+    static constexpr size_t ACTION_COUNT = 6;
 
     enum class Mode : uint8_t
     {
@@ -83,6 +95,7 @@ private:
 
     lv_obj_t* action_labels_[ACTION_COUNT]{};
     size_t selected_action_ = 0;
+    bool format_confirm_pending_ = false; // FormatSdCard is destructive -- press-twice, same pattern as restore
 
     static constexpr size_t MAX_BACKUPS = 16;
     vault::backup::BackupInfo backups_[MAX_BACKUPS]{};

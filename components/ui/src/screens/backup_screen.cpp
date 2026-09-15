@@ -4,6 +4,8 @@
 #include "ui/ui_manager.hpp"
 
 #include "security/permission_manager.hpp"
+#include "storage/sdcard.hpp"
+#include "storage/storage.hpp"
 
 #include "esp_log.h"
 #include "esp_system.h"
@@ -22,6 +24,8 @@ constexpr const char* ACTION_NAMES[] = {
     "Restore Backup",
     "Export Vault",
     "Import Vault",
+    "Refresh SD Card",
+    "Format SD Card",
 };
 
 } // namespace
@@ -78,8 +82,19 @@ void BackupScreen::render_action_list()
 
     for (size_t i = 0; i < ACTION_COUNT; ++i) {
         const bool is_selected = (i == selected_action_);
-        lv_obj_set_style_text_color(action_labels_[i], is_selected ? pal.accent : pal.primary_text, 0);
-        lv_label_set_text_fmt(action_labels_[i], "%s%s", is_selected ? "> " : "", ACTION_NAMES[i]);
+        const bool is_confirming = is_selected && static_cast<Action>(i) == Action::FormatSdCard
+                                    && format_confirm_pending_;
+        lv_obj_set_style_text_color(
+            action_labels_[i], is_confirming ? pal.error : (is_selected ? pal.accent : pal.primary_text), 0);
+        if (is_confirming) {
+            lv_label_set_text_fmt(action_labels_[i], "> %s -- confirm?", ACTION_NAMES[i]);
+        } else {
+            lv_label_set_text_fmt(action_labels_[i], "%s%s", is_selected ? "> " : "", ACTION_NAMES[i]);
+        }
+    }
+
+    if (action_labels_[selected_action_] != nullptr) {
+        lv_obj_scroll_to_view(action_labels_[selected_action_], LV_ANIM_ON);
     }
 }
 
@@ -94,6 +109,8 @@ void BackupScreen::move_action_selection(int32_t delta)
         index = 0;
     }
     selected_action_ = static_cast<size_t>(index);
+
+    format_confirm_pending_ = false;
 
     if (status_label_ != nullptr) {
         lv_label_set_text(status_label_, "");
@@ -126,6 +143,48 @@ void BackupScreen::activate_action()
             ESP_LOGI(TAG, "%s selected -- not implemented yet", ACTION_NAMES[selected_action_]);
             lv_label_set_text_fmt(status_label_, "%s: coming soon", ACTION_NAMES[selected_action_]);
             return;
+
+        case Action::RefreshSdCard: {
+            if (storage::refresh_sdcard()) {
+                uint64_t total = 0;
+                uint64_t used = 0;
+                if (storage::sd::get_usage(total, used)) {
+                    const unsigned used_mb = static_cast<unsigned>(used / (1024 * 1024));
+                    const unsigned total_mb = static_cast<unsigned>(total / (1024 * 1024));
+                    lv_label_set_text_fmt(status_label_, "SD card mounted: %u / %u MB", used_mb, total_mb);
+                } else {
+                    lv_label_set_text(status_label_, "SD card mounted");
+                }
+            } else if (storage::sd::mount_looked_unreadable()) {
+                // See storage::sd::mount_looked_unreadable()'s own
+                // comment -- this is a best-effort signal, not a
+                // guaranteed-precise diagnosis, but it's more useful
+                // than a flat "not inserted" when it applies.
+                lv_label_set_text(status_label_, "Card found but unreadable -- try Format SD Card");
+            } else {
+                lv_label_set_text(status_label_, "No SD card detected");
+            }
+            return;
+        }
+
+        case Action::FormatSdCard: {
+            if (!format_confirm_pending_) {
+                format_confirm_pending_ = true;
+                render_action_list();
+                lv_label_set_text(status_label_, "This erases everything on the card. Press OK again to confirm.");
+                return;
+            }
+
+            format_confirm_pending_ = false;
+            ESP_LOGW(TAG, "Formatting SD card (user-requested)");
+            if (storage::format_sdcard()) {
+                lv_label_set_text(status_label_, "SD card formatted and mounted");
+            } else {
+                lv_label_set_text(status_label_, "Format failed -- no card, or a hardware fault");
+            }
+            render_action_list();
+            return;
+        }
     }
 }
 

@@ -110,7 +110,19 @@ void SystemInfoScreen::refresh()
             std::snprintf(buf, sizeof(buf), "microSD: present, usage unavailable");
         }
     } else {
-        std::snprintf(buf, sizeof(buf), "microSD: not inserted");
+        // "not inserted" would overclaim precision this board doesn't
+        // have -- there's no card-detect GPIO (see storage::sd's own
+        // file comment), so a failed mount could equally mean no card
+        // at all, or a card that's physically present but unreadable
+        // (e.g. shipped pre-formatted exFAT, which this project's
+        // FAT-only mount code can't read -- common on 32GB+ cards).
+        // mount_looked_unreadable() is a best-effort distinction, not
+        // a guarantee.
+        if (storage::sd::mount_looked_unreadable()) {
+            std::snprintf(buf, sizeof(buf), "microSD: unreadable (see Backup > Format SD Card)");
+        } else {
+            std::snprintf(buf, sizeof(buf), "microSD: not detected");
+        }
     }
     add_row(buf);
 }
