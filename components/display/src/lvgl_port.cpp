@@ -2,7 +2,6 @@
 
 #include "display/display.hpp"
 #include "display/display_config.hpp"
-#include "display/fonts.hpp"
 #include "display_panel.hpp"
 
 #include "esp_heap_caps.h"
@@ -175,18 +174,22 @@ bool init()
         return false;
     }
 
-    // Applies keykeeper_cyrillic_16 (see display/fonts.hpp) as the
-    // DEFAULT font for every label that doesn't set an explicit one
-    // of its own -- which is most of this app's screens. Without
-    // this, LVGL falls back to its own compiled-in LV_FONT_DEFAULT
-    // (Basic Latin only), and Cyrillic text renders as blank/missing
-    // glyphs everywhere. Color parameters here barely matter in
-    // practice: every screen sets its own text colors explicitly via
-    // ui::theme::current(), so this theme's colors are mostly
-    // invisible -- this call exists for the font parameter.
-    lv_theme_t* default_theme = lv_theme_default_init(
-        lv_disp, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_GREY), true, &keykeeper_cyrillic_16);
-    lv_display_set_theme(lv_disp, default_theme);
+    // REVERTED -- an attempt to apply keykeeper_cyrillic_16 (see
+    // display/fonts.hpp) as the default font via lv_theme_default_init()
+    // caused a confirmed, serious regression: no text rendered ANYWHERE
+    // after boot (blank labels, MainMenu showing only background
+    // gradient/bars). Root cause not yet confirmed -- possibly
+    // LV_ATTRIBUTE_LARGE_CONST placement for the externally-generated
+    // font's glyph bitmap data, possibly something else entirely. Not
+    // worth debugging further on a device that has to stay usable in
+    // the meantime -- reverted to LVGL's own default theme/font
+    // entirely (unchanged from before the Cyrillic font work) until
+    // this is understood. Cyrillic TEXT ENTRY itself
+    // (widgets::TextEntry's UTF-8 handling) is NOT reverted -- it
+    // doesn't touch rendering and isn't implicated in this bug; typed
+    // Cyrillic will render as missing/blank glyphs again (the
+    // ORIGINAL, pre-existing limitation), not correctly, until the
+    // font issue is actually resolved.
 
     lv_display_set_color_format(lv_disp, LV_COLOR_FORMAT_RGB565);
     lv_display_set_flush_cb(lv_disp, flush_cb);
