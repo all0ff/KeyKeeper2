@@ -7,7 +7,7 @@
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
 #else
-#include "lvgl/lvgl.h"
+#include "lvgl.h" // was "lvgl/lvgl.h" -- see keykeeper_cyrillic_16.c's identical comment
 #endif
 
 #ifndef KEYKEEPER_CYRILLIC_18

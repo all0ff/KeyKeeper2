@@ -7,7 +7,11 @@
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
 #else
-#include "lvgl/lvgl.h"
+#include "lvgl.h" // was "lvgl/lvgl.h" -- LV_LVGL_H_INCLUDE_SIMPLE (a DIFFERENT macro from this
+                   // project's own LV_CONF_INCLUDE_SIMPLE, similar name, not the same thing) is
+                   // never defined here, so this branch always ran and the nested path didn't
+                   // exist on this project's include path -- fixed to just match how every
+                   // other file in this project includes LVGL directly.
 #endif
 
 #ifndef KEYKEEPER_CYRILLIC_16
