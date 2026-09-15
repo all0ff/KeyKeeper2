@@ -3,6 +3,7 @@
 #include "ui/screen.hpp"
 
 #include "vault/vault_backup.hpp"
+#include "vault/vault_csv.hpp"
 
 #include <cstdint>
 
@@ -22,11 +23,22 @@
 // FAT-only mount code can't read that. Destructive (erases the
 // card), press-twice confirm, same pattern as Restore Backup below.
 //
-// Create Backup and Restore Backup are REAL -- call
-// vault::backup::create_backup()/restore_backup(). Export Vault and
-// Import Vault are placeholders: they imply a different interchange
-// format (e.g. CSV, per storage_paths.hpp's own comment) that hasn't
-// been designed -- see vault_backup.hpp for the full reasoning.
+// Create Backup and Restore Backup: call
+// vault::backup::create_backup()/restore_backup() -- raw copies of
+// this project's own internal vault.db, only ever readable by
+// another KeyKeeper2 (see vault_backup.hpp).
+//
+// Export Vault and Import Vault: call vault::csv::export_csv()/
+// import_csv() -- plain CSV, for interop with OTHER password
+// managers/apps (see vault_csv.hpp for the exact format and the
+// lenient header-name matching on import). Export requires
+// security::permission::check(Operation::ExportVault) (GUI.md 15's
+// "protected operations are checked via SecurityService" -- this
+// reveals every stored password in the clear to a file). Import picks
+// a file the same way Restore Backup does (a list from
+// vault::csv::list_import_files()), but is NOT destructive -- it only
+// ADDS entries, so there's no press-twice confirm for it the way
+// Restore has.
 //
 // Restore Backup: selecting it shows the list of existing backup
 // files (vault::backup::list_backups()); picking one runs
@@ -75,6 +87,7 @@ private:
     {
         ActionList,
         BackupList,
+        ImportList,
     };
 
     void build_action_list();
@@ -87,6 +100,12 @@ private:
     void render_backup_list();
     void move_backup_selection(int32_t delta);
     void activate_backup();
+
+    void enter_import_list();
+    void build_import_list();
+    void render_import_list();
+    void move_import_selection(int32_t delta);
+    void activate_import();
 
     lv_obj_t* content_parent_ = nullptr;
     lv_obj_t* status_label_ = nullptr;
@@ -103,6 +122,12 @@ private:
     lv_obj_t* backup_labels_[MAX_BACKUPS]{};
     size_t selected_backup_ = 0;
     bool restore_confirm_pending_ = false;
+
+    static constexpr size_t MAX_IMPORT_FILES = 16;
+    vault::csv::ImportFileInfo import_files_[MAX_IMPORT_FILES]{};
+    size_t import_file_count_ = 0;
+    lv_obj_t* import_labels_[MAX_IMPORT_FILES]{};
+    size_t selected_import_ = 0;
 };
 
 } // namespace ui::screens

@@ -14,6 +14,16 @@
 // row each, plus Save -- see settings::PasswordGenSettings and
 // components/password_gen's own README for why toggles instead of
 // KeyKeeper 1.90's free-text "allowed characters" string.
+//
+// "Generate & Type" row: a standalone way to generate a password and
+// type it via USB HID WITHOUT creating or editing a vault entry at
+// all -- e.g. a fresh password needed right now for some signup form
+// already open elsewhere. Uses the CURRENT in-memory length_/
+// uppercase_/etc, not necessarily what's been Saved yet -- lets you
+// try a setting out before committing to it. Separate from
+// ui::screens::AccountEditScreen's own OkLong-on-Password-row
+// generate action, which always uses the SAVED settings and fills a
+// specific entry's field.
 // =============================================================================
 
 namespace ui::screens {
@@ -36,9 +46,10 @@ private:
         Lowercase,
         Digits,
         Symbols,
+        GenerateAndType,
         Save,
     };
-    static constexpr size_t ROW_COUNT = 6;
+    static constexpr size_t ROW_COUNT = 7;
 
     enum class Mode : uint8_t
     {
@@ -52,6 +63,7 @@ private:
     void adjust_value(int32_t delta);
     void activate();
     void save();
+    void generate_and_type();
 
     lv_obj_t* content_parent_ = nullptr;
     lv_obj_t* row_labels_[ROW_COUNT]{};

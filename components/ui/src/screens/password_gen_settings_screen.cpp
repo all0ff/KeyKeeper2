@@ -5,6 +5,7 @@
 
 #include "password_gen/password_gen.hpp"
 #include "settings/settings.hpp"
+#include "usb/usb_service.hpp"
 
 #include "esp_log.h"
 
@@ -100,6 +101,9 @@ void PasswordGenSettingsScreen::render_rows()
             case Row::Symbols:
                 lv_label_set_text_fmt(row_labels_[i], "%sSymbols (!@#...): %s", prefix, symbols_ ? "on" : "off");
                 break;
+            case Row::GenerateAndType:
+                lv_label_set_text_fmt(row_labels_[i], "%sGenerate & Type", prefix);
+                break;
             case Row::Save:
                 lv_label_set_text_fmt(row_labels_[i], "%sSave", prefix);
                 break;
@@ -149,6 +153,7 @@ void PasswordGenSettingsScreen::adjust_value(int32_t delta)
         case Row::Digits:    digits_ = !digits_; break;
         case Row::Symbols:   symbols_ = !symbols_; break;
 
+        case Row::GenerateAndType:
         case Row::Save:
             break;
     }
@@ -163,8 +168,34 @@ void PasswordGenSettingsScreen::activate()
         return;
     }
 
+    if (static_cast<Row>(selected_row_) == Row::GenerateAndType) {
+        generate_and_type();
+        return;
+    }
+
     mode_ = Mode::Adjust;
     render_rows();
+}
+
+void PasswordGenSettingsScreen::generate_and_type()
+{
+    // Uses the CURRENT in-memory values, not necessarily what's been
+    // Saved -- see this screen's own header comment.
+    settings::PasswordGenSettings cfg;
+    cfg.length = length_;
+    cfg.include_uppercase = uppercase_;
+    cfg.include_lowercase = lowercase_;
+    cfg.include_digits = digits_;
+    cfg.include_symbols = symbols_;
+
+    char buf[password_gen::MAX_LENGTH + 1];
+    if (!password_gen::generate(cfg, buf, sizeof(buf))) {
+        lv_label_set_text(status_label_, "Enable at least one character type");
+        return;
+    }
+
+    usb::type_string(buf);
+    lv_label_set_text(status_label_, usb::last_status());
 }
 
 void PasswordGenSettingsScreen::save()

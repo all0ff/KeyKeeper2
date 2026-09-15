@@ -32,13 +32,18 @@ constexpr const char* ACTION_NAMES[] = {
 
 const char* BackupScreen::title() const
 {
-    return (mode_ == Mode::BackupList) ? "Restore Backup" : "Backup";
+    if (mode_ == Mode::BackupList) return "Restore Backup";
+    if (mode_ == Mode::ImportList) return "Import Vault";
+    return "Backup";
 }
 
 const char* BackupScreen::footer_hint() const
 {
     if (mode_ == Mode::BackupList) {
         return "OK  Select/Confirm    BACK  Return";
+    }
+    if (mode_ == Mode::ImportList) {
+        return "OK  Import    BACK  Return";
     }
     return "OK  Run    BACK  Return";
 }
@@ -137,11 +142,28 @@ void BackupScreen::activate_action()
             enter_backup_list();
             return;
 
-        case Action::ExportVault:
+        case Action::ExportVault: {
+            const security::permission::Result perm =
+                security::permission::check(security::permission::Operation::ExportVault);
+            if (perm != security::permission::Result::Allowed) {
+                ESP_LOGI(TAG, "Export Vault denied (%d)", static_cast<int>(perm));
+                lv_label_set_text(status_label_, "Not allowed");
+                return;
+            }
+
+            char filename[32];
+            if (vault::csv::export_csv(filename, sizeof(filename))) {
+                ESP_LOGI(TAG, "Vault exported: %s", filename);
+                lv_label_set_text_fmt(status_label_, "Exported: %s", filename);
+            } else {
+                ESP_LOGW(TAG, "Export vault failed");
+                lv_label_set_text(status_label_, "Export failed (locked or no SD card?)");
+            }
+            return;
+        }
+
         case Action::ImportVault:
-            // PLACEHOLDER -- see backup_screen.hpp.
-            ESP_LOGI(TAG, "%s selected -- not implemented yet", ACTION_NAMES[selected_action_]);
-            lv_label_set_text_fmt(status_label_, "%s: coming soon", ACTION_NAMES[selected_action_]);
+            enter_import_list();
             return;
 
         case Action::RefreshSdCard: {
@@ -311,6 +333,98 @@ void BackupScreen::activate_backup()
     esp_restart(); // does not return
 }
 
+void BackupScreen::enter_import_list()
+{
+    mode_ = Mode::ImportList;
+    selected_import_ = 0;
+    build_import_list();
+}
+
+void BackupScreen::build_import_list()
+{
+    lv_obj_clean(content_parent_);
+
+    import_file_count_ = vault::csv::list_import_files(import_files_, MAX_IMPORT_FILES);
+
+    const theme::Palette& pal = theme::current();
+
+    if (import_file_count_ == 0) {
+        lv_obj_t* empty = lv_label_create(content_parent_);
+        lv_obj_set_style_text_color(empty, pal.secondary_text, 0);
+        lv_label_set_text(empty, "No files in /sdcard/vault/import");
+        lv_obj_center(empty);
+    } else {
+        for (size_t i = 0; i < import_file_count_; ++i) {
+            lv_obj_t* label = lv_label_create(content_parent_);
+            lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4, ROW_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i));
+            import_labels_[i] = label;
+        }
+    }
+
+    status_label_ = lv_label_create(content_parent_);
+    lv_obj_set_style_text_color(status_label_, pal.secondary_text, 0);
+    lv_label_set_text(status_label_, "");
+    lv_obj_align(status_label_, LV_ALIGN_BOTTOM_MID, 0, -2);
+
+    render_import_list();
+}
+
+void BackupScreen::render_import_list()
+{
+    const theme::Palette& pal = theme::current();
+
+    for (size_t i = 0; i < import_file_count_; ++i) {
+        const bool is_selected = (i == selected_import_);
+        lv_obj_set_style_text_color(import_labels_[i], is_selected ? pal.accent : pal.primary_text, 0);
+
+        const unsigned kb = static_cast<unsigned>(import_files_[i].size_bytes / 1024);
+        lv_label_set_text_fmt(import_labels_[i], "%s%s (%uKB)", is_selected ? "> " : "",
+                               import_files_[i].filename, kb);
+    }
+
+    if (import_file_count_ > 0) {
+        lv_obj_scroll_to_view(import_labels_[selected_import_], LV_ANIM_ON);
+    }
+}
+
+void BackupScreen::move_import_selection(int32_t delta)
+{
+    if (import_file_count_ == 0) {
+        return;
+    }
+
+    int32_t index = static_cast<int32_t>(selected_import_) + delta;
+    const int32_t count = static_cast<int32_t>(import_file_count_);
+    if (index < 0) {
+        index = count - 1;
+    }
+    if (index >= count) {
+        index = 0;
+    }
+    selected_import_ = static_cast<size_t>(index);
+
+    if (status_label_ != nullptr) {
+        lv_label_set_text(status_label_, "");
+    }
+    render_import_list();
+}
+
+void BackupScreen::activate_import()
+{
+    if (import_file_count_ == 0) {
+        return;
+    }
+
+    // NOT destructive (only ADDS entries -- see vault_csv.hpp), so no
+    // press-twice confirm the way Restore Backup needs one.
+    const char* filename = import_files_[selected_import_].filename;
+    ESP_LOGI(TAG, "Importing CSV: %s", filename);
+
+    const vault::csv::ImportResult result = vault::csv::import_csv(filename);
+    lv_label_set_text_fmt(status_label_, "Imported %u, skipped %u", static_cast<unsigned>(result.created),
+                           static_cast<unsigned>(result.skipped));
+}
+
 bool BackupScreen::on_input(InputAction action)
 {
     if (mode_ == Mode::BackupList) {
@@ -325,6 +439,30 @@ bool BackupScreen::on_input(InputAction action)
 
             case InputAction::OkShort:
                 activate_backup();
+                return true;
+
+            case InputAction::BackShort:
+                mode_ = Mode::ActionList;
+                build_action_list();
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    if (mode_ == Mode::ImportList) {
+        switch (action) {
+            case InputAction::RotateLeft:
+                move_import_selection(-1);
+                return true;
+
+            case InputAction::RotateRight:
+                move_import_selection(+1);
+                return true;
+
+            case InputAction::OkShort:
+                activate_import();
                 return true;
 
             case InputAction::BackShort:

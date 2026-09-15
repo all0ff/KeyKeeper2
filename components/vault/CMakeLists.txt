@@ -5,6 +5,7 @@ idf_component_register(
         "src/vault_repository.cpp"
         "src/vault_wipe.cpp"
         "src/vault_backup.cpp"
+        "src/vault_csv.cpp"
 
     INCLUDE_DIRS
         "include"
