@@ -14,14 +14,21 @@
 // via LVGL's own official lv_font_conv tool:
 //
 //   lv_font_conv --font PT_Sans-Web-Regular.ttf --size <16|18> --bpp 4
-//     --format lvgl -r 0x20-0x7E,0x400-0x45F,0x2022
+//     --format lvgl -r 0x20-0x7E,0x400-0x45F,0x2013,0x2014,0x2022,0x2026,0x2116
 //     --lv-font-name keykeeper_cyrillic_<16|18>
 //
 // Range covers printable ASCII (0x20-0x7E, matching
 // widgets::TextEntry's existing ALPHABET) + the modern Russian
-// alphabet including Ё/ё (0x400-0x45F) + the bullet character U+2022
-// (used as a password-mask glyph elsewhere in the UI). Deliberately
-// NOT the full Cyrillic Unicode block (0x400-0x4FF also has Ukrainian/
+// alphabet including Ё/ё (0x400-0x45F) + common typography symbols
+// that plain ASCII doesn't have: en dash U+2013, em dash U+2014,
+// bullet U+2022 (also used as the password-mask glyph elsewhere in
+// the UI), ellipsis U+2026, and the Russian/Cyrillic-locale number
+// sign № U+2116. Widened from an initial ASCII+Cyrillic-only version
+// after ui::screens::FontTestScreen's own test text (which used an em
+// dash) exposed the gap -- none of these five are typeable via
+// widgets::TextEntry's character wheel, so they only matter for
+// fixed/hardcoded UI strings, not user-entered text. Deliberately NOT
+// the full Cyrillic Unicode block (0x400-0x4FF also has Ukrainian/
 // Belarusian/other Slavic extensions) -- kept narrow to hold the
 // flash footprint down; widen the range and regenerate if broader
 // script coverage is ever needed.

@@ -36,7 +36,16 @@ void FontTestScreen::initialize(lv_obj_t* content_parent)
 
 bool FontTestScreen::on_input(InputAction action)
 {
-    return action == InputAction::BackShort;
+    // Was `return action == InputAction::BackShort;` -- backwards.
+    // UiManager::handle_input() only runs its own default navigation
+    // (pop() on BackShort) when on_input() returns FALSE ("I didn't
+    // handle this"); returning TRUE means "handled, don't pop". This
+    // screen doesn't actually handle BackShort itself, so it must
+    // return false to let the framework's default back-navigation
+    // run -- returning true for it (as it did) meant BackShort was
+    // silently swallowed and the screen could never be left.
+    (void)action;
+    return false;
 }
 
 } // namespace ui::screens
