@@ -1,5 +1,6 @@
 #include "ui/screens/search_screen.hpp"
 
+#include "display/fonts.hpp"
 #include "ui/screens/account_view_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
@@ -121,6 +122,9 @@ void SearchScreen::update_results()
     for (size_t i = 0; i < results_.size(); ++i) {
         lv_obj_t* label = lv_label_create(content_parent_);
         lv_obj_set_style_text_color(label, pal.primary_text, 0);
+        // Result text comes from matched entries' own fields
+        // (user-entered, could be Cyrillic).
+        lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0);
         lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4,
                      RESULTS_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i));
         result_labels_[i] = label;

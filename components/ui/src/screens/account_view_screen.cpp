@@ -1,5 +1,6 @@
 #include "ui/screens/account_view_screen.hpp"
 
+#include "display/fonts.hpp"
 #include "ui/screens/account_edit_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
@@ -96,6 +97,10 @@ lv_coord_t AccountViewScreen::build_fields(lv_obj_t* parent)
         }
         lv_obj_t* row = lv_label_create(parent);
         lv_obj_set_style_text_color(row, pal.primary_text, 0);
+        // value is user-entered (URL/Username/Category/Notes), could
+        // be Cyrillic -- see widgets::TextEntry's own comment for why
+        // this is set per-label, not as a global default theme font.
+        lv_obj_set_style_text_font(row, &keykeeper_cyrillic_16, 0);
         lv_label_set_text_fmt(row, "%s: %s", label, value.c_str());
         lv_obj_align(row, LV_ALIGN_TOP_LEFT, 4, y);
         y += FIELD_SPACING;
@@ -110,6 +115,7 @@ lv_coord_t AccountViewScreen::build_fields(lv_obj_t* parent)
     if (!entry_.password.empty()) {
         lv_obj_t* row = lv_label_create(parent);
         lv_obj_set_style_text_color(row, pal.primary_text, 0);
+        lv_obj_set_style_text_font(row, &keykeeper_cyrillic_16, 0); // password could contain Cyrillic now too
         lv_obj_align(row, LV_ALIGN_TOP_LEFT, 4, y);
         password_value_label_ = row;
         update_password_label();

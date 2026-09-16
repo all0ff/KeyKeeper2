@@ -1,5 +1,6 @@
 #include "ui/widgets/text_entry.hpp"
 
+#include "display/fonts.hpp"
 #include "ui/theme.hpp"
 
 #include <cstring>
@@ -126,6 +127,15 @@ void TextEntry::init(lv_obj_t* parent, const Config& cfg)
     const theme::Palette& pal = theme::current();
     value_label_ = lv_label_create(parent);
     lv_obj_set_style_text_color(value_label_, pal.primary_text, 0);
+    // keykeeper_cyrillic_16 (see display/fonts.hpp), applied
+    // EXPLICITLY to this one label -- NOT via lv_theme_default_init()
+    // as a global default, which caused a confirmed, serious
+    // regression (blank labels app-wide). Confirmed working via
+    // ui::screens::FontTestScreen using this exact same
+    // set-it-on-the-specific-label approach. This widget is the
+    // single most important place to have it: whatever you're
+    // TYPING has to be visible, Cyrillic included.
+    lv_obj_set_style_text_font(value_label_, &keykeeper_cyrillic_16, 0);
 
     reset(cfg.initial_value);
 }

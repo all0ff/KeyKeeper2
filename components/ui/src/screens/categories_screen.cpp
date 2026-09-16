@@ -1,5 +1,6 @@
 #include "ui/screens/categories_screen.hpp"
 
+#include "display/fonts.hpp"
 #include "ui/screens/account_view_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
@@ -99,6 +100,7 @@ void CategoriesScreen::reload_categories()
     } else {
         for (size_t i = 0; i < total_rows; ++i) {
             lv_obj_t* label = lv_label_create(content_parent_);
+            lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0); // category names are user-entered
             lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4,
                          FIRST_ITEM_Y + static_cast<lv_coord_t>(ITEM_SPACING * i));
             category_labels_[i] = label;
@@ -200,6 +202,7 @@ void CategoriesScreen::reload_entries()
     for (size_t i = 0; i < entries_.size(); ++i) {
         lv_obj_t* label = lv_label_create(content_parent_);
         lv_obj_set_style_text_color(label, pal.primary_text, 0);
+        lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0); // entry login is user-entered
         lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4,
                      FIRST_ITEM_Y + static_cast<lv_coord_t>(ITEM_SPACING * i));
         entry_labels_[i] = label;

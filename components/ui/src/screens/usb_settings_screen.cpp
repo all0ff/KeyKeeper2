@@ -1,5 +1,6 @@
 #include "ui/screens/usb_settings_screen.hpp"
 
+#include "display/fonts.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -67,6 +68,7 @@ void UsbSettingsScreen::build_rows(lv_obj_t* parent)
 {
     for (size_t i = 0; i < ROW_COUNT; ++i) {
         lv_obj_t* label = lv_label_create(parent);
+        lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0); // default_password can be Cyrillic
         lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4, ROW_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i));
         row_labels_[i] = label;
     }

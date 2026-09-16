@@ -1,5 +1,6 @@
 #include "ui/screens/account_edit_screen.hpp"
 
+#include "display/fonts.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -88,6 +89,11 @@ void AccountEditScreen::build_rows(lv_obj_t* parent)
 {
     for (size_t i = 0; i < ROW_COUNT; ++i) {
         lv_obj_t* label = lv_label_create(parent);
+        // Rows show field VALUES (login/password/url/notes/category --
+        // all user-entered, could be Cyrillic) alongside their fixed
+        // English labels -- see widgets::TextEntry's own comment for
+        // why this is set per-label, not as a global default theme font.
+        lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0);
         lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4, ROW_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i));
         row_labels_[i] = label;
     }
