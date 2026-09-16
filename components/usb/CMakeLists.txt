@@ -4,6 +4,7 @@ idf_component_register(
         "src/hid_keyboard.cpp"
         "src/type_engine.cpp"
         "src/keycode_map.cpp"
+        "src/cyrillic_layout.cpp"
     INCLUDE_DIRS "include"
     REQUIRES
         vault

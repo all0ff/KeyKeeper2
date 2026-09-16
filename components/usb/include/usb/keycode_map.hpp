@@ -11,8 +11,11 @@ namespace usb {
 // Maps ASCII characters to (hid_keycode, modifier) pairs.
 // modifier bits: 0x02 = Left Shift
 //
-// Supports US QWERTY layout only for now.
-// Russian layout support planned (Phase 6.4).
+// Supports US QWERTY layout only for direct ASCII typing.
+// Cyrillic support (via a Russian-layout switch on the host) lives
+// separately in usb::cyrillic (cyrillic_layout.hpp) -- see that
+// file's own comment for how it reuses ascii_to_hid() rather than
+// duplicating a second keycode table.
 // =============================================================================
 
 struct KeyMapping {
@@ -40,6 +43,7 @@ namespace keycode {
 namespace modifier {
     constexpr uint8_t NONE       = 0x00;
     constexpr uint8_t LEFT_SHIFT = 0x02;
+    constexpr uint8_t LEFT_ALT   = 0x04; // used by usb::cyrillic's layout-switch hotkey (Alt+Shift)
 } // namespace modifier
 
 } // namespace usb
