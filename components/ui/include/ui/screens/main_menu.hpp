@@ -26,10 +26,8 @@ namespace ui::screens {
  * VaultListScreen directly. Restructured this way at the project
  * owner's request; see AccountsScreen's own header comment.
  *
- * Note this project's Main Menu doesn't match docs/GUI.md section 9's
- * list 1:1 -- it has no separate "System" item (that lives inside
- * Settings instead, see SettingsScreen), and adds Backup/Lock/About
- * which aren't in GUI.md's own 7-item list at all.
+ * "Font Test" is a temporary diagnostic entry used to validate
+ * per-label Cyrillic fonts without changing LVGL's global theme.
  */
 class MainMenu : public Screen
 {
@@ -49,6 +47,7 @@ private:
         Backup,
         Lock,
         About,
+        FontTest,
         Count,
     };
 
