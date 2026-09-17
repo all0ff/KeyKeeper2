@@ -132,12 +132,28 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     <div id="recovery-codes-section" style="margin-top:20px">
       <div class="topbar" style="margin-bottom:6px">
         <h3 style="margin:0; font-size:1rem">Recovery Codes</h3>
-        <button class="small secondary" id="recovery-generate-btn" onclick="generateRecoveryCodes()">Generate</button>
       </div>
       <div id="recovery-codes-list"></div>
-      <div class="row" id="recovery-codes-actions" style="display:none; margin-top:6px">
-        <button class="small secondary" onclick="copyRecoveryCodes()">Copy unused</button>
+      <div id="recovery-codes-edit" style="display:none">
+        <textarea id="recovery-codes-input" rows="4"
+          placeholder="Paste the codes this service gave you, one per line"
+          style="width:100%; font-family:ui-monospace,Consolas,monospace; font-size:0.9rem"></textarea>
+        <div class="row" style="margin-top:6px">
+          <button class="small secondary" onclick="document.getElementById('recovery-codes-file').click()">Import from file</button>
+          <input type="file" id="recovery-codes-file" accept=".txt" style="display:none" onchange="handleRecoveryCodesFile(event)">
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button class="small" onclick="saveRecoveryCodes()">Save</button>
+          <button class="small secondary" onclick="cancelEditRecoveryCodes()">Cancel</button>
+        </div>
       </div>
+      <div class="row" id="recovery-codes-actions" style="margin-top:6px">
+        <button class="small secondary" id="recovery-set-btn" onclick="startEditRecoveryCodes()">Set / Replace</button>
+        <button class="small secondary" id="recovery-copy-btn" onclick="copyRecoveryCodes()" style="display:none">Copy unused</button>
+      </div>
+      <div class="note" style="margin-top:8px">These come FROM the service the account belongs to (its own 2FA or
+        account-recovery settings page) -- paste or import the ones it gave you. This device has no way to create
+        codes that service would actually accept.</div>
       <div id="recovery-msg" style="font-size:0.85rem; margin-top:4px"></div>
     </div>
 
@@ -151,6 +167,10 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         <textarea id="seed-phrase-input" rows="3"
           placeholder="12, 15, 18, 21 or 24 words, space or newline separated"
           style="width:100%; font-family:ui-monospace,Consolas,monospace; font-size:0.9rem"></textarea>
+        <div class="row" style="margin-top:6px">
+          <button class="small secondary" onclick="document.getElementById('seed-phrase-file').click()">Import from file</button>
+          <input type="file" id="seed-phrase-file" accept=".txt" style="display:none" onchange="handleSeedPhraseFile(event)">
+        </div>
         <div class="row" style="margin-top:6px">
           <button class="small" onclick="saveSeedPhrase()">Save</button>
           <button class="small secondary" onclick="cancelEditSeedPhrase()">Cancel</button>
@@ -398,7 +418,6 @@ let currentEntryId = null;
 let editingId = null;
 let deleteConfirmPending = false;
 let currentRecoveryCodes = [];
-let regenerateConfirmPending = false;
 let currentSeedPhrase = [];
 let seedRevealed = false;
 let seedClearConfirmPending = false;
@@ -549,7 +568,7 @@ async function openEntry(id) {
   if (e.favorite) addField('Favorite', 'Yes', false);
 
   currentRecoveryCodes = e.recovery_codes || [];
-  regenerateConfirmPending = false;
+  document.getElementById('recovery-codes-edit').style.display = 'none';
   renderRecoveryCodes();
 
   currentSeedPhrase = e.seed_phrase || [];
@@ -564,17 +583,19 @@ async function openEntry(id) {
 
 function renderRecoveryCodes() {
   const list = document.getElementById('recovery-codes-list');
-  const genBtn = document.getElementById('recovery-generate-btn');
   const actions = document.getElementById('recovery-codes-actions');
+  const setBtn = document.getElementById('recovery-set-btn');
+  const copyBtn = document.getElementById('recovery-copy-btn');
   list.innerHTML = '';
 
   if (currentRecoveryCodes.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'empty';
     empty.style.padding = '10px 0';
-    empty.textContent = 'None generated yet.';
+    empty.textContent = 'Not set.';
     list.appendChild(empty);
-    actions.style.display = 'none';
+    copyBtn.style.display = 'none';
+    setBtn.textContent = 'Set';
   } else {
     currentRecoveryCodes.forEach(rc => {
       const row = document.createElement('div');
@@ -590,34 +611,66 @@ function renderRecoveryCodes() {
       row.appendChild(btn);
       list.appendChild(row);
     });
-    actions.style.display = 'flex';
+    copyBtn.style.display = 'inline-block';
+    setBtn.textContent = 'Replace';
   }
-
-  genBtn.textContent = regenerateConfirmPending ? 'Tap again to confirm' : (currentRecoveryCodes.length ? 'Regenerate' : 'Generate');
+  actions.style.display = 'flex';
 }
 
-async function generateRecoveryCodes() {
-  if (currentRecoveryCodes.length > 0 && !regenerateConfirmPending) {
-    // Regenerating invalidates every existing code, used or not --
-    // same "tap again to confirm" pattern as Delete above, not a
-    // silent replace.
-    regenerateConfirmPending = true;
-    renderRecoveryCodes();
+function startEditRecoveryCodes() {
+  document.getElementById('recovery-codes-input').value = currentRecoveryCodes.map(rc => rc.code).join('\n');
+  document.getElementById('recovery-codes-edit').style.display = 'block';
+  document.getElementById('recovery-codes-actions').style.display = 'none';
+}
+
+function cancelEditRecoveryCodes() {
+  document.getElementById('recovery-codes-edit').style.display = 'none';
+  document.getElementById('recovery-codes-actions').style.display = 'flex';
+  document.getElementById('recovery-msg').textContent = '';
+}
+
+function handleRecoveryCodesFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById('recovery-codes-input').value = reader.result;
+  };
+  reader.onerror = () => {
+    document.getElementById('recovery-msg').textContent = 'Could not read that file.';
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // allow re-selecting the same file later
+}
+
+async function saveRecoveryCodes() {
+  const raw = document.getElementById('recovery-codes-input').value;
+  // One code per line -- whatever the service's own export/display
+  // used (this device doesn't assume any particular format, since
+  // every service's codes look different -- see this section's own
+  // "note" in the HTML).
+  const codes = raw.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0);
+  const msg = document.getElementById('recovery-msg');
+
+  if (codes.length === 0) {
+    msg.textContent = 'Paste or import at least one code first.';
     return;
   }
-  regenerateConfirmPending = false;
 
-  const msg = document.getElementById('recovery-msg');
-  msg.textContent = '';
+  msg.textContent = 'Saving...';
   const { ok, body } = await api(
     'api/v1/entry/recovery_codes?id=' + encodeURIComponent(currentEntryId),
-    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ count: 16 }) }
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codes }) }
   );
   if (!ok) {
-    msg.textContent = body.message || 'Failed to generate codes';
+    msg.textContent = body.message || 'Failed to save recovery codes';
     return;
   }
+
   currentRecoveryCodes = body.data.recovery_codes;
+  document.getElementById('recovery-codes-edit').style.display = 'none';
+  document.getElementById('recovery-codes-actions').style.display = 'flex';
+  msg.textContent = '';
   renderRecoveryCodes();
 }
 
@@ -625,7 +678,7 @@ async function toggleRecoveryCode(code, used) {
   const msg = document.getElementById('recovery-msg');
   msg.textContent = '';
   const { ok, body } = await api(
-    'api/v1/entry/recovery_codes?id=' + encodeURIComponent(currentEntryId),
+    'api/v1/entry/recovery_codes/mark?id=' + encodeURIComponent(currentEntryId),
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, used }) }
   );
   if (!ok) {
@@ -633,7 +686,6 @@ async function toggleRecoveryCode(code, used) {
     return;
   }
   currentRecoveryCodes = body.data.recovery_codes;
-  regenerateConfirmPending = false;
   renderRecoveryCodes();
 }
 
@@ -707,6 +759,20 @@ function cancelEditSeedPhrase() {
   document.getElementById('seed-phrase-edit').style.display = 'none';
   document.getElementById('seed-phrase-actions').style.display = 'flex';
   document.getElementById('seed-msg').textContent = '';
+}
+
+function handleSeedPhraseFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById('seed-phrase-input').value = reader.result;
+  };
+  reader.onerror = () => {
+    document.getElementById('seed-msg').textContent = 'Could not read that file.';
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 async function saveSeedPhrase() {

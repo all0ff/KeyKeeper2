@@ -24,11 +24,6 @@ constexpr char TAG[] = "web.vault";
 // for a personal vault's realistic size, not a considered limit.
 constexpr size_t MAX_LIST_ENTRIES = 256;
 
-// Matches the "10-20 lines" the project owner asked for -- the
-// middle of that range as a reasonable default when the client
-// doesn't specify a count.
-constexpr size_t DEFAULT_RECOVERY_CODE_COUNT = 16;
-
 bool require_unlocked(httpd_req_t* req)
 {
     if (security::lock::state() != security::lock::State::Unlocked) {
@@ -296,12 +291,27 @@ cJSON* recovery_codes_to_json(const std::vector<vault::RecoveryCode>& codes)
     return data;
 }
 
-// POST /api/v1/entry/recovery_codes?id=N -- (re)generates the WHOLE
-// set, replacing whatever was there (same "regenerating invalidates
-// the old ones" behavior as GitHub/a crypto wallet -- see
-// vault::generate_recovery_codes()'s own comment). Body is optional;
-// {"count": N} picks how many, default DEFAULT_RECOVERY_CODE_COUNT.
-esp_err_t handle_generate_recovery_codes(httpd_req_t* req)
+// PUT /api/v1/entry/recovery_codes?id=N -- sets (REPLACES) the whole
+// set with codes THE PERSON PROVIDES. Body: {"codes": ["6458f-49d3c", ...]}.
+//
+// Deliberately NOT "generate a random set on-device" (an earlier
+// version of this endpoint did exactly that, and it was a real
+// mistake, not a design choice -- caught by the project owner:
+// recovery codes only mean anything in relation to whatever OUTSIDE
+// service (GitHub, a bank, an exchange, ...) they're for, and that
+// service is the only thing that can generate ones it will actually
+// accept back. A device-invented code looks exactly like a real one
+// and is completely useless for actually recovering that account --
+// worse than not storing anything, since it creates false confidence.
+// So this only ever stores what the person actually copied or
+// imported from that service's own recovery-codes page/file.
+//
+// No specific format is enforced beyond vault::validate()'s own
+// length/count caps (MAX_RECOVERY_CODES, MAX_RECOVERY_CODE_LEN) --
+// unlike a seed phrase's fixed BIP-39 shape, real services use very
+// different code formats from each other, so this can't validate
+// against any one pattern.
+esp_err_t handle_set_recovery_codes(httpd_req_t* req)
 {
     if (!require_unlocked(req)) {
         return ESP_OK;
@@ -319,20 +329,46 @@ esp_err_t handle_generate_recovery_codes(httpd_req_t* req)
         return ESP_OK;
     }
 
-    size_t count = DEFAULT_RECOVERY_CODE_COUNT;
     std::string body;
-    if (read_body(req, body) && !body.empty()) {
-        cJSON* root = cJSON_Parse(body.c_str());
-        if (root != nullptr) {
-            const cJSON* count_item = cJSON_GetObjectItemCaseSensitive(root, "count");
-            if (cJSON_IsNumber(count_item)) {
-                count = static_cast<size_t>(count_item->valueint);
-            }
-            cJSON_Delete(root);
-        }
+    if (!read_body(req, body)) {
+        respond_error(req, "400 Bad Request", "Missing or too-large request body");
+        return ESP_OK;
     }
 
-    entry.recovery_codes = vault::generate_recovery_codes(count);
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (root == nullptr) {
+        respond_error(req, "400 Bad Request", "Invalid JSON");
+        return ESP_OK;
+    }
+
+    std::vector<vault::RecoveryCode> codes;
+    const cJSON* codes_item = cJSON_GetObjectItemCaseSensitive(root, "codes");
+    if (cJSON_IsArray(codes_item)) {
+        const cJSON* c = nullptr;
+        cJSON_ArrayForEach(c, codes_item) {
+            if (cJSON_IsString(c) && c->valuestring != nullptr && c->valuestring[0] != '\0') {
+                codes.push_back(vault::RecoveryCode{std::string(c->valuestring), false});
+            }
+        }
+    }
+    cJSON_Delete(root);
+
+    if (codes.empty()) {
+        respond_error(req, "400 Bad Request", "No codes provided");
+        return ESP_OK;
+    }
+    if (codes.size() > vault::MAX_RECOVERY_CODES) {
+        respond_error(req, "400 Bad Request", "Too many codes (max " +
+                                                    std::to_string(vault::MAX_RECOVERY_CODES) + ")");
+        return ESP_OK;
+    }
+
+    entry.recovery_codes = std::move(codes);
+
+    if (!vault::validate(entry)) {
+        respond_error(req, "400 Bad Request", "One or more codes is too long");
+        return ESP_OK;
+    }
 
     if (!vault::update_entry(entry)) {
         respond_error(req, "500 Internal Server Error", "Failed to save recovery codes");
@@ -343,9 +379,9 @@ esp_err_t handle_generate_recovery_codes(httpd_req_t* req)
     return ESP_OK;
 }
 
-// PUT /api/v1/entry/recovery_codes?id=N -- marks ONE existing code
-// used/unused (matched by its exact string, since that's what the
-// client already has on screen). Body: {"code": "...", "used": true}.
+// PUT /api/v1/entry/recovery_codes/mark?id=N -- marks ONE existing
+// code used/unused (matched by its exact string, since that's what
+// the client already has on screen). Body: {"code": "...", "used": true}.
 esp_err_t handle_mark_recovery_code(httpd_req_t* req)
 {
     if (!require_unlocked(req)) {
@@ -522,6 +558,13 @@ void register_vault_routes(httpd_handle_t server)
     static char recovery_codes_path[64];
     build_prefixed_path(recovery_codes_path, sizeof(recovery_codes_path), "/api/v1/entry/recovery_codes");
 
+    // Separate sub-path for "mark one code used" -- both it and
+    // set_codes_uri below are PUT, and httpd registers one handler
+    // per exact (method, path) pair, so they can't share
+    // recovery_codes_path itself.
+    static char recovery_codes_mark_path[64];
+    build_prefixed_path(recovery_codes_mark_path, sizeof(recovery_codes_mark_path), "/api/v1/entry/recovery_codes/mark");
+
     static char seed_phrase_path[64];
     build_prefixed_path(seed_phrase_path, sizeof(seed_phrase_path), "/api/v1/entry/seed_phrase");
 
@@ -555,14 +598,14 @@ void register_vault_routes(httpd_handle_t server)
     delete_uri.handler = handle_delete_entry;
     delete_uri.user_ctx = nullptr;
 
-    static httpd_uri_t generate_codes_uri{};
-    generate_codes_uri.uri = recovery_codes_path;
-    generate_codes_uri.method = HTTP_POST;
-    generate_codes_uri.handler = handle_generate_recovery_codes;
-    generate_codes_uri.user_ctx = nullptr;
+    static httpd_uri_t set_codes_uri{};
+    set_codes_uri.uri = recovery_codes_path;
+    set_codes_uri.method = HTTP_PUT;
+    set_codes_uri.handler = handle_set_recovery_codes;
+    set_codes_uri.user_ctx = nullptr;
 
     static httpd_uri_t mark_code_uri{};
-    mark_code_uri.uri = recovery_codes_path;
+    mark_code_uri.uri = recovery_codes_mark_path;
     mark_code_uri.method = HTTP_PUT;
     mark_code_uri.handler = handle_mark_recovery_code;
     mark_code_uri.user_ctx = nullptr;

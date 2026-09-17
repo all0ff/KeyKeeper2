@@ -42,14 +42,15 @@ inline constexpr size_t MAX_NOTES_LEN = 512;
 inline constexpr size_t MAX_TOTP_SECRET_LEN = 128;
 inline constexpr size_t MAX_CATEGORY_LEN = 64;
 
-/// "6458f-49d3c" style -- 10 lowercase hex characters plus one
-/// separating dash. See generate_recovery_codes()'s own comment for
-/// the exact shape.
+/// Sized for whatever format a real service's own codes come in --
+/// not any particular shape, since every service's are different
+/// (see RecoveryCode's own comment on why this device doesn't
+/// generate its own).
 inline constexpr size_t MAX_RECOVERY_CODE_LEN = 32;
 
-/// Matches the "10-20 lines" the project owner asked for -- a cap,
-/// not a fixed count; generate_recovery_codes() takes its own count
-/// argument within this bound.
+/// A cap, not a fixed count -- matches the "10-20 lines" the project
+/// owner originally asked for as a reasonable upper bound for however
+/// many codes a real service's own set turns out to be.
 inline constexpr size_t MAX_RECOVERY_CODES = 20;
 
 /// BIP-39 words are 3-8 characters (english.txt); generous headroom
@@ -65,12 +66,20 @@ inline constexpr size_t MAX_SEED_PHRASE_WORDS = 24;
 /// sentinel.
 inline constexpr uint32_t INVALID_ID = 0;
 
-/// One single-use recovery/backup code -- the "6458f-49d3c" style
-/// list some services (GitHub 2FA, crypto wallets, ...) give you to
-/// regain access if you lose your normal login method. Not the same
-/// thing as totp_secret: a TOTP secret regenerates a new code every
-/// 30 seconds from one shared secret, while these are a FIXED list of
+/// One single-use recovery/backup code -- the kind some services
+/// (GitHub 2FA, a bank, an exchange, ...) give you to regain access
+/// if you lose your normal login method. Not the same thing as
+/// totp_secret: a TOTP secret regenerates a new code every 30 seconds
+/// from one shared secret, while these are a FIXED list of
 /// individually one-time-use codes, each crossed off once spent.
+///
+/// ALWAYS comes FROM that outside service, never invented here --
+/// see generate_recovery_codes()'s own comment (now unused) for why
+/// an on-device-generated code would be actively harmful, not
+/// merely pointless. `code` is stored exactly as the person pasted
+/// or imported it -- no assumed format, since every service's own
+/// codes look different from every other's.
+///
 /// Added in format v3 -- see vault_repository.hpp.
 struct RecoveryCode
 {
@@ -100,9 +109,9 @@ struct VaultEntry
     /// entries from an older vault.db that never had this field.
     bool favorite = false;
 
-    /// Empty means none generated for this entry. Added in format v3
-    /// -- see RecoveryCode's own comment, and
-    /// vault::generate_recovery_codes() for how these get created.
+    /// Empty means none stored for this entry. See RecoveryCode's
+    /// own comment -- these come from an outside service, not
+    /// generated here. Added in format v3.
     std::vector<RecoveryCode> recovery_codes;
 
     /// A crypto wallet's mnemonic recovery phrase (BIP-39), one
@@ -142,18 +151,19 @@ struct VaultEntry
 bool validate(const VaultEntry& entry);
 
 /**
- * @brief Generate a fresh set of single-use recovery codes, e.g.
- *        "6458f-49d3c" -- 10 lowercase hex characters (esp_random(),
- *        same non-cryptographic-but-hardware-backed source
- *        components/password_gen already uses) split into two groups
- *        of 5 by a dash, purely for readability -- no semantic
- *        meaning to the split point.
+ * @brief Generates a set of RANDOM, MEANINGLESS "recovery codes".
  *
- * REPLACES whatever recovery codes the entry already had -- like
- * regenerating recovery codes on GitHub or a crypto wallet, the old
- * ones are invalidated, not added to.
- *
- * @param count Clamped to [1, MAX_RECOVERY_CODES].
+ * NOT CALLED ANYWHERE -- kept only as a record of a real mistake, not
+ * as a utility. Recovery codes only mean anything in relation to the
+ * OUTSIDE service (GitHub, a bank, an exchange, ...) that will
+ * eventually be asked to accept one back -- only that service can
+ * generate codes it will actually recognize. A device-invented code
+ * looks exactly like a real one and is worse than storing nothing:
+ * it creates false confidence that the account is backed up when it
+ * isn't. Caught by the project owner after this was built and
+ * briefly wired into the web UI's own "Generate" button -- see
+ * web_vault_routes.cpp's handle_set_recovery_codes() (PUT, stores
+ * exactly what the person pasted or imported) for what replaced it.
  */
 std::vector<RecoveryCode> generate_recovery_codes(size_t count);
 

@@ -52,18 +52,19 @@
 // Operation::PrintPassword's gate here as a placeholder, same
 // decision already made in QuickScreen for its own Print URL action.
 //
-// Recovery Codes (format v3, vault::RecoveryCode -- a FIXED list of
-// individually one-time-use codes, distinct from totp_secret's
-// rotating ones) get two MORE conditional actions when the entry has
-// any: "View Recovery Codes" switches this screen into a second,
-// read-only scrolling MODE (mode_) listing every code with its
-// used/unused status -- device-side support is deliberately NOMINAL
-// per the project owner's own framing (view + print only); actually
-// generating a set, or marking one used, is web-UI-only (see
-// web_vault_routes.cpp's dedicated endpoints and web_app_html.hpp's
-// own recovery-codes section) since typing/tapping on a phone or
-// laptop is a much better fit for that than this device's single
-// rotary knob. "Print Recovery Codes" types every UNUSED code over
+// Recovery Codes (format v3, vault::RecoveryCode -- codes THE
+// OUTSIDE SERVICE gave the person, e.g. GitHub 2FA or a bank's own
+// account-recovery codes, never invented by this device -- see that
+// struct's own comment for why) get two MORE conditional actions
+// when the entry has any: "View Recovery Codes" switches this screen
+// into a second, read-only scrolling MODE (mode_) listing every code
+// with its used/unused status -- device-side support is deliberately
+// NOMINAL per the project owner's own framing (view + print only);
+// actually pasting or importing a set, or marking one used, is
+// web-UI-only (see web_vault_routes.cpp's dedicated endpoints and
+// web_app_html.hpp's own recovery-codes section) since typing 12-20
+// odd-shaped codes via a single rotary knob is not a reasonable
+// on-device task. "Print Recovery Codes" types every UNUSED code over
 // USB, one per line (same Operation::PrintPassword gate as the other
 // Print* actions here) -- matching the web UI's own "Copy unused",
 // not the full list including already-spent codes.
