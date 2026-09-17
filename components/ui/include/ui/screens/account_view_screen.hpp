@@ -51,6 +51,22 @@
 // OTP among the print-related gated ops) -- both reuse
 // Operation::PrintPassword's gate here as a placeholder, same
 // decision already made in QuickScreen for its own Print URL action.
+//
+// Recovery Codes (format v3, vault::RecoveryCode -- a FIXED list of
+// individually one-time-use codes, distinct from totp_secret's
+// rotating ones) get two MORE conditional actions when the entry has
+// any: "View Recovery Codes" switches this screen into a second,
+// read-only scrolling MODE (mode_) listing every code with its
+// used/unused status -- device-side support is deliberately NOMINAL
+// per the project owner's own framing (view + print only); actually
+// generating a set, or marking one used, is web-UI-only (see
+// web_vault_routes.cpp's dedicated endpoints and web_app_html.hpp's
+// own recovery-codes section) since typing/tapping on a phone or
+// laptop is a much better fit for that than this device's single
+// rotary knob. "Print Recovery Codes" types every UNUSED code over
+// USB, one per line (same Operation::PrintPassword gate as the other
+// Print* actions here) -- matching the web UI's own "Copy unused",
+// not the full list including already-spent codes.
 // =============================================================================
 
 namespace ui::screens {
@@ -70,6 +86,12 @@ public:
     bool on_input(InputAction action) override;
 
 private:
+    enum class Mode : uint8_t
+    {
+        Main,
+        RecoveryCodesList,
+    };
+
     enum class Action : uint8_t
     {
         RevealPassword,
@@ -78,6 +100,8 @@ private:
         PrintUsername,
         PrintPassword,
         PrintOtp,
+        ViewRecoveryCodes,
+        PrintRecoveryCodes,
         Edit,
         Delete,
     };
@@ -93,9 +117,16 @@ private:
     void activate();
     const char* action_name(Action action) const;
 
+    void enter_recovery_codes_list();
+    void build_recovery_codes_list();
+    void render_recovery_codes_list();
+    void move_recovery_code_selection(int32_t delta);
+
     uint32_t entry_id_;
     vault::VaultEntry entry_{};
     bool loaded_ = false;
+
+    Mode mode_ = Mode::Main;
 
     lv_obj_t* content_parent_ = nullptr;
     lv_obj_t* password_value_label_ = nullptr;
@@ -104,13 +135,17 @@ private:
     lv_obj_t* otp_value_label_ = nullptr;
     lv_timer_t* otp_refresh_timer_ = nullptr;
 
-    static constexpr size_t MAX_ACTIONS = 8;
+    static constexpr size_t MAX_ACTIONS = 10;
     Action available_actions_[MAX_ACTIONS]{};
     size_t action_count_ = 0;
     lv_obj_t* action_labels_[MAX_ACTIONS]{};
     size_t selected_action_ = 0;
 
     bool delete_confirm_pending_ = false;
+
+    // vault::MAX_RECOVERY_CODES caps how many an entry can ever have.
+    lv_obj_t* recovery_code_labels_[vault::MAX_RECOVERY_CODES]{};
+    size_t selected_recovery_code_ = 0;
 
     lv_obj_t* status_label_ = nullptr;
 };

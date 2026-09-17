@@ -89,6 +89,13 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     background: #e5e7eb; border: 1px solid #d1d5db; font-family: inherit;
   }
   .note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; font-size: 0.88rem; }
+  .recovery-code-row {
+    display: flex; align-items: center; gap: 8px; padding: 6px 0;
+    border-bottom: 1px solid #f0f0f0; font-size: 0.95rem;
+  }
+  .recovery-code-row .code { font-family: ui-monospace, Consolas, monospace; flex: 1; }
+  .recovery-code-row.used .code { text-decoration: line-through; color: #9ca3af; }
+  .recovery-code-row button { width: auto; padding: 3px 10px; font-size: 0.78rem; margin: 0; }
 </style>
 </head>
 <body>
@@ -121,6 +128,19 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
       <span></span>
     </div>
     <div id="detail-fields"></div>
+
+    <div id="recovery-codes-section" style="margin-top:20px">
+      <div class="topbar" style="margin-bottom:6px">
+        <h3 style="margin:0; font-size:1rem">Recovery Codes</h3>
+        <button class="small secondary" id="recovery-generate-btn" onclick="generateRecoveryCodes()">Generate</button>
+      </div>
+      <div id="recovery-codes-list"></div>
+      <div class="row" id="recovery-codes-actions" style="display:none; margin-top:6px">
+        <button class="small secondary" onclick="copyRecoveryCodes()">Copy unused</button>
+      </div>
+      <div id="recovery-msg" style="font-size:0.85rem; margin-top:4px"></div>
+    </div>
+
     <div class="row" style="margin-top:16px">
       <button onclick="openEdit(currentEntryId)">Edit</button>
       <button class="danger" id="delete-btn" onclick="confirmDelete()">Delete</button>
@@ -351,6 +371,8 @@ let entries = [];
 let currentEntryId = null;
 let editingId = null;
 let deleteConfirmPending = false;
+let currentRecoveryCodes = [];
+let regenerateConfirmPending = false;
 
 function showView(id) {
   ['list-view', 'detail-view', 'edit-view', 'settings-view', 'help-view'].forEach(v => {
@@ -497,8 +519,98 @@ async function openEntry(id) {
   addField('Category', e.category, false);
   if (e.favorite) addField('Favorite', 'Yes', false);
 
+  currentRecoveryCodes = e.recovery_codes || [];
+  regenerateConfirmPending = false;
+  renderRecoveryCodes();
+
   document.getElementById('delete-btn').textContent = 'Delete';
   showView('detail-view');
+}
+
+function renderRecoveryCodes() {
+  const list = document.getElementById('recovery-codes-list');
+  const genBtn = document.getElementById('recovery-generate-btn');
+  const actions = document.getElementById('recovery-codes-actions');
+  list.innerHTML = '';
+
+  if (currentRecoveryCodes.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.style.padding = '10px 0';
+    empty.textContent = 'None generated yet.';
+    list.appendChild(empty);
+    actions.style.display = 'none';
+  } else {
+    currentRecoveryCodes.forEach(rc => {
+      const row = document.createElement('div');
+      row.className = 'recovery-code-row' + (rc.used ? ' used' : '');
+      const code = document.createElement('span');
+      code.className = 'code';
+      code.textContent = rc.code;
+      const btn = document.createElement('button');
+      btn.className = 'small secondary';
+      btn.textContent = rc.used ? 'Mark unused' : 'Mark used';
+      btn.onclick = () => toggleRecoveryCode(rc.code, !rc.used);
+      row.appendChild(code);
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+    actions.style.display = 'flex';
+  }
+
+  genBtn.textContent = regenerateConfirmPending ? 'Tap again to confirm' : (currentRecoveryCodes.length ? 'Regenerate' : 'Generate');
+}
+
+async function generateRecoveryCodes() {
+  if (currentRecoveryCodes.length > 0 && !regenerateConfirmPending) {
+    // Regenerating invalidates every existing code, used or not --
+    // same "tap again to confirm" pattern as Delete above, not a
+    // silent replace.
+    regenerateConfirmPending = true;
+    renderRecoveryCodes();
+    return;
+  }
+  regenerateConfirmPending = false;
+
+  const msg = document.getElementById('recovery-msg');
+  msg.textContent = '';
+  const { ok, body } = await api(
+    'api/v1/entry/recovery_codes?id=' + encodeURIComponent(currentEntryId),
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ count: 16 }) }
+  );
+  if (!ok) {
+    msg.textContent = body.message || 'Failed to generate codes';
+    return;
+  }
+  currentRecoveryCodes = body.data.recovery_codes;
+  renderRecoveryCodes();
+}
+
+async function toggleRecoveryCode(code, used) {
+  const msg = document.getElementById('recovery-msg');
+  msg.textContent = '';
+  const { ok, body } = await api(
+    'api/v1/entry/recovery_codes?id=' + encodeURIComponent(currentEntryId),
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, used }) }
+  );
+  if (!ok) {
+    msg.textContent = body.message || 'Failed to update code';
+    return;
+  }
+  currentRecoveryCodes = body.data.recovery_codes;
+  regenerateConfirmPending = false;
+  renderRecoveryCodes();
+}
+
+async function copyRecoveryCodes() {
+  const unused = currentRecoveryCodes.filter(rc => !rc.used).map(rc => rc.code).join('\n');
+  const msg = document.getElementById('recovery-msg');
+  try {
+    await navigator.clipboard.writeText(unused);
+    msg.textContent = 'Copied to clipboard.';
+  } catch (e) {
+    msg.textContent = 'Could not access clipboard -- select and copy manually.';
+  }
 }
 
 async function confirmDelete() {

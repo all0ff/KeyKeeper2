@@ -43,11 +43,14 @@ AccountViewScreen::~AccountViewScreen()
 
 const char* AccountViewScreen::title() const
 {
-    return "Account";
+    return (mode_ == Mode::RecoveryCodesList) ? "Recovery Codes" : "Account";
 }
 
 const char* AccountViewScreen::footer_hint() const
 {
+    if (mode_ == Mode::RecoveryCodesList) {
+        return "ROTATE  Scroll    BACK  Return";
+    }
     return "ROTATE  Select    OK  Run    BACK  Return";
 }
 
@@ -76,6 +79,7 @@ void AccountViewScreen::reload()
     // on_show() re-runs this every time the screen becomes active
     // again (e.g. returning from a future AccountEdit) -- clear the
     // previous tree first.
+    mode_ = Mode::Main; // always land back on the main view, never mid-scroll in the recovery-codes list
     lv_obj_clean(content_parent_);
     password_value_label_ = nullptr;
     if (otp_refresh_timer_ != nullptr) {
@@ -253,6 +257,10 @@ void AccountViewScreen::build_actions(lv_obj_t* parent, lv_coord_t y_start)
     if (!entry_.totp_secret.empty()) {
         add_action(Action::PrintOtp);
     }
+    if (!entry_.recovery_codes.empty()) {
+        add_action(Action::ViewRecoveryCodes);
+        add_action(Action::PrintRecoveryCodes);
+    }
     add_action(Action::Edit);
     add_action(Action::Delete);
 
@@ -272,6 +280,8 @@ const char* AccountViewScreen::action_name(Action action) const
         case Action::PrintUsername:  return "Print Username";
         case Action::PrintPassword:  return "Print Password";
         case Action::PrintOtp:       return "Print OTP";
+        case Action::ViewRecoveryCodes:  return "View Recovery Codes";
+        case Action::PrintRecoveryCodes: return "Print Recovery Codes";
         case Action::Edit:           return "Edit";
         case Action::Delete:         return "Delete";
     }
@@ -397,6 +407,40 @@ void AccountViewScreen::activate()
             return;
         }
 
+        case Action::ViewRecoveryCodes:
+            enter_recovery_codes_list();
+            return;
+
+        case Action::PrintRecoveryCodes: {
+            const security::permission::Result result =
+                security::permission::check(security::permission::Operation::PrintPassword);
+            if (result != security::permission::Result::Allowed) {
+                ESP_LOGI(TAG, "%s denied (%d)", action_name(action), static_cast<int>(result));
+                lv_label_set_text(status_label_, "Not allowed");
+                return;
+            }
+
+            std::string text;
+            for (const vault::RecoveryCode& rc : entry_.recovery_codes) {
+                if (rc.used) {
+                    continue;
+                }
+                if (!text.empty()) {
+                    text += '\n';
+                }
+                text += rc.code;
+            }
+
+            if (text.empty()) {
+                lv_label_set_text(status_label_, "No unused codes left");
+                return;
+            }
+
+            usb::type_string(text);
+            lv_label_set_text(status_label_, usb::last_status());
+            return;
+        }
+
         case Action::Edit:
             manager().push(std::make_unique<AccountEditScreen>(entry_id_));
             return;
@@ -423,10 +467,99 @@ void AccountViewScreen::activate()
     }
 }
 
+void AccountViewScreen::enter_recovery_codes_list()
+{
+    mode_ = Mode::RecoveryCodesList;
+    selected_recovery_code_ = 0;
+    build_recovery_codes_list();
+}
+
+void AccountViewScreen::build_recovery_codes_list()
+{
+    lv_obj_clean(content_parent_);
+
+    const theme::Palette& pal = theme::current();
+    constexpr lv_coord_t ROW_Y_START = 4;
+    constexpr lv_coord_t ROW_SPACING = 20;
+
+    for (size_t i = 0; i < entry_.recovery_codes.size(); ++i) {
+        lv_obj_t* label = lv_label_create(content_parent_);
+        lv_obj_set_style_text_color(label, pal.primary_text, 0);
+        lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4, ROW_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i));
+        recovery_code_labels_[i] = label;
+    }
+
+    render_recovery_codes_list();
+}
+
+void AccountViewScreen::render_recovery_codes_list()
+{
+    const theme::Palette& pal = theme::current();
+
+    for (size_t i = 0; i < entry_.recovery_codes.size(); ++i) {
+        const vault::RecoveryCode& rc = entry_.recovery_codes[i];
+        const bool is_selected = (i == selected_recovery_code_);
+
+        // No strikethrough here -- kept to plain text + a bracketed
+        // marker, since this list is read-only on-device anyway (see
+        // this screen's own header comment on why marking one used is
+        // web-UI-only) and a marker reads fine even on this display's
+        // smaller font.
+        const lv_color_t color = is_selected ? pal.accent : (rc.used ? pal.secondary_text : pal.primary_text);
+        lv_obj_set_style_text_color(recovery_code_labels_[i], color, 0);
+        lv_label_set_text_fmt(recovery_code_labels_[i], "%s%s%s", is_selected ? "> " : "", rc.code.c_str(),
+                               rc.used ? " [used]" : "");
+    }
+
+    if (!entry_.recovery_codes.empty()) {
+        lv_obj_scroll_to_view(recovery_code_labels_[selected_recovery_code_], LV_ANIM_ON);
+    }
+}
+
+void AccountViewScreen::move_recovery_code_selection(int32_t delta)
+{
+    const size_t count = entry_.recovery_codes.size();
+    if (count == 0) {
+        return;
+    }
+
+    int32_t index = static_cast<int32_t>(selected_recovery_code_) + delta;
+    const int32_t total = static_cast<int32_t>(count);
+    if (index < 0) {
+        index = total - 1;
+    }
+    if (index >= total) {
+        index = 0;
+    }
+    selected_recovery_code_ = static_cast<size_t>(index);
+
+    render_recovery_codes_list();
+}
+
 bool AccountViewScreen::on_input(InputAction action)
 {
     if (!loaded_) {
         return false; // just the "not found" message; BACK pops normally
+    }
+
+    if (mode_ == Mode::RecoveryCodesList) {
+        switch (action) {
+            case InputAction::RotateLeft:
+                move_recovery_code_selection(-1);
+                return true;
+
+            case InputAction::RotateRight:
+                move_recovery_code_selection(+1);
+                return true;
+
+            case InputAction::BackShort:
+                mode_ = Mode::Main;
+                reload();
+                return true;
+
+            default:
+                return true; // swallow OK/etc -- nothing to activate in a read-only list
+        }
     }
 
     switch (action) {
