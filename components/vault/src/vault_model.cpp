@@ -1,5 +1,7 @@
 #include "vault/vault_model.hpp"
 
+#include "vault/bip39.hpp"
+
 #include "esp_random.h"
 
 namespace vault {
@@ -17,6 +19,17 @@ bool validate(const VaultEntry& entry)
     for (const RecoveryCode& rc : entry.recovery_codes) {
         if (rc.code.empty() || rc.code.size() > MAX_RECOVERY_CODE_LEN) return false;
     }
+
+    // Empty (no seed phrase set) is fine. Non-empty must be a FULLY
+    // valid BIP-39 phrase -- see bip39::validate_seed_phrase()'s own
+    // comment for exactly what that checks (length + wordlist, not
+    // the checksum). Enforced here, not just a size cap like the
+    // other fields above, because this is the single gate every
+    // create_entry()/update_entry() call goes through -- letting a
+    // malformed phrase (wrong word count, a typo'd word) through
+    // would mean silently saving something the person likely can't
+    // actually recover their wallet from later.
+    if (!entry.seed_phrase.empty() && !bip39::validate_seed_phrase(entry.seed_phrase)) return false;
 
     return true;
 }

@@ -21,9 +21,12 @@
 // own file comment) to actually produce a code.
 //
 // IMPORTANT: vault.db is not encrypted (see components/security's
-// scope note). totp_secret sitting here in plaintext is exactly as
-// exposed to a physical flash dump as password is -- this is not a
-// separate, smaller risk.
+// scope note). totp_secret and seed_phrase sitting here in plaintext
+// are exactly as exposed to a physical flash dump as password is --
+// this is not a separate, smaller risk. For seed_phrase specifically
+// (see that field's own comment) there is no cushion at all: it is
+// direct, unmediated control of real funds, not a password to some
+// account.
 // =============================================================================
 
 namespace vault {
@@ -48,6 +51,15 @@ inline constexpr size_t MAX_RECOVERY_CODE_LEN = 32;
 /// not a fixed count; generate_recovery_codes() takes its own count
 /// argument within this bound.
 inline constexpr size_t MAX_RECOVERY_CODES = 20;
+
+/// BIP-39 words are 3-8 characters (english.txt); generous headroom
+/// kept anyway rather than hardcoding exactly 8, in case a future
+/// non-English wordlist is ever added to vault::bip39.
+inline constexpr size_t MAX_SEED_WORD_LEN = 16;
+
+/// BIP-39's longest defined length -- see
+/// vault::bip39::validate_seed_phrase().
+inline constexpr size_t MAX_SEED_PHRASE_WORDS = 24;
 
 /// Never a valid entry id -- used as a "not found" / "not yet saved"
 /// sentinel.
@@ -92,6 +104,25 @@ struct VaultEntry
     /// -- see RecoveryCode's own comment, and
     /// vault::generate_recovery_codes() for how these get created.
     std::vector<RecoveryCode> recovery_codes;
+
+    /// A crypto wallet's mnemonic recovery phrase (BIP-39), one
+    /// lowercase word per element, IN ORDER -- word position matters,
+    /// unlike recovery_codes above (which is an unordered set of
+    /// individually spendable codes). ONE phrase per entry (the
+    /// project owner's own stated scope -- multiple wallets means
+    /// multiple entries, not multiple phrases on one). Empty means
+    /// none set. See vault::bip39::validate_seed_phrase() for the
+    /// length (12/15/18/21/24 words) and wordlist checks this must
+    /// pass before being accepted -- and that function's own comment
+    /// for what it deliberately does NOT check (the BIP-39 checksum).
+    /// Added in format v4.
+    ///
+    /// EXTRA SENSITIVE, more so than password or totp_secret: this is
+    /// literal, unmediated control of whatever crypto funds the
+    /// wallet holds, not a password to some account -- the SAME
+    /// "vault.db is not encrypted at rest" limitation from this
+    /// file's own top comment applies here with NO cushion at all.
+    std::vector<std::string> seed_phrase;
 
     /// Unix epoch seconds, best-effort (see components/vault/README.md
     /// -- there is currently no trustworthy time source, so these may

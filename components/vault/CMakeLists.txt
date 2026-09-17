@@ -6,6 +6,7 @@ idf_component_register(
         "src/vault_wipe.cpp"
         "src/vault_backup.cpp"
         "src/vault_csv.cpp"
+        "src/bip39_wordlist.cpp"
 
     INCLUDE_DIRS
         "include"

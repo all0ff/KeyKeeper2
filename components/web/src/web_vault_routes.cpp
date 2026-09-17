@@ -2,6 +2,7 @@
 #include "web_json_helpers.hpp"
 
 #include "security/lock_manager.hpp"
+#include "vault/bip39.hpp"
 #include "vault/vault.hpp"
 
 #include "cJSON.h"
@@ -72,6 +73,11 @@ cJSON* entry_to_json_full(const vault::VaultEntry& e)
         cJSON_AddItemToArray(codes, code_obj);
     }
     cJSON_AddItemToObject(obj, "recovery_codes", codes);
+    cJSON* seed_words = cJSON_CreateArray();
+    for (const std::string& w : e.seed_phrase) {
+        cJSON_AddItemToArray(seed_words, cJSON_CreateString(w.c_str()));
+    }
+    cJSON_AddItemToObject(obj, "seed_phrase", seed_words);
     cJSON_AddNumberToObject(obj, "created_at", e.created_at);
     cJSON_AddNumberToObject(obj, "updated_at", e.updated_at);
     return obj;
@@ -396,6 +402,113 @@ esp_err_t handle_mark_recovery_code(httpd_req_t* req)
     return ESP_OK;
 }
 
+cJSON* seed_phrase_to_json(const std::vector<std::string>& words)
+{
+    cJSON* array = cJSON_CreateArray();
+    for (const std::string& w : words) {
+        cJSON_AddItemToArray(array, cJSON_CreateString(w.c_str()));
+    }
+    cJSON* data = cJSON_CreateObject();
+    cJSON_AddItemToObject(data, "seed_phrase", array);
+    return data;
+}
+
+// PUT /api/v1/entry/seed_phrase?id=N -- sets (or REPLACES) the whole
+// phrase. Body: {"words": ["abandon", "ability", ...]}. Validated in
+// full server-side (vault::bip39::validate_seed_phrase() -- word
+// count is one of BIP-39's five defined lengths AND every word is in
+// the wordlist; see that function's own comment for what it does NOT
+// check) regardless of what client-side validation the web UI itself
+// does -- never trust the browser alone for something this sensitive.
+esp_err_t handle_set_seed_phrase(httpd_req_t* req)
+{
+    if (!require_unlocked(req)) {
+        return ESP_OK;
+    }
+
+    uint32_t id = vault::INVALID_ID;
+    if (!get_id_from_query(req, id)) {
+        respond_error(req, "400 Bad Request", "Missing 'id' query parameter");
+        return ESP_OK;
+    }
+
+    vault::VaultEntry entry;
+    if (!vault::get_entry(id, entry)) {
+        respond_error(req, "404 Not Found", "No such entry");
+        return ESP_OK;
+    }
+
+    std::string body;
+    if (!read_body(req, body)) {
+        respond_error(req, "400 Bad Request", "Missing or too-large request body");
+        return ESP_OK;
+    }
+
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (root == nullptr) {
+        respond_error(req, "400 Bad Request", "Invalid JSON");
+        return ESP_OK;
+    }
+
+    std::vector<std::string> words;
+    const cJSON* words_item = cJSON_GetObjectItemCaseSensitive(root, "words");
+    if (cJSON_IsArray(words_item)) {
+        const cJSON* w = nullptr;
+        cJSON_ArrayForEach(w, words_item) {
+            if (cJSON_IsString(w) && w->valuestring != nullptr) {
+                words.emplace_back(w->valuestring);
+            }
+        }
+    }
+    cJSON_Delete(root);
+
+    if (!vault::bip39::validate_seed_phrase(words)) {
+        respond_error(req, "400 Bad Request",
+                       "Invalid seed phrase -- must be 12/15/18/21/24 words, each from the BIP-39 wordlist");
+        return ESP_OK;
+    }
+
+    entry.seed_phrase = std::move(words);
+
+    if (!vault::update_entry(entry)) {
+        respond_error(req, "500 Internal Server Error", "Failed to save seed phrase");
+        return ESP_OK;
+    }
+
+    respond_ok(req, seed_phrase_to_json(entry.seed_phrase));
+    return ESP_OK;
+}
+
+// DELETE /api/v1/entry/seed_phrase?id=N -- clears it.
+esp_err_t handle_delete_seed_phrase(httpd_req_t* req)
+{
+    if (!require_unlocked(req)) {
+        return ESP_OK;
+    }
+
+    uint32_t id = vault::INVALID_ID;
+    if (!get_id_from_query(req, id)) {
+        respond_error(req, "400 Bad Request", "Missing 'id' query parameter");
+        return ESP_OK;
+    }
+
+    vault::VaultEntry entry;
+    if (!vault::get_entry(id, entry)) {
+        respond_error(req, "404 Not Found", "No such entry");
+        return ESP_OK;
+    }
+
+    entry.seed_phrase.clear();
+
+    if (!vault::update_entry(entry)) {
+        respond_error(req, "500 Internal Server Error", "Failed to clear seed phrase");
+        return ESP_OK;
+    }
+
+    respond_ok(req, nullptr);
+    return ESP_OK;
+}
+
 } // namespace
 
 void register_vault_routes(httpd_handle_t server)
@@ -408,6 +521,9 @@ void register_vault_routes(httpd_handle_t server)
 
     static char recovery_codes_path[64];
     build_prefixed_path(recovery_codes_path, sizeof(recovery_codes_path), "/api/v1/entry/recovery_codes");
+
+    static char seed_phrase_path[64];
+    build_prefixed_path(seed_phrase_path, sizeof(seed_phrase_path), "/api/v1/entry/seed_phrase");
 
     static httpd_uri_t list_uri{};
     list_uri.uri = entries_path;
@@ -451,6 +567,18 @@ void register_vault_routes(httpd_handle_t server)
     mark_code_uri.handler = handle_mark_recovery_code;
     mark_code_uri.user_ctx = nullptr;
 
+    static httpd_uri_t set_seed_uri{};
+    set_seed_uri.uri = seed_phrase_path;
+    set_seed_uri.method = HTTP_PUT;
+    set_seed_uri.handler = handle_set_seed_phrase;
+    set_seed_uri.user_ctx = nullptr;
+
+    static httpd_uri_t delete_seed_uri{};
+    delete_seed_uri.uri = seed_phrase_path;
+    delete_seed_uri.method = HTTP_DELETE;
+    delete_seed_uri.handler = handle_delete_seed_phrase;
+    delete_seed_uri.user_ctx = nullptr;
+
     httpd_register_uri_handler(server, &list_uri);
     httpd_register_uri_handler(server, &get_uri);
     httpd_register_uri_handler(server, &create_uri);
@@ -458,6 +586,8 @@ void register_vault_routes(httpd_handle_t server)
     httpd_register_uri_handler(server, &delete_uri);
     httpd_register_uri_handler(server, &generate_codes_uri);
     httpd_register_uri_handler(server, &mark_code_uri);
+    httpd_register_uri_handler(server, &set_seed_uri);
+    httpd_register_uri_handler(server, &delete_seed_uri);
 
     ESP_LOGI(TAG, "Vault REST routes registered");
 }

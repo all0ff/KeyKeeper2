@@ -126,6 +126,9 @@ enum FieldType : uint8_t
     // case below and skips it, rather than choking on an unknown
     // field type).
     FIELD_RECOVERY_CODES = 10,
+    // Added in format v4 -- same forward-compat story as v3's field
+    // above.
+    FIELD_SEED_PHRASE = 11,
 };
 
 void write_field_u8(std::vector<uint8_t>& buf, FieldType type, uint8_t value)
@@ -174,6 +177,28 @@ void write_field_recovery_codes(std::vector<uint8_t>& buf, const std::vector<vau
     buf.insert(buf.end(), payload.begin(), payload.end());
 }
 
+/**
+ * @brief FIELD_SEED_PHRASE's payload: u16 word count, then for each
+ *        word (IN ORDER -- see vault::VaultEntry::seed_phrase's own
+ *        comment on why order matters here unlike recovery codes) a
+ *        u8 length + the word's own bytes. No per-word flag needed
+ *        (unlike recovery codes' used bit) -- a seed phrase word
+ *        doesn't have a used/unused state.
+ */
+void write_field_seed_phrase(std::vector<uint8_t>& buf, const std::vector<std::string>& words)
+{
+    std::vector<uint8_t> payload;
+    append_u16(payload, static_cast<uint16_t>(words.size()));
+    for (const std::string& w : words) {
+        append_u8(payload, static_cast<uint8_t>(w.size()));
+        append_str(payload, w);
+    }
+
+    append_u8(buf, static_cast<uint8_t>(FIELD_SEED_PHRASE));
+    append_u16(buf, static_cast<uint16_t>(payload.size()));
+    buf.insert(buf.end(), payload.begin(), payload.end());
+}
+
 std::vector<uint8_t> encode_entry(const VaultEntry& e)
 {
     std::vector<uint8_t> fields;
@@ -186,6 +211,7 @@ std::vector<uint8_t> encode_entry(const VaultEntry& e)
     write_field_str(fields, FIELD_CATEGORY, e.category);
     write_field_u8(fields, FIELD_FAVORITE, e.favorite ? 1 : 0);
     write_field_recovery_codes(fields, e.recovery_codes);
+    write_field_seed_phrase(fields, e.seed_phrase);
     write_field_u32(fields, FIELD_CREATED_AT, e.created_at);
     write_field_u32(fields, FIELD_UPDATED_AT, e.updated_at);
 
@@ -314,6 +340,20 @@ bool decode_entry(const uint8_t* data, size_t len, VaultEntry& out)
                     uint8_t used = 0;
                     if (!r.read_u8(used)) return false;
                     out.recovery_codes.push_back(vault::RecoveryCode{std::move(code_str), used != 0});
+                }
+                break;
+            }
+            case FIELD_SEED_PHRASE: {
+                uint16_t count = 0;
+                if (!r.read_u16(count)) return false;
+                out.seed_phrase.clear();
+                out.seed_phrase.reserve(count);
+                for (uint16_t i = 0; i < count; ++i) {
+                    uint8_t word_len = 0;
+                    if (!r.read_u8(word_len)) return false;
+                    std::string word;
+                    if (!r.read_str(word_len, word)) return false;
+                    out.seed_phrase.push_back(std::move(word));
                 }
                 break;
             }

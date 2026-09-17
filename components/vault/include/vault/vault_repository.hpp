@@ -15,11 +15,12 @@
 namespace vault::repository {
 
 /// v1: id/login/password/url/notes/totp_secret/created_at/updated_at.
-/// v2: adds category, favorite. v3: adds recovery_codes. All three
-/// are read by this firmware -- see vault_repository.cpp's
-/// decode_all() for how an older v1/v2 file loads (missing fields
-/// default to empty/false, nothing is rejected).
-inline constexpr uint16_t VAULT_FORMAT_VERSION = 3;
+/// v2: adds category, favorite. v3: adds recovery_codes. v4: adds
+/// seed_phrase. All four are read by this firmware -- see
+/// vault_repository.cpp's decode_all() for how an older v1/v2/v3 file
+/// loads (missing fields default to empty/false, nothing is
+/// rejected).
+inline constexpr uint16_t VAULT_FORMAT_VERSION = 4;
 
 bool init();
 bool load();

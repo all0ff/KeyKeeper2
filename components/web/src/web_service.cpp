@@ -161,9 +161,9 @@ bool start()
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    // Default max_uri_handlers is 8. root/login/status (3) + 7 vault
-    // CRUD/recovery-code routes + 5 settings routes
-    // (register_settings_routes()) = 15 already -- bumped well past
+    // Default max_uri_handlers is 8. root/login/status (3) + 9 vault
+    // CRUD/recovery-code/seed-phrase routes + 5 settings routes
+    // (register_settings_routes()) = 17 already -- bumped well past
     // that for real headroom against whatever's added next (search,
     // backup/restore over REST), not just enough for what exists
     // today.
