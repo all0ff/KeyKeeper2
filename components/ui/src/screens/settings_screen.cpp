@@ -6,6 +6,7 @@
 #include "ui/screens/system_info_screen.hpp"
 #include "ui/screens/usb_settings_screen.hpp"
 #include "ui/screens/wifi_settings_screen.hpp"
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -18,17 +19,43 @@ namespace {
 constexpr lv_coord_t ITEM_Y_START = 4;
 constexpr lv_coord_t ITEM_SPACING = 20;
 
-constexpr const char* ITEM_NAMES[] = {"General", "USB", "Security", "System", "WiFi", "Password Gen"};
+const char* item_name(size_t index)
+{
+    if (i18n::language() == settings::Language::Russian) {
+        switch (index) {
+            case 0: return "Общие";
+            case 1: return "USB";
+            case 2: return "Безопасность";
+            case 3: return "Система";
+            case 4: return "Wi-Fi";
+            case 5: return "Генератор паролей";
+            default: return "";
+        }
+    }
+
+    switch (index) {
+        case 0: return "General";
+        case 1: return "USB";
+        case 2: return "Security";
+        case 3: return "System";
+        case 4: return "WiFi";
+        case 5: return "Password Gen";
+        default: return "";
+    }
+}
 
 } // namespace
 
 const char* SettingsScreen::title() const
 {
-    return "Settings";
+    return i18n::tr(i18n::Key::Settings);
 }
 
 const char* SettingsScreen::footer_hint() const
 {
+    if (i18n::language() == settings::Language::Russian) {
+        return "OK  Открыть    НАЗАД  Возврат";
+    }
     return "OK  Open    BACK  Return";
 }
 
@@ -64,13 +91,9 @@ void SettingsScreen::render()
     for (size_t i = 0; i < ITEM_COUNT; ++i) {
         const bool is_selected = (i == selected_);
         lv_obj_set_style_text_color(item_labels_[i], is_selected ? pal.accent : pal.primary_text, 0);
-        lv_label_set_text_fmt(item_labels_[i], "%s%s", is_selected ? "> " : "", ITEM_NAMES[i]);
+        lv_label_set_text_fmt(item_labels_[i], "%s%s", is_selected ? "> " : "", item_name(i));
     }
 
-    // 6 items no longer reliably fit the visible content area at once
-    // -- same fix as the settings SUB-screens already have (WiFi/
-    // Security/USB/General), just missing here on the hub list itself
-    // until now.
     if (item_labels_[selected_] != nullptr) {
         lv_obj_scroll_to_view(item_labels_[selected_], LV_ANIM_ON);
     }
@@ -139,7 +162,7 @@ bool SettingsScreen::on_input(InputAction action)
             return true;
 
         case InputAction::BackShort:
-            return false; // pop back to MainMenu
+            return false;
 
         default:
             return false;
