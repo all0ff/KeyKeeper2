@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 // =============================================================================
 // vault -- vault_model.hpp
@@ -38,9 +39,32 @@ inline constexpr size_t MAX_NOTES_LEN = 512;
 inline constexpr size_t MAX_TOTP_SECRET_LEN = 128;
 inline constexpr size_t MAX_CATEGORY_LEN = 64;
 
+/// "6458f-49d3c" style -- 10 lowercase hex characters plus one
+/// separating dash. See generate_recovery_codes()'s own comment for
+/// the exact shape.
+inline constexpr size_t MAX_RECOVERY_CODE_LEN = 32;
+
+/// Matches the "10-20 lines" the project owner asked for -- a cap,
+/// not a fixed count; generate_recovery_codes() takes its own count
+/// argument within this bound.
+inline constexpr size_t MAX_RECOVERY_CODES = 20;
+
 /// Never a valid entry id -- used as a "not found" / "not yet saved"
 /// sentinel.
 inline constexpr uint32_t INVALID_ID = 0;
+
+/// One single-use recovery/backup code -- the "6458f-49d3c" style
+/// list some services (GitHub 2FA, crypto wallets, ...) give you to
+/// regain access if you lose your normal login method. Not the same
+/// thing as totp_secret: a TOTP secret regenerates a new code every
+/// 30 seconds from one shared secret, while these are a FIXED list of
+/// individually one-time-use codes, each crossed off once spent.
+/// Added in format v3 -- see vault_repository.hpp.
+struct RecoveryCode
+{
+    std::string code;
+    bool used = false;
+};
 
 struct VaultEntry
 {
@@ -64,6 +88,11 @@ struct VaultEntry
     /// entries from an older vault.db that never had this field.
     bool favorite = false;
 
+    /// Empty means none generated for this entry. Added in format v3
+    /// -- see RecoveryCode's own comment, and
+    /// vault::generate_recovery_codes() for how these get created.
+    std::vector<RecoveryCode> recovery_codes;
+
     /// Unix epoch seconds, best-effort (see components/vault/README.md
     /// -- there is currently no trustworthy time source, so these may
     /// simply be 0 or drift). Not relied on for anything security-
@@ -80,5 +109,21 @@ struct VaultEntry
  * validation is never written to vault.db.
  */
 bool validate(const VaultEntry& entry);
+
+/**
+ * @brief Generate a fresh set of single-use recovery codes, e.g.
+ *        "6458f-49d3c" -- 10 lowercase hex characters (esp_random(),
+ *        same non-cryptographic-but-hardware-backed source
+ *        components/password_gen already uses) split into two groups
+ *        of 5 by a dash, purely for readability -- no semantic
+ *        meaning to the split point.
+ *
+ * REPLACES whatever recovery codes the entry already had -- like
+ * regenerating recovery codes on GitHub or a crypto wallet, the old
+ * ones are invalidated, not added to.
+ *
+ * @param count Clamped to [1, MAX_RECOVERY_CODES].
+ */
+std::vector<RecoveryCode> generate_recovery_codes(size_t count);
 
 } // namespace vault

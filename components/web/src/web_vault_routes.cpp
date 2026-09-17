@@ -23,6 +23,11 @@ constexpr char TAG[] = "web.vault";
 // for a personal vault's realistic size, not a considered limit.
 constexpr size_t MAX_LIST_ENTRIES = 256;
 
+// Matches the "10-20 lines" the project owner asked for -- the
+// middle of that range as a reasonable default when the client
+// doesn't specify a count.
+constexpr size_t DEFAULT_RECOVERY_CODE_COUNT = 16;
+
 bool require_unlocked(httpd_req_t* req)
 {
     if (security::lock::state() != security::lock::State::Unlocked) {
@@ -59,6 +64,14 @@ cJSON* entry_to_json_full(const vault::VaultEntry& e)
     cJSON_AddStringToObject(obj, "totp_secret", e.totp_secret.c_str());
     cJSON_AddStringToObject(obj, "category", e.category.c_str());
     cJSON_AddBoolToObject(obj, "favorite", e.favorite);
+    cJSON* codes = cJSON_CreateArray();
+    for (const vault::RecoveryCode& rc : e.recovery_codes) {
+        cJSON* code_obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(code_obj, "code", rc.code.c_str());
+        cJSON_AddBoolToObject(code_obj, "used", rc.used);
+        cJSON_AddItemToArray(codes, code_obj);
+    }
+    cJSON_AddItemToObject(obj, "recovery_codes", codes);
     cJSON_AddNumberToObject(obj, "created_at", e.created_at);
     cJSON_AddNumberToObject(obj, "updated_at", e.updated_at);
     return obj;
@@ -263,6 +276,126 @@ esp_err_t handle_delete_entry(httpd_req_t* req)
     return ESP_OK;
 }
 
+cJSON* recovery_codes_to_json(const std::vector<vault::RecoveryCode>& codes)
+{
+    cJSON* array = cJSON_CreateArray();
+    for (const vault::RecoveryCode& rc : codes) {
+        cJSON* code_obj = cJSON_CreateObject();
+        cJSON_AddStringToObject(code_obj, "code", rc.code.c_str());
+        cJSON_AddBoolToObject(code_obj, "used", rc.used);
+        cJSON_AddItemToArray(array, code_obj);
+    }
+    cJSON* data = cJSON_CreateObject();
+    cJSON_AddItemToObject(data, "recovery_codes", array);
+    return data;
+}
+
+// POST /api/v1/entry/recovery_codes?id=N -- (re)generates the WHOLE
+// set, replacing whatever was there (same "regenerating invalidates
+// the old ones" behavior as GitHub/a crypto wallet -- see
+// vault::generate_recovery_codes()'s own comment). Body is optional;
+// {"count": N} picks how many, default DEFAULT_RECOVERY_CODE_COUNT.
+esp_err_t handle_generate_recovery_codes(httpd_req_t* req)
+{
+    if (!require_unlocked(req)) {
+        return ESP_OK;
+    }
+
+    uint32_t id = vault::INVALID_ID;
+    if (!get_id_from_query(req, id)) {
+        respond_error(req, "400 Bad Request", "Missing 'id' query parameter");
+        return ESP_OK;
+    }
+
+    vault::VaultEntry entry;
+    if (!vault::get_entry(id, entry)) {
+        respond_error(req, "404 Not Found", "No such entry");
+        return ESP_OK;
+    }
+
+    size_t count = DEFAULT_RECOVERY_CODE_COUNT;
+    std::string body;
+    if (read_body(req, body) && !body.empty()) {
+        cJSON* root = cJSON_Parse(body.c_str());
+        if (root != nullptr) {
+            const cJSON* count_item = cJSON_GetObjectItemCaseSensitive(root, "count");
+            if (cJSON_IsNumber(count_item)) {
+                count = static_cast<size_t>(count_item->valueint);
+            }
+            cJSON_Delete(root);
+        }
+    }
+
+    entry.recovery_codes = vault::generate_recovery_codes(count);
+
+    if (!vault::update_entry(entry)) {
+        respond_error(req, "500 Internal Server Error", "Failed to save recovery codes");
+        return ESP_OK;
+    }
+
+    respond_ok(req, recovery_codes_to_json(entry.recovery_codes));
+    return ESP_OK;
+}
+
+// PUT /api/v1/entry/recovery_codes?id=N -- marks ONE existing code
+// used/unused (matched by its exact string, since that's what the
+// client already has on screen). Body: {"code": "...", "used": true}.
+esp_err_t handle_mark_recovery_code(httpd_req_t* req)
+{
+    if (!require_unlocked(req)) {
+        return ESP_OK;
+    }
+
+    uint32_t id = vault::INVALID_ID;
+    if (!get_id_from_query(req, id)) {
+        respond_error(req, "400 Bad Request", "Missing 'id' query parameter");
+        return ESP_OK;
+    }
+
+    vault::VaultEntry entry;
+    if (!vault::get_entry(id, entry)) {
+        respond_error(req, "404 Not Found", "No such entry");
+        return ESP_OK;
+    }
+
+    std::string body;
+    if (!read_body(req, body)) {
+        respond_error(req, "400 Bad Request", "Missing or too-large request body");
+        return ESP_OK;
+    }
+
+    cJSON* root = cJSON_Parse(body.c_str());
+    if (root == nullptr) {
+        respond_error(req, "400 Bad Request", "Invalid JSON");
+        return ESP_OK;
+    }
+    const std::string code = json_get_string(root, "code");
+    const bool used = json_get_bool(root, "used");
+    cJSON_Delete(root);
+
+    bool found = false;
+    for (vault::RecoveryCode& rc : entry.recovery_codes) {
+        if (rc.code == code) {
+            rc.used = used;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        respond_error(req, "404 Not Found", "No such recovery code on this entry");
+        return ESP_OK;
+    }
+
+    if (!vault::update_entry(entry)) {
+        respond_error(req, "500 Internal Server Error", "Failed to save recovery codes");
+        return ESP_OK;
+    }
+
+    respond_ok(req, recovery_codes_to_json(entry.recovery_codes));
+    return ESP_OK;
+}
+
 } // namespace
 
 void register_vault_routes(httpd_handle_t server)
@@ -272,6 +405,9 @@ void register_vault_routes(httpd_handle_t server)
 
     static char entry_path[64];
     build_prefixed_path(entry_path, sizeof(entry_path), "/api/v1/entry");
+
+    static char recovery_codes_path[64];
+    build_prefixed_path(recovery_codes_path, sizeof(recovery_codes_path), "/api/v1/entry/recovery_codes");
 
     static httpd_uri_t list_uri{};
     list_uri.uri = entries_path;
@@ -303,11 +439,25 @@ void register_vault_routes(httpd_handle_t server)
     delete_uri.handler = handle_delete_entry;
     delete_uri.user_ctx = nullptr;
 
+    static httpd_uri_t generate_codes_uri{};
+    generate_codes_uri.uri = recovery_codes_path;
+    generate_codes_uri.method = HTTP_POST;
+    generate_codes_uri.handler = handle_generate_recovery_codes;
+    generate_codes_uri.user_ctx = nullptr;
+
+    static httpd_uri_t mark_code_uri{};
+    mark_code_uri.uri = recovery_codes_path;
+    mark_code_uri.method = HTTP_PUT;
+    mark_code_uri.handler = handle_mark_recovery_code;
+    mark_code_uri.user_ctx = nullptr;
+
     httpd_register_uri_handler(server, &list_uri);
     httpd_register_uri_handler(server, &get_uri);
     httpd_register_uri_handler(server, &create_uri);
     httpd_register_uri_handler(server, &update_uri);
     httpd_register_uri_handler(server, &delete_uri);
+    httpd_register_uri_handler(server, &generate_codes_uri);
+    httpd_register_uri_handler(server, &mark_code_uri);
 
     ESP_LOGI(TAG, "Vault REST routes registered");
 }

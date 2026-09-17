@@ -15,5 +15,6 @@ idf_component_register(
         security
         event_bus
         esp_timer
+        esp_hw_support
         log
 )

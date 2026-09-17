@@ -121,6 +121,11 @@ enum FieldType : uint8_t
     // default-constructed values: empty string, false).
     FIELD_CATEGORY = 8,
     FIELD_FAVORITE = 9,
+    // Added in format v3 -- same forward-compat story as v2's fields
+    // above (an older firmware's decode_entry() hits the `default:`
+    // case below and skips it, rather than choking on an unknown
+    // field type).
+    FIELD_RECOVERY_CODES = 10,
 };
 
 void write_field_u8(std::vector<uint8_t>& buf, FieldType type, uint8_t value)
@@ -144,6 +149,31 @@ void write_field_str(std::vector<uint8_t>& buf, FieldType type, const std::strin
     append_str(buf, value);
 }
 
+/**
+ * @brief FIELD_RECOVERY_CODES's payload is itself a small nested
+ *        structure (a list, unlike every other field so far, which
+ *        are all flat scalars/strings): a u16 count, then for each
+ *        code a u16 length + the code's own bytes + a u8 used flag.
+ *        Bounds-checked the same way as everything else when read
+ *        back -- see decode_entry()'s FIELD_RECOVERY_CODES case,
+ *        which just calls the SAME Reader sequentially rather than
+ *        needing a separate sub-reader.
+ */
+void write_field_recovery_codes(std::vector<uint8_t>& buf, const std::vector<vault::RecoveryCode>& codes)
+{
+    std::vector<uint8_t> payload;
+    append_u16(payload, static_cast<uint16_t>(codes.size()));
+    for (const vault::RecoveryCode& rc : codes) {
+        append_u16(payload, static_cast<uint16_t>(rc.code.size()));
+        append_str(payload, rc.code);
+        payload.push_back(rc.used ? 1 : 0);
+    }
+
+    append_u8(buf, static_cast<uint8_t>(FIELD_RECOVERY_CODES));
+    append_u16(buf, static_cast<uint16_t>(payload.size()));
+    buf.insert(buf.end(), payload.begin(), payload.end());
+}
+
 std::vector<uint8_t> encode_entry(const VaultEntry& e)
 {
     std::vector<uint8_t> fields;
@@ -155,6 +185,7 @@ std::vector<uint8_t> encode_entry(const VaultEntry& e)
     write_field_str(fields, FIELD_TOTP_SECRET, e.totp_secret);
     write_field_str(fields, FIELD_CATEGORY, e.category);
     write_field_u8(fields, FIELD_FAVORITE, e.favorite ? 1 : 0);
+    write_field_recovery_codes(fields, e.recovery_codes);
     write_field_u32(fields, FIELD_CREATED_AT, e.created_at);
     write_field_u32(fields, FIELD_UPDATED_AT, e.updated_at);
 
@@ -268,6 +299,22 @@ bool decode_entry(const uint8_t* data, size_t len, VaultEntry& out)
                 uint8_t v = 0;
                 if (field_len != 1 || !r.read_u8(v)) return false;
                 out.favorite = (v != 0);
+                break;
+            }
+            case FIELD_RECOVERY_CODES: {
+                uint16_t count = 0;
+                if (!r.read_u16(count)) return false;
+                out.recovery_codes.clear();
+                out.recovery_codes.reserve(count);
+                for (uint16_t i = 0; i < count; ++i) {
+                    uint16_t code_len = 0;
+                    if (!r.read_u16(code_len)) return false;
+                    std::string code_str;
+                    if (!r.read_str(code_len, code_str)) return false;
+                    uint8_t used = 0;
+                    if (!r.read_u8(used)) return false;
+                    out.recovery_codes.push_back(vault::RecoveryCode{std::move(code_str), used != 0});
+                }
                 break;
             }
             case FIELD_CREATED_AT: {

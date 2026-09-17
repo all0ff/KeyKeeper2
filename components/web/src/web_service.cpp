@@ -161,11 +161,12 @@ bool start()
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    // Default max_uri_handlers is 8. root/login/status (3) + 5 vault
-    // CRUD routes + 5 settings routes (register_settings_routes()) =
-    // 13 already -- bumped well past that for real headroom against
-    // whatever's added next (search, backup/restore over REST), not
-    // just enough for what exists today.
+    // Default max_uri_handlers is 8. root/login/status (3) + 7 vault
+    // CRUD/recovery-code routes + 5 settings routes
+    // (register_settings_routes()) = 15 already -- bumped well past
+    // that for real headroom against whatever's added next (search,
+    // backup/restore over REST), not just enough for what exists
+    // today.
     config.max_uri_handlers = 24;
 
     // Default stack_size (4096 bytes on this ESP-IDF version) turned
