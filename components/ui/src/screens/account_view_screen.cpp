@@ -43,13 +43,18 @@ AccountViewScreen::~AccountViewScreen()
 
 const char* AccountViewScreen::title() const
 {
-    return (mode_ == Mode::RecoveryCodesList) ? "Recovery Codes" : "Account";
+    if (mode_ == Mode::RecoveryCodesList) return "Recovery Codes";
+    if (mode_ == Mode::SeedPhraseView) return "Seed Phrase";
+    return "Account";
 }
 
 const char* AccountViewScreen::footer_hint() const
 {
     if (mode_ == Mode::RecoveryCodesList) {
         return "ROTATE  Scroll    BACK  Return";
+    }
+    if (mode_ == Mode::SeedPhraseView) {
+        return "ROTATE  Scroll    OK  Reveal/Hide    BACK  Return";
     }
     return "ROTATE  Select    OK  Run    BACK  Return";
 }
@@ -80,6 +85,7 @@ void AccountViewScreen::reload()
     // again (e.g. returning from a future AccountEdit) -- clear the
     // previous tree first.
     mode_ = Mode::Main; // always land back on the main view, never mid-scroll in the recovery-codes list
+    seed_phrase_revealed_ = false; // re-mask every time this screen is (re)entered, same caution as password
     lv_obj_clean(content_parent_);
     password_value_label_ = nullptr;
     if (otp_refresh_timer_ != nullptr) {
@@ -261,6 +267,10 @@ void AccountViewScreen::build_actions(lv_obj_t* parent, lv_coord_t y_start)
         add_action(Action::ViewRecoveryCodes);
         add_action(Action::PrintRecoveryCodes);
     }
+    if (!entry_.seed_phrase.empty()) {
+        add_action(Action::ViewSeedPhrase);
+        add_action(Action::PrintSeedPhrase);
+    }
     add_action(Action::Edit);
     add_action(Action::Delete);
 
@@ -282,6 +292,8 @@ const char* AccountViewScreen::action_name(Action action) const
         case Action::PrintOtp:       return "Print OTP";
         case Action::ViewRecoveryCodes:  return "View Recovery Codes";
         case Action::PrintRecoveryCodes: return "Print Recovery Codes";
+        case Action::ViewSeedPhrase:     return "View Seed Phrase";
+        case Action::PrintSeedPhrase:    return "Print Seed Phrase";
         case Action::Edit:           return "Edit";
         case Action::Delete:         return "Delete";
     }
@@ -441,6 +453,35 @@ void AccountViewScreen::activate()
             return;
         }
 
+        case Action::ViewSeedPhrase:
+            enter_seed_phrase_view();
+            return;
+
+        case Action::PrintSeedPhrase: {
+            const security::permission::Result result =
+                security::permission::check(security::permission::Operation::PrintPassword);
+            if (result != security::permission::Result::Allowed) {
+                ESP_LOGI(TAG, "%s denied (%d)", action_name(action), static_cast<int>(result));
+                lv_label_set_text(status_label_, "Not allowed");
+                return;
+            }
+
+            // Space-separated on ONE line -- matches how wallet
+            // software's own "paste your recovery phrase" fields
+            // expect it, unlike Print Recovery Codes' one-per-line.
+            std::string text;
+            for (const std::string& w : entry_.seed_phrase) {
+                if (!text.empty()) {
+                    text += ' ';
+                }
+                text += w;
+            }
+
+            usb::type_string(text);
+            lv_label_set_text(status_label_, usb::last_status());
+            return;
+        }
+
         case Action::Edit:
             manager().push(std::make_unique<AccountEditScreen>(entry_id_));
             return;
@@ -536,6 +577,77 @@ void AccountViewScreen::move_recovery_code_selection(int32_t delta)
     render_recovery_codes_list();
 }
 
+void AccountViewScreen::enter_seed_phrase_view()
+{
+    mode_ = Mode::SeedPhraseView;
+    selected_seed_word_ = 0;
+    seed_phrase_revealed_ = false; // always starts masked, even if it was revealed last time
+    build_seed_phrase_view();
+}
+
+void AccountViewScreen::build_seed_phrase_view()
+{
+    lv_obj_clean(content_parent_);
+
+    const theme::Palette& pal = theme::current();
+    constexpr lv_coord_t ROW_Y_START = 4;
+    constexpr lv_coord_t ROW_SPACING = 20;
+
+    for (size_t i = 0; i < entry_.seed_phrase.size(); ++i) {
+        lv_obj_t* label = lv_label_create(content_parent_);
+        lv_obj_set_style_text_color(label, pal.primary_text, 0);
+        lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4, ROW_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i));
+        seed_word_labels_[i] = label;
+    }
+
+    render_seed_phrase_view();
+}
+
+void AccountViewScreen::render_seed_phrase_view()
+{
+    const theme::Palette& pal = theme::current();
+
+    for (size_t i = 0; i < entry_.seed_phrase.size(); ++i) {
+        const bool is_selected = (i == selected_seed_word_);
+        lv_obj_set_style_text_color(seed_word_labels_[i], is_selected ? pal.accent : pal.primary_text, 0);
+
+        if (seed_phrase_revealed_) {
+            lv_label_set_text_fmt(seed_word_labels_[i], "%s%u. %s", is_selected ? "> " : "",
+                                   static_cast<unsigned>(i + 1), entry_.seed_phrase[i].c_str());
+        } else {
+            // Fixed-width mask, same reasoning as
+            // update_password_label()'s own -- not hinting at the
+            // real word length.
+            lv_label_set_text_fmt(seed_word_labels_[i], "%s%u. ****", is_selected ? "> " : "",
+                                   static_cast<unsigned>(i + 1));
+        }
+    }
+
+    if (!entry_.seed_phrase.empty()) {
+        lv_obj_scroll_to_view(seed_word_labels_[selected_seed_word_], LV_ANIM_ON);
+    }
+}
+
+void AccountViewScreen::move_seed_phrase_selection(int32_t delta)
+{
+    const size_t count = entry_.seed_phrase.size();
+    if (count == 0) {
+        return;
+    }
+
+    int32_t index = static_cast<int32_t>(selected_seed_word_) + delta;
+    const int32_t total = static_cast<int32_t>(count);
+    if (index < 0) {
+        index = total - 1;
+    }
+    if (index >= total) {
+        index = 0;
+    }
+    selected_seed_word_ = static_cast<size_t>(index);
+
+    render_seed_phrase_view();
+}
+
 bool AccountViewScreen::on_input(InputAction action)
 {
     if (!loaded_) {
@@ -559,6 +671,31 @@ bool AccountViewScreen::on_input(InputAction action)
 
             default:
                 return true; // swallow OK/etc -- nothing to activate in a read-only list
+        }
+    }
+
+    if (mode_ == Mode::SeedPhraseView) {
+        switch (action) {
+            case InputAction::RotateLeft:
+                move_seed_phrase_selection(-1);
+                return true;
+
+            case InputAction::RotateRight:
+                move_seed_phrase_selection(+1);
+                return true;
+
+            case InputAction::OkShort:
+                seed_phrase_revealed_ = !seed_phrase_revealed_;
+                render_seed_phrase_view();
+                return true;
+
+            case InputAction::BackShort:
+                mode_ = Mode::Main;
+                reload();
+                return true;
+
+            default:
+                return true;
         }
     }
 

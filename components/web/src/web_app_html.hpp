@@ -141,6 +141,32 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
       <div id="recovery-msg" style="font-size:0.85rem; margin-top:4px"></div>
     </div>
 
+    <div id="seed-phrase-section" style="margin-top:20px">
+      <div class="topbar" style="margin-bottom:6px">
+        <h3 style="margin:0; font-size:1rem">Seed Phrase</h3>
+        <button class="small secondary" id="seed-reveal-btn" onclick="toggleSeedPhraseReveal()" style="display:none">Reveal</button>
+      </div>
+      <div id="seed-phrase-view"></div>
+      <div id="seed-phrase-edit" style="display:none">
+        <textarea id="seed-phrase-input" rows="3"
+          placeholder="12, 15, 18, 21 or 24 words, space or newline separated"
+          style="width:100%; font-family:ui-monospace,Consolas,monospace; font-size:0.9rem"></textarea>
+        <div class="row" style="margin-top:6px">
+          <button class="small" onclick="saveSeedPhrase()">Save</button>
+          <button class="small secondary" onclick="cancelEditSeedPhrase()">Cancel</button>
+        </div>
+      </div>
+      <div class="row" id="seed-phrase-actions" style="margin-top:6px">
+        <button class="small secondary" id="seed-edit-btn" onclick="startEditSeedPhrase()">Set / Replace</button>
+        <button class="small secondary" id="seed-copy-btn" onclick="copySeedPhrase()" style="display:none">Copy</button>
+        <button class="small danger" id="seed-clear-btn" onclick="clearSeedPhrase()" style="display:none">Clear</button>
+      </div>
+      <div class="note" style="margin-top:8px">Anyone who has this phrase has full, irreversible control of the
+        wallet it belongs to -- treat it with at least the same care as the wallet itself. This device does not
+        encrypt its storage (see Help).</div>
+      <div id="seed-msg" style="font-size:0.85rem; margin-top:4px"></div>
+    </div>
+
     <div class="row" style="margin-top:16px">
       <button onclick="openEdit(currentEntryId)">Edit</button>
       <button class="danger" id="delete-btn" onclick="confirmDelete()">Delete</button>
@@ -373,6 +399,9 @@ let editingId = null;
 let deleteConfirmPending = false;
 let currentRecoveryCodes = [];
 let regenerateConfirmPending = false;
+let currentSeedPhrase = [];
+let seedRevealed = false;
+let seedClearConfirmPending = false;
 
 function showView(id) {
   ['list-view', 'detail-view', 'edit-view', 'settings-view', 'help-view'].forEach(v => {
@@ -523,6 +552,12 @@ async function openEntry(id) {
   regenerateConfirmPending = false;
   renderRecoveryCodes();
 
+  currentSeedPhrase = e.seed_phrase || [];
+  seedRevealed = false;
+  seedClearConfirmPending = false;
+  document.getElementById('seed-phrase-edit').style.display = 'none';
+  renderSeedPhrase();
+
   document.getElementById('delete-btn').textContent = 'Delete';
   showView('detail-view');
 }
@@ -611,6 +646,135 @@ async function copyRecoveryCodes() {
   } catch (e) {
     msg.textContent = 'Could not access clipboard -- select and copy manually.';
   }
+}
+
+// ---------- Seed phrase ----------
+
+const VALID_SEED_LENGTHS = [12, 15, 18, 21, 24];
+
+function renderSeedPhrase() {
+  const view = document.getElementById('seed-phrase-view');
+  const revealBtn = document.getElementById('seed-reveal-btn');
+  const editBtn = document.getElementById('seed-edit-btn');
+  const copyBtn = document.getElementById('seed-copy-btn');
+  const clearBtn = document.getElementById('seed-clear-btn');
+  view.innerHTML = '';
+
+  if (currentSeedPhrase.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty';
+    empty.style.padding = '6px 0';
+    empty.textContent = 'Not set.';
+    view.appendChild(empty);
+    revealBtn.style.display = 'none';
+    copyBtn.style.display = 'none';
+    clearBtn.style.display = 'none';
+    editBtn.textContent = 'Set';
+  } else {
+    revealBtn.style.display = 'inline-block';
+    revealBtn.textContent = seedRevealed ? 'Hide' : 'Reveal';
+    copyBtn.style.display = 'inline-block';
+    clearBtn.style.display = 'inline-block';
+    editBtn.textContent = 'Replace';
+
+    const list = document.createElement('div');
+    list.style.fontFamily = 'ui-monospace, Consolas, monospace';
+    list.style.fontSize = '0.92rem';
+    list.style.lineHeight = '1.6';
+    if (seedRevealed) {
+      list.textContent = currentSeedPhrase.map((w, i) => (i + 1) + '. ' + w).join('   ');
+    } else {
+      list.textContent = currentSeedPhrase.map((_, i) => (i + 1) + '. \u2022\u2022\u2022\u2022').join('   ');
+    }
+    view.appendChild(list);
+  }
+
+  clearBtn.textContent = seedClearConfirmPending ? 'Tap again to confirm' : 'Clear';
+}
+
+function toggleSeedPhraseReveal() {
+  seedRevealed = !seedRevealed;
+  renderSeedPhrase();
+}
+
+function startEditSeedPhrase() {
+  document.getElementById('seed-phrase-input').value = currentSeedPhrase.join(' ');
+  document.getElementById('seed-phrase-edit').style.display = 'block';
+  document.getElementById('seed-phrase-actions').style.display = 'none';
+}
+
+function cancelEditSeedPhrase() {
+  document.getElementById('seed-phrase-edit').style.display = 'none';
+  document.getElementById('seed-phrase-actions').style.display = 'flex';
+  document.getElementById('seed-msg').textContent = '';
+}
+
+async function saveSeedPhrase() {
+  const raw = document.getElementById('seed-phrase-input').value;
+  const words = raw.trim().split(/\s+/).filter(w => w.length > 0).map(w => w.toLowerCase());
+  const msg = document.getElementById('seed-msg');
+
+  // Quick client-side length check only -- catches the most common
+  // mistake (pasted the wrong thing, missed a word) instantly. The
+  // real check (every word actually in the BIP-39 wordlist) runs
+  // server-side, which has the 2048-word list to check against and
+  // is the one that actually decides -- see
+  // web_vault_routes.cpp's handle_set_seed_phrase().
+  if (!VALID_SEED_LENGTHS.includes(words.length)) {
+    msg.textContent = 'Must be 12, 15, 18, 21 or 24 words -- got ' + words.length + '.';
+    return;
+  }
+
+  msg.textContent = 'Saving...';
+  const { ok, body } = await api(
+    'api/v1/entry/seed_phrase?id=' + encodeURIComponent(currentEntryId),
+    { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ words }) }
+  );
+  if (!ok) {
+    msg.textContent = body.message || 'Failed to save seed phrase';
+    return;
+  }
+
+  currentSeedPhrase = body.data.seed_phrase;
+  seedRevealed = false;
+  document.getElementById('seed-phrase-edit').style.display = 'none';
+  document.getElementById('seed-phrase-actions').style.display = 'flex';
+  msg.textContent = '';
+  renderSeedPhrase();
+}
+
+async function copySeedPhrase() {
+  const msg = document.getElementById('seed-msg');
+  try {
+    await navigator.clipboard.writeText(currentSeedPhrase.join(' '));
+    msg.textContent = 'Copied to clipboard.';
+  } catch (e) {
+    msg.textContent = 'Could not access clipboard -- select and copy manually.';
+  }
+}
+
+async function clearSeedPhrase() {
+  if (!seedClearConfirmPending) {
+    seedClearConfirmPending = true;
+    renderSeedPhrase();
+    return;
+  }
+  seedClearConfirmPending = false;
+
+  const msg = document.getElementById('seed-msg');
+  const { ok, body } = await api(
+    'api/v1/entry/seed_phrase?id=' + encodeURIComponent(currentEntryId),
+    { method: 'DELETE' }
+  );
+  if (!ok) {
+    msg.textContent = body.message || 'Failed to clear seed phrase';
+    return;
+  }
+
+  currentSeedPhrase = [];
+  seedRevealed = false;
+  msg.textContent = '';
+  renderSeedPhrase();
 }
 
 async function confirmDelete() {

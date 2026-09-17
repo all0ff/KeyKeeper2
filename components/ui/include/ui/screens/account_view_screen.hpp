@@ -67,6 +67,23 @@
 // USB, one per line (same Operation::PrintPassword gate as the other
 // Print* actions here) -- matching the web UI's own "Copy unused",
 // not the full list including already-spent codes.
+//
+// Seed Phrase (format v4, vault::VaultEntry::seed_phrase -- a crypto
+// wallet's BIP-39 mnemonic, MORE sensitive than anything else this
+// screen shows, see that field's own comment) gets the SAME
+// view/print pattern as Recovery Codes above, one more conditional
+// mode (SeedPhraseView) -- but MASKED by default like Password is,
+// unlike the recovery-codes list: OK toggles reveal for the whole
+// list at once (seed_phrase_revealed_), same "hide by default, one
+// press to see it" caution as update_password_label(). Setting or
+// replacing the phrase is web-UI-only, same reasoning as recovery
+// codes (typing 12-24 exact BIP-39 words via a single rotary knob
+// is not a reasonable on-device task, and the real wordlist
+// validation -- vault::bip39::validate_seed_phrase() -- runs
+// server-side regardless of where the words came from). "Print Seed
+// Phrase" types every word over USB space-separated on ONE line
+// (matching how wallet software's own "paste your recovery phrase"
+// fields expect it), same Operation::PrintPassword gate.
 // =============================================================================
 
 namespace ui::screens {
@@ -90,6 +107,7 @@ private:
     {
         Main,
         RecoveryCodesList,
+        SeedPhraseView,
     };
 
     enum class Action : uint8_t
@@ -102,6 +120,8 @@ private:
         PrintOtp,
         ViewRecoveryCodes,
         PrintRecoveryCodes,
+        ViewSeedPhrase,
+        PrintSeedPhrase,
         Edit,
         Delete,
     };
@@ -122,6 +142,11 @@ private:
     void render_recovery_codes_list();
     void move_recovery_code_selection(int32_t delta);
 
+    void enter_seed_phrase_view();
+    void build_seed_phrase_view();
+    void render_seed_phrase_view();
+    void move_seed_phrase_selection(int32_t delta);
+
     uint32_t entry_id_;
     vault::VaultEntry entry_{};
     bool loaded_ = false;
@@ -135,7 +160,7 @@ private:
     lv_obj_t* otp_value_label_ = nullptr;
     lv_timer_t* otp_refresh_timer_ = nullptr;
 
-    static constexpr size_t MAX_ACTIONS = 10;
+    static constexpr size_t MAX_ACTIONS = 12;
     Action available_actions_[MAX_ACTIONS]{};
     size_t action_count_ = 0;
     lv_obj_t* action_labels_[MAX_ACTIONS]{};
@@ -146,6 +171,12 @@ private:
     // vault::MAX_RECOVERY_CODES caps how many an entry can ever have.
     lv_obj_t* recovery_code_labels_[vault::MAX_RECOVERY_CODES]{};
     size_t selected_recovery_code_ = 0;
+
+    // vault::MAX_SEED_PHRASE_WORDS (24) caps how many an entry can
+    // ever have.
+    lv_obj_t* seed_word_labels_[vault::MAX_SEED_PHRASE_WORDS]{};
+    size_t selected_seed_word_ = 0;
+    bool seed_phrase_revealed_ = false;
 
     lv_obj_t* status_label_ = nullptr;
 };
