@@ -1,8 +1,10 @@
 #include "ui/ui_manager.hpp"
 
 #include "ui/theme.hpp"
+#include "ui/localization.hpp"
 
 #include "display/display.hpp"
+#include "display/fonts.hpp"
 
 #include "esp_log.h"
 
@@ -29,6 +31,10 @@ bool UiManager::init(lv_obj_t* lv_screen)
 
     lv_obj_set_style_bg_color(lv_screen_, pal.background, 0);
     lv_obj_set_style_bg_opa(lv_screen_, LV_OPA_COVER, 0);
+    // Use the project font as the inherited UI font. Unlike changing the
+    // LVGL default theme, this is local to KeyKeeper's screen tree and
+    // therefore does not alter LVGL's global theme initialization.
+    lv_obj_set_style_text_font(lv_screen_, &keykeeper_cyrillic_16, 0);
 
     // -------------------------------------------------------------------
     // Header (docs/GUI.md section 6)
@@ -42,6 +48,7 @@ bool UiManager::init(lv_obj_t* lv_screen)
 
     header_label_ = lv_label_create(header_);
     lv_obj_set_style_text_color(header_label_, pal.primary_text, 0);
+    lv_obj_set_style_text_font(header_label_, &keykeeper_cyrillic_16, 0);
     lv_obj_center(header_label_);
 
     // -------------------------------------------------------------------
@@ -56,6 +63,7 @@ bool UiManager::init(lv_obj_t* lv_screen)
 
     footer_label_ = lv_label_create(footer_);
     lv_obj_set_style_text_color(footer_label_, pal.secondary_text, 0);
+    lv_obj_set_style_text_font(footer_label_, &keykeeper_cyrillic_16, 0);
     lv_obj_center(footer_label_);
 
     // -------------------------------------------------------------------
@@ -83,17 +91,13 @@ void UiManager::push(std::unique_ptr<Screen> screen)
 
     hide_active();
 
-    // Each screen gets its own child container under the shared
-    // content_ area, sized to fill it. This is what makes Hide
-    // ("become invisible, keep the LVGL tree") and Destroy ("actually
-    // delete it") two distinct steps, per docs/GUI.md 4's lifecycle,
-    // instead of tearing down and rebuilding on every navigation.
     lv_obj_t* container = lv_obj_create(content_);
     lv_obj_remove_style_all(container);
     lv_obj_set_size(container, LV_PCT(100), LV_PCT(100));
 
     screen->manager_ = this;
     screen->root_ = container;
+    lv_obj_set_style_text_font(screen->root_, &keykeeper_cyrillic_16, 0);
     screen->initialize(container);
 
     stack_.push_back(std::move(screen));
@@ -110,9 +114,9 @@ void UiManager::pop()
 
     Screen* leaving = stack_.back().get();
     if (leaving->root() != nullptr) {
-        lv_obj_del(leaving->root()); // Destroy stage: LVGL tree gone
+        lv_obj_del(leaving->root());
     }
-    stack_.pop_back(); // Destroy stage: C++ object gone
+    stack_.pop_back();
 
     show_active();
 }
@@ -138,6 +142,7 @@ void UiManager::replace(std::unique_ptr<Screen> screen)
 
     screen->manager_ = this;
     screen->root_ = container;
+    lv_obj_set_style_text_font(screen->root_, &keykeeper_cyrillic_16, 0);
     screen->initialize(container);
 
     stack_.push_back(std::move(screen));
@@ -179,7 +184,6 @@ void UiManager::handle_input(InputAction action)
         return;
     }
 
-    // Default navigation for anything a screen didn't handle itself.
     if (action == InputAction::BackShort) {
         pop();
     }

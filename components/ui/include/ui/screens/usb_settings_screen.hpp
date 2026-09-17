@@ -15,6 +15,13 @@
 // (settings_types.hpp): default_password, the three delay_*_ms
 // fields, and typing_order.
 //
+// Auto-switch layout (CyrillicAutoSwitch) added later, not part of
+// GUI.md 14's original list -- toggles
+// settings::UsbSettings::cyrillic_auto_switch_layout, see that
+// field's own comment for the full reasoning (defaults off: manual
+// host-side layout switching, after a real test found the automatic
+// switch-back unreliable).
+//
 // Password Shortcut uses widgets::TextEntry (masked, like a password
 // field elsewhere in this UI) rather than a dedicated widget --
 // same reasoning as AccountEditScreen's Password field.
@@ -49,9 +56,10 @@ private:
         DelayBetweenChars,
         DelayBetweenFields,
         PrintSequence,
+        CyrillicAutoSwitch,
         Save,
     };
-    static constexpr size_t ROW_COUNT = 6;
+    static constexpr size_t ROW_COUNT = 7;
 
     enum class Mode : uint8_t
     {
@@ -84,6 +92,7 @@ private:
     uint16_t delay_between_chars_ms_ = 0;
     uint16_t delay_between_fields_ms_ = 0;
     settings::TypingOrder typing_order_ = settings::TypingOrder::LoginTabPasswordEnter;
+    bool cyrillic_auto_switch_layout_ = false;
 
     widgets::TextEntry text_entry_;
 };

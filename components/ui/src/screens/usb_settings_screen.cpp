@@ -53,6 +53,7 @@ void UsbSettingsScreen::initialize(lv_obj_t* content_parent)
     delay_between_chars_ms_ = u.delay_between_chars_ms;
     delay_between_fields_ms_ = u.delay_between_fields_ms;
     typing_order_ = u.typing_order;
+    cyrillic_auto_switch_layout_ = u.cyrillic_auto_switch_layout;
 
     build_rows(content_parent_);
 }
@@ -123,6 +124,10 @@ void UsbSettingsScreen::render_rows()
                 break;
             case Row::PrintSequence:
                 lv_label_set_text_fmt(row_labels_[i], "%sPrint Sequence: %s", prefix, typing_order_label());
+                break;
+            case Row::CyrillicAutoSwitch:
+                lv_label_set_text_fmt(row_labels_[i], "%sAuto-switch layout: %s", prefix,
+                                       cyrillic_auto_switch_layout_ ? "on" : "off");
                 break;
             case Row::Save:
                 lv_label_set_text_fmt(row_labels_[i], "%sSave", prefix);
@@ -197,6 +202,10 @@ void UsbSettingsScreen::adjust_value(int32_t delta)
             }
             break;
 
+        case Row::CyrillicAutoSwitch:
+            cyrillic_auto_switch_layout_ = !cyrillic_auto_switch_layout_;
+            break;
+
         default:
             break;
     }
@@ -262,6 +271,7 @@ void UsbSettingsScreen::save()
     updated.delay_before_typing_ms = delay_before_typing_ms_;
     updated.delay_between_chars_ms = delay_between_chars_ms_;
     updated.delay_between_fields_ms = delay_between_fields_ms_;
+    updated.cyrillic_auto_switch_layout = cyrillic_auto_switch_layout_;
 
     if (settings::set_usb(updated)) {
         ESP_LOGI(TAG, "USB settings saved");

@@ -3,11 +3,13 @@
 #include "ui/screens/quick_screen.hpp"
 #include "ui/screens/setup_pin_screen.hpp"
 #include "ui/ui_manager.hpp"
+#include "ui/localization.hpp"
 
 #include "display/lvgl_port.hpp"
 #include "input/input.hpp"
 #include "security/lock_manager.hpp"
 #include "security/pin_manager.hpp"
+#include "settings/settings.hpp"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -71,22 +73,6 @@ void ui_task(void* /*arg*/)
     }
 }
 
-/**
- * @brief On any transition to Locked -- however it happens (Main
- *        Menu's explicit Lock action, auto-lock's idle timeout, a
- *        wipe-triggered re-lock, ...) -- force the navigation stack
- *        back down to the root screen (QuickScreen).
- *
- * security::lock::lock() only flips internal state and fires
- * callbacks; nothing was subscribed to those callbacks before this,
- * so no screen transition ever happened on its own -- this was the
- * real reason auto-lock looked like it "did nothing".
- *
- * May run on a different task than ui_task (auto-lock's own task
- * calls lock() directly) -- lvgl_port::lock() is a recursive mutex,
- * so this is safe either way, including when it fires synchronously
- * from within an already-lvgl_port::lock()-held call chain.
- */
 void on_lock_state_changed(security::lock::State new_state, void* /*ctx*/)
 {
     if (new_state != security::lock::State::Locked) {
@@ -112,11 +98,13 @@ bool init()
         return false;
     }
 
+    // Restore the last selected language before any screen is created.
+    // This makes the saved language effective immediately after reboot.
+    i18n::set_language(settings::all().general.language);
+
     lvgl_port::lock();
     const bool manager_ok = manager.init(lv_screen_active());
     if (manager_ok) {
-        // First boot: no PIN configured -> force setup
-        // Otherwise: normal QuickScreen
         if (!security::pin::has_pin()) {
             ESP_LOGI(TAG, "First boot: no PIN set, showing SetupPinScreen");
             manager.push(std::make_unique<screens::SetupPinScreen>());

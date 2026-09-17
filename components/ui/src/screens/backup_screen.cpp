@@ -1,5 +1,6 @@
 #include "ui/screens/backup_screen.hpp"
 
+#include "display/fonts.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -356,6 +357,7 @@ void BackupScreen::build_import_list()
     } else {
         for (size_t i = 0; i < import_file_count_; ++i) {
             lv_obj_t* label = lv_label_create(content_parent_);
+            lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0); // filename could be Cyrillic
             lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4, ROW_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i));
             import_labels_[i] = label;
         }

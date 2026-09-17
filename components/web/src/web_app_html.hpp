@@ -165,6 +165,10 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     <h3 style="margin-top:24px">USB</h3>
     <div class="field-label">Quick Password (no PIN required)</div>
     <input id="set-default-password" type="text">
+    <label class="checkbox" style="margin-top:12px">
+      <input id="set-cyrillic-auto-switch" type="checkbox">
+      Auto-switch keyboard layout for Cyrillic (best-effort, Alt+Shift)
+    </label>
     <div id="set-usb-msg"></div>
     <button onclick="saveSettings('usb')" style="margin-top:8px">Save USB</button>
 
@@ -488,6 +492,7 @@ async function openSettings() {
   document.getElementById('set-screen-timeout').value = d.general.display_off_timeout_s;
 
   document.getElementById('set-default-password').value = d.usb.default_password;
+  document.getElementById('set-cyrillic-auto-switch').checked = !!d.usb.cyrillic_auto_switch_layout;
 
   document.getElementById('set-auto-lock-enabled').checked = !!d.security.auto_lock_enabled;
   document.getElementById('set-auto-lock-timeout').value = d.security.auto_lock_timeout_s;
@@ -517,7 +522,8 @@ async function saveSettings(section) {
     };
   } else if (section === 'usb') {
     payload = {
-      default_password: document.getElementById('set-default-password').value
+      default_password: document.getElementById('set-default-password').value,
+      cyrillic_auto_switch_layout: document.getElementById('set-cyrillic-auto-switch').checked
     };
   } else if (section === 'security') {
     payload = {

@@ -1,5 +1,6 @@
 #include "ui/screens/general_settings_screen.hpp"
 
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -19,22 +20,22 @@ constexpr lv_coord_t ROW_SPACING = 20;
 
 constexpr int32_t BRIGHTNESS_STEP = 5;
 constexpr int32_t TIMEOUT_STEP_S = 5;
-constexpr uint32_t TIMEOUT_MIN_S = 0; // 0 = off (never times out)
-constexpr uint32_t TIMEOUT_MAX_S = 300; // placeholder range, not spec'd anywhere
+constexpr uint32_t TIMEOUT_MIN_S = 0;
+constexpr uint32_t TIMEOUT_MAX_S = 300;
 
 } // namespace
 
 const char* GeneralSettingsScreen::title() const
 {
-    return "General";
+    return i18n::tr(i18n::Key::General);
 }
 
 const char* GeneralSettingsScreen::footer_hint() const
 {
     if (mode_ == Mode::Adjust) {
-        return "ROTATE  Change    OK/BACK  Confirm";
+        return i18n::tr(i18n::Key::OkBackConfirm);
     }
-    return "OK  Open    BACK  Cancel";
+    return i18n::tr(i18n::Key::OkOpenBackCancel);
 }
 
 void GeneralSettingsScreen::initialize(lv_obj_t* content_parent)
@@ -67,13 +68,11 @@ void GeneralSettingsScreen::on_show()
     if (status_label_ != nullptr) {
         lv_label_set_text(status_label_, "");
     }
+    render();
 }
 
 void GeneralSettingsScreen::on_hide()
 {
-    // Undo the live brightness preview if the user leaves without
-    // saving -- otherwise the display would be left at a brightness
-    // that was never actually persisted.
     if (!saved_) {
         display::set_brightness(original_brightness_);
     }
@@ -93,35 +92,39 @@ void GeneralSettingsScreen::render()
 
         switch (static_cast<Row>(i)) {
             case Row::Language:
-                lv_label_set_text_fmt(row_labels_[i], "%sLanguage: %s", prefix,
-                                       language_ == settings::Language::English ? "English" : "Russian");
+                lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix,
+                                      i18n::tr(i18n::Key::Language),
+                                      language_ == settings::Language::English
+                                          ? i18n::tr(i18n::Key::English)
+                                          : i18n::tr(i18n::Key::Russian));
                 break;
             case Row::Theme:
-                // Only Theme::Dark exists today -- see the header
-                // comment, this is a placeholder for a future second
-                // theme, not a live-adjustable value right now.
-                lv_label_set_text_fmt(row_labels_[i], "%sTheme: Dark", prefix);
+                lv_label_set_text_fmt(row_labels_[i], "%s%s: Dark", prefix,
+                                      i18n::tr(i18n::Key::Theme));
                 break;
             case Row::Brightness:
-                lv_label_set_text_fmt(row_labels_[i], "%sBrightness: %u%%", prefix,
-                                       static_cast<unsigned>(brightness_));
+                lv_label_set_text_fmt(row_labels_[i], "%s%s: %u%%", prefix,
+                                      i18n::tr(i18n::Key::Brightness),
+                                      static_cast<unsigned>(brightness_));
                 break;
             case Row::ScreenTimeout:
                 if (screen_timeout_s_ == 0) {
-                    lv_label_set_text_fmt(row_labels_[i], "%sScreen Timeout: off", prefix);
+                    lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix,
+                                          i18n::tr(i18n::Key::ScreenTimeout),
+                                          i18n::tr(i18n::Key::Off));
                 } else {
-                    lv_label_set_text_fmt(row_labels_[i], "%sScreen Timeout: %lus", prefix,
-                                           static_cast<unsigned long>(screen_timeout_s_));
+                    lv_label_set_text_fmt(row_labels_[i], "%s%s: %lus", prefix,
+                                          i18n::tr(i18n::Key::ScreenTimeout),
+                                          static_cast<unsigned long>(screen_timeout_s_));
                 }
                 break;
             case Row::Save:
-                lv_label_set_text_fmt(row_labels_[i], "%sSave", prefix);
+                lv_label_set_text_fmt(row_labels_[i], "%s%s", prefix,
+                                      i18n::tr(i18n::Key::Save));
                 break;
         }
     }
 
-    // Same fix as WifiSettingsScreen/SecuritySettingsScreen/
-    // UsbSettingsScreen -- keep the selected row scrolled into view.
     if (row_labels_[selected_row_] != nullptr) {
         lv_obj_scroll_to_view(row_labels_[selected_row_], LV_ANIM_ON);
     }
@@ -152,40 +155,26 @@ void GeneralSettingsScreen::adjust_value(int32_t delta)
             language_ = (language_ == settings::Language::English) ? settings::Language::Russian
                                                                      : settings::Language::English;
             break;
-
         case Row::Theme:
-            // No-op -- only one value exists.
             break;
-
         case Row::Brightness: {
             int32_t value = static_cast<int32_t>(brightness_) + delta * BRIGHTNESS_STEP;
-            if (value < 0) {
-                value = 0;
-            }
-            if (value > 100) {
-                value = 100;
-            }
+            if (value < 0) value = 0;
+            if (value > 100) value = 100;
             brightness_ = static_cast<uint8_t>(value);
-            display::set_brightness(brightness_); // live preview
+            display::set_brightness(brightness_);
             break;
         }
-
         case Row::ScreenTimeout: {
             int32_t value = static_cast<int32_t>(screen_timeout_s_) + delta * TIMEOUT_STEP_S;
-            if (value < static_cast<int32_t>(TIMEOUT_MIN_S)) {
-                value = static_cast<int32_t>(TIMEOUT_MIN_S);
-            }
-            if (value > static_cast<int32_t>(TIMEOUT_MAX_S)) {
-                value = static_cast<int32_t>(TIMEOUT_MAX_S);
-            }
+            if (value < static_cast<int32_t>(TIMEOUT_MIN_S)) value = static_cast<int32_t>(TIMEOUT_MIN_S);
+            if (value > static_cast<int32_t>(TIMEOUT_MAX_S)) value = static_cast<int32_t>(TIMEOUT_MAX_S);
             screen_timeout_s_ = static_cast<uint32_t>(value);
             break;
         }
-
         case Row::Save:
             break;
     }
-
     render();
 }
 
@@ -195,7 +184,6 @@ void GeneralSettingsScreen::activate()
         save();
         return;
     }
-
     mode_ = Mode::Adjust;
     render();
 }
@@ -210,10 +198,11 @@ void GeneralSettingsScreen::save()
 
     if (settings::set_general(updated)) {
         saved_ = true;
+        i18n::set_language(language_);
         ESP_LOGI(TAG, "General settings saved");
         manager().pop();
     } else {
-        lv_label_set_text(status_label_, "Save failed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::SaveFailed));
     }
 }
 
@@ -241,18 +230,14 @@ bool GeneralSettingsScreen::on_input(InputAction action)
         case InputAction::RotateLeft:
             move_selection(-1);
             return true;
-
         case InputAction::RotateRight:
             move_selection(+1);
             return true;
-
         case InputAction::OkShort:
             activate();
             return true;
-
         case InputAction::BackShort:
-            return false; // pop, discarding unsaved changes (brightness reverted in on_hide())
-
+            return false;
         default:
             return false;
     }

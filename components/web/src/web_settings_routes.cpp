@@ -104,6 +104,7 @@ cJSON* usb_to_json(const settings::UsbSettings& u)
     cJSON_AddNumberToObject(obj, "delay_before_typing_ms", u.delay_before_typing_ms);
     cJSON_AddNumberToObject(obj, "delay_between_chars_ms", u.delay_between_chars_ms);
     cJSON_AddNumberToObject(obj, "delay_between_fields_ms", u.delay_between_fields_ms);
+    cJSON_AddBoolToObject(obj, "cyrillic_auto_switch_layout", u.cyrillic_auto_switch_layout);
     return obj;
 }
 
@@ -246,6 +247,10 @@ esp_err_t handle_put_usb(httpd_req_t* req)
         static_cast<uint16_t>(json_get_uint32(root, "delay_between_chars_ms", updated.delay_between_chars_ms));
     updated.delay_between_fields_ms =
         static_cast<uint16_t>(json_get_uint32(root, "delay_between_fields_ms", updated.delay_between_fields_ms));
+    const cJSON* auto_switch_item = cJSON_GetObjectItemCaseSensitive(root, "cyrillic_auto_switch_layout");
+    if (auto_switch_item != nullptr && cJSON_IsBool(auto_switch_item)) {
+        updated.cyrillic_auto_switch_layout = cJSON_IsTrue(auto_switch_item);
+    }
     cJSON_Delete(root);
 
     if (!settings::set_usb(updated)) {

@@ -5,6 +5,7 @@
 #include "ui/screens/backup_screen.hpp"
 #include "ui/screens/font_test_screen.hpp"
 #include "ui/screens/settings_screen.hpp"
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -21,13 +22,13 @@ namespace {
 
 constexpr char TAG[] = "ui.main_menu";
 
-constexpr const char* ITEM_NAMES[] = {
-    "Accounts",
-    "Settings",
-    "Backup",
-    "Lock",
-    "About",
-    "Font Test",
+constexpr i18n::Key ITEM_KEYS[] = {
+    i18n::Key::Accounts,
+    i18n::Key::Settings,
+    i18n::Key::Backup,
+    i18n::Key::Lock,
+    i18n::Key::About,
+    i18n::Key::FontTest,
 };
 
 constexpr lv_coord_t FIRST_ITEM_Y = 8;
@@ -37,7 +38,7 @@ constexpr lv_coord_t ITEM_SPACING = 20;
 
 const char* MainMenu::title() const
 {
-    return "Main Menu";
+    return i18n::tr(i18n::Key::MainMenu);
 }
 
 const char* MainMenu::footer_hint() const
@@ -62,7 +63,7 @@ void MainMenu::initialize(lv_obj_t* content_parent)
 
         lv_label_set_text(
             item_labels_[i],
-            ITEM_NAMES[i]
+            i18n::tr(ITEM_KEYS[i])
         );
 
         lv_obj_align(
@@ -172,7 +173,7 @@ void MainMenu::refresh()
             lv_label_set_text_fmt(
                 item_labels_[i],
                 "> %s",
-                ITEM_NAMES[i]
+                i18n::tr(ITEM_KEYS[i])
             );
         } else {
             lv_obj_set_style_text_color(
@@ -183,7 +184,7 @@ void MainMenu::refresh()
 
             lv_label_set_text(
                 item_labels_[i],
-                ITEM_NAMES[i]
+                i18n::tr(ITEM_KEYS[i])
             );
         }
     }

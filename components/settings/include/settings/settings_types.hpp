@@ -102,6 +102,28 @@ struct UsbSettings
     uint16_t delay_before_typing_ms = 500;
     uint16_t delay_between_chars_ms = 10;
     uint16_t delay_between_fields_ms = 100;
+
+    // When true, usb::TypeEngine sends a layout-switch hotkey
+    // (Alt+Shift) to the host before/after each run of Cyrillic
+    // characters it types -- see usb::cyrillic_layout.hpp for the
+    // full mechanism. Confirmed working for the FIRST switch in a
+    // real test, but the switch-BACK after a Cyrillic run didn't
+    // reliably register (produced wrong characters for what followed,
+    // not just missing ones) -- inherently best-effort, since the
+    // device can't know what's actually configured on the host it's
+    // plugged into. Defaults to false: the person manually switching
+    // their own host's keyboard layout before printing is both more
+    // predictable and was explicitly what the project owner asked
+    // for, given the demonstrated unreliability. When false, this
+    // device never sends the hotkey at all -- Cyrillic characters
+    // still type via their ЙЦУКЕН physical-key equivalent (so it
+    // works correctly once you've switched the host layout yourself
+    // first), non-Cyrillic characters still type via the normal US
+    // mapping regardless of this setting (so a mixed string like a
+    // Cyrillic domain with a literal "." in it needs the SAME layout
+    // to correctly interpret both parts -- not something this device
+    // tries to compensate for in manual mode).
+    bool cyrillic_auto_switch_layout = false;
 };
 
 struct SecuritySettings

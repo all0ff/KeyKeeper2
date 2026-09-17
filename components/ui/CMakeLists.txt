@@ -4,6 +4,7 @@ idf_component_register(
         "src/ui_manager.cpp"
         "src/theme.cpp"
         "src/icon.cpp"
+        "src/localization.cpp"
         "src/screens/quick_screen.cpp"
         "src/screens/lock_screen.cpp"
         "src/screens/setup_pin_screen.cpp"

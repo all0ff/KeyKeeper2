@@ -3,6 +3,8 @@
 #include "usb/hid_keyboard.hpp"
 #include "usb/keycode_map.hpp"
 
+#include "settings/settings.hpp"
+
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -16,6 +18,14 @@ constexpr char TAG[] = "usb.type";
 // layout-switch hotkey handlers are sometimes picky about very brief
 // modifier-only taps being recognized at all.
 constexpr uint32_t LAYOUT_SWITCH_HOLD_MS = 50;
+// Gives the host a moment to fully process the PREVIOUS keystroke's
+// release before the modifier-only hotkey report goes out -- a real,
+// confirmed failure mode was the switch-back after a Cyrillic run not
+// registering (typed wrong characters afterward, not just missing
+// ones), which looked consistent with the hotkey arriving too soon
+// after the last regular key's release for the host to treat it as a
+// distinct event.
+constexpr uint32_t LAYOUT_SWITCH_PRE_DELAY_MS = 60;
 // Give the host a moment to actually apply the new layout before the
 // first character of the run goes out.
 constexpr uint32_t LAYOUT_SWITCH_SETTLE_MS = 80;
@@ -118,6 +128,7 @@ bool TypeEngine::type_char(char c, const Timing& timing)
 bool TypeEngine::switch_layout(const Timing& timing)
 {
     (void)timing;
+    vTaskDelay(pdMS_TO_TICKS(LAYOUT_SWITCH_PRE_DELAY_MS));
     const bool ok = hid::send_key(keycode::NONE, modifier::LEFT_ALT | modifier::LEFT_SHIFT, LAYOUT_SWITCH_HOLD_MS);
     if (!ok) {
         last_error_ = hid::last_error();
@@ -172,6 +183,13 @@ size_t TypeEngine::type_string(const std::string& text, const Timing& timing)
         return 0;
     }
 
+    // See settings::UsbSettings::cyrillic_auto_switch_layout's own
+    // comment -- defaults to false (manual layout switching by the
+    // person, on the host, themselves) given a real test found the
+    // switch-BACK after a run didn't reliably register. When false,
+    // this device never touches Alt+Shift at all.
+    const bool auto_switch_layout = settings::all().usb.cyrillic_auto_switch_layout;
+
     size_t sent = 0;
     size_t pos = 0;
     size_t char_index = 0; // for chunk_ms pacing -- counts CHARACTERS, not bytes
@@ -191,7 +209,7 @@ size_t TypeEngine::type_string(const std::string& text, const Timing& timing)
             // already a best-effort feature; switching once per run
             // is both faster and less likely to confuse the host than
             // switching back and forth for every single letter).
-            if (!switch_layout(timing)) {
+            if (auto_switch_layout && !switch_layout(timing)) {
                 break;
             }
 
@@ -214,7 +232,9 @@ size_t TypeEngine::type_string(const std::string& text, const Timing& timing)
                 }
             }
 
-            switch_layout(timing); // switch back, regardless of whether the run above fully succeeded
+            if (auto_switch_layout) {
+                switch_layout(timing); // switch back, regardless of whether the run above fully succeeded
+            }
             if (!ok) {
                 break;
             }
