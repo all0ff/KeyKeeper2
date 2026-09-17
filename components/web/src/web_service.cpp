@@ -37,6 +37,15 @@ void publish(WebEventId id)
 esp_err_t handle_root(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "text/html");
+    // no-store -- without this, a browser can (and evidently did, in
+    // practice) keep serving an OLD cached copy of this page after a
+    // firmware update changed it, with no visible sign anything was
+    // wrong (no error, just silently stale content -- new features
+    // looking like they were never applied at all). This page is
+    // generated fresh from the running firmware on every request
+    // anyway (APP_PAGE is a compiled-in constant, not a file read),
+    // so there's no cost to never caching it.
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     httpd_resp_send(req, APP_PAGE, HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
