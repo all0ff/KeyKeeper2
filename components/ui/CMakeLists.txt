@@ -44,6 +44,8 @@ idf_component_register(
         vault
         usb
         wifi
+        rtc_time
+        totp
         web
         power
         esp_app_format

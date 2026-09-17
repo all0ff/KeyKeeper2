@@ -10,4 +10,6 @@ idf_component_register(
         vault
         security
         settings
+        totp
+        rtc_time
 )

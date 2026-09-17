@@ -15,6 +15,7 @@
 #include "vault/vault.hpp"
 #include "ui/ui.hpp"
 #include "usb/usb_service.hpp"
+#include "rtc_time/rtc_time.hpp"
 #include "wifi/wifi_service.hpp"
 #include "web/web_service.hpp"
 
@@ -269,6 +270,18 @@ bool initialize_wifi()
 {
     state::set_boot_stage(state::BootStage::Wifi);
     logger::boot_stage("Wifi");
+
+    // rtc_time::init() just sets up the SNTP client (no network
+    // needed yet) -- folded into this stage rather than getting its
+    // own BootStage entry, since it's lightweight and tightly coupled
+    // to Wi-Fi anyway (rtc_time::start_sync() only ever gets called
+    // from wifi::'s own IP_EVENT_STA_GOT_IP handler). Not a hard
+    // failure if this doesn't succeed -- TOTP generation just stays
+    // unavailable (see totp::generate()'s own comment), nothing else
+    // depends on it.
+    if (!rtc_time::init()) {
+        logger::error("rtc_time::init() failed -- TOTP codes will be unavailable");
+    }
 
     if (!wifi::init()) {
         report_failure(

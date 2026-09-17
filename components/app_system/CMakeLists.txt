@@ -20,6 +20,7 @@ idf_component_register(
         vault
         usb
         wifi
+        rtc_time
         web
         ui
         esp_timer

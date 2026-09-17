@@ -1,6 +1,7 @@
 #include "wifi/wifi_service.hpp"
 
 #include "event_bus/event_bus.hpp"
+#include "rtc_time/rtc_time.hpp"
 #include "settings/settings.hpp"
 
 #include "esp_event.h"
@@ -131,6 +132,12 @@ void handle_ip_event(void* arg, esp_event_base_t event_base, int32_t event_id, v
         current_state = ConnectionState::Connected;
         last_error_buf[0] = '\0';
         publish(WifiEventId::Connected);
+
+        // Only real clock source on this board -- see rtc_time.hpp's
+        // own file comment. Safe/cheap to call on every reconnect,
+        // not just the first one (also helps catch clock drift on a
+        // long-running session).
+        rtc_time::start_sync();
     }
 }
 

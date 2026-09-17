@@ -12,10 +12,12 @@
 // added later (format v2) for docs/GUI.md's Vault/Account/Search/
 // Favorites/Categories screens, which name these fields explicitly.
 //
-// IMPORTANT: totp_secret is stored, but nothing in this component
-// generates a TOTP code from it yet -- that needs a trustworthy time
-// source (no RTC chip, no NTP/Wi-Fi built yet), deliberately deferred.
-// See components/vault/README.md.
+// IMPORTANT: totp_secret is stored here, but code GENERATION from it
+// lives in components/totp, not here -- this component only ever
+// holds the Base32 secret string, same as it holds the password.
+// components/totp additionally needs components/rtc_time (NTP over
+// Wi-Fi Station, no RTC chip on this board -- see that component's
+// own file comment) to actually produce a code.
 //
 // IMPORTANT: vault.db is not encrypted (see components/security's
 // scope note). totp_secret sitting here in plaintext is exactly as

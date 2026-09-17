@@ -18,9 +18,21 @@
 // (no separate Name field exists). Category/Favorite (format v2) are
 // now real: Category is shown only when non-empty, Favorite as a
 // "Yes"/nothing-shown-if-false row plus a "Toggle Favorite" action.
-// OTP shows only a "configured" indicator -- no code is generated
-// (see vault_model.hpp's file comment: no trustworthy time source
-// yet).
+// OTP shows a LIVE, auto-refreshing 6-digit TOTP code (RFC 6238, via
+// totp::generate()) plus a seconds-remaining countdown, refreshed
+// once a second by otp_refresh_timer_ -- not just a "configured"
+// indicator anymore. Requires rtc_time::is_synced() (Wi-Fi Station
+// connected and NTP-synced at least once this boot -- see
+// rtc_time.hpp's own comment for why this board has no other time
+// source); shows a clear "no time sync" message in place of the code
+// otherwise, rather than a stale or wrong-looking one.
+//
+// Available Actions per GUI.md 11: Print URL/Username/Password/OTP,
+// Edit, Delete. Print* actions run a real security::permission::check();
+// Print OTP types the SAME live code this screen is currently
+// showing (usb::print_field() calls totp::generate() itself, so it's
+// always the code for the moment you press the action, not
+// whatever was on screen when the screen first opened).
 //
 // Password is masked by default with a fixed-width placeholder (not
 // matching the real length, to avoid leaking that) and a "Reveal
@@ -29,10 +41,7 @@
 // a displayed field without specifying masking either way.
 //
 // Available Actions per GUI.md 11: Print URL/Username/Password/OTP,
-// Edit, Delete. Print* actions run a real security::permission::check()
-// but the actual USB HID typing is a logged placeholder (no
-// OutputChannel implementation exists -- see interfaces::channels).
-// Edit pushes ui::screens::AccountEditScreen. Delete is
+// Edit, Delete. Edit pushes ui::screens::AccountEditScreen. Delete is
 // REAL -- calls vault::delete_entry() -- gated by a two-step confirm
 // (press the Delete action twice) since no confirmation dialog widget
 // exists yet.
@@ -50,12 +59,14 @@ class AccountViewScreen : public Screen
 {
 public:
     explicit AccountViewScreen(uint32_t entry_id);
+    ~AccountViewScreen() override;
 
     const char* title() const override;
     const char* footer_hint() const override;
 
     void initialize(lv_obj_t* content_parent) override;
     void on_show() override;
+    void on_hide() override;
     bool on_input(InputAction action) override;
 
 private:
@@ -76,6 +87,8 @@ private:
     void build_actions(lv_obj_t* parent, lv_coord_t y_start);
     void render_actions();
     void update_password_label();
+    void update_otp_label();
+    static void otp_refresh_timer_cb(lv_timer_t* timer);
     void move_selection(int32_t delta);
     void activate();
     const char* action_name(Action action) const;
@@ -87,6 +100,9 @@ private:
     lv_obj_t* content_parent_ = nullptr;
     lv_obj_t* password_value_label_ = nullptr;
     bool password_revealed_ = false;
+
+    lv_obj_t* otp_value_label_ = nullptr;
+    lv_timer_t* otp_refresh_timer_ = nullptr;
 
     static constexpr size_t MAX_ACTIONS = 8;
     Action available_actions_[MAX_ACTIONS]{};

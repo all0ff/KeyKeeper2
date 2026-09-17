@@ -2,6 +2,8 @@
 #include "usb/hid_keyboard.hpp"
 
 #include "security/permission_manager.hpp"
+#include "rtc_time/rtc_time.hpp"
+#include "totp/totp.hpp"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -126,10 +128,20 @@ void print_field(const vault::VaultEntry& entry, Field field)
         case Field::Password:
             text = entry.password;
             break;
-        case Field::Otp:
-            // TODO: generate TOTP code from entry.totp_secret
-            text = "123456"; // placeholder until TOTP is implemented
+        case Field::Otp: {
+            char code[8];
+            if (totp::generate(entry.totp_secret, code, sizeof(code))) {
+                text = code;
+            } else {
+                // See totp::generate()'s own comment for why this
+                // fails cleanly rather than falling back to a
+                // placeholder -- no Wi-Fi Station time sync yet this
+                // boot, or the secret itself isn't valid Base32.
+                set_status(rtc_time::is_synced() ? "Invalid TOTP secret" : "No time sync -- connect WiFi first");
+                return;
+            }
             break;
+        }
         case Field::LoginAndPassword:
             text = entry.login + "\t" + entry.password;
             break;

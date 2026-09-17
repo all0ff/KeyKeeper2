@@ -6,6 +6,8 @@
 #include "ui/ui_manager.hpp"
 
 #include "security/permission_manager.hpp"
+#include "rtc_time/rtc_time.hpp"
+#include "totp/totp.hpp"
 #include "vault/vault.hpp"
 #include "usb/usb_service.hpp"
 
@@ -26,6 +28,18 @@ constexpr lv_coord_t ACTION_SPACING = 20;
 } // namespace
 
 AccountViewScreen::AccountViewScreen(uint32_t entry_id) : entry_id_(entry_id) {}
+
+AccountViewScreen::~AccountViewScreen()
+{
+    // Safety net -- on_hide() (called by the Screen lifecycle before
+    // Destroy, see screen.hpp) already deletes this normally. Checked
+    // for null either way, lv_timer_del() on a null pointer would be
+    // undefined behavior.
+    if (otp_refresh_timer_ != nullptr) {
+        lv_timer_del(otp_refresh_timer_);
+        otp_refresh_timer_ = nullptr;
+    }
+}
 
 const char* AccountViewScreen::title() const
 {
@@ -49,6 +63,14 @@ void AccountViewScreen::on_show()
     reload();
 }
 
+void AccountViewScreen::on_hide()
+{
+    if (otp_refresh_timer_ != nullptr) {
+        lv_timer_del(otp_refresh_timer_);
+        otp_refresh_timer_ = nullptr;
+    }
+}
+
 void AccountViewScreen::reload()
 {
     // on_show() re-runs this every time the screen becomes active
@@ -56,6 +78,17 @@ void AccountViewScreen::reload()
     // previous tree first.
     lv_obj_clean(content_parent_);
     password_value_label_ = nullptr;
+    if (otp_refresh_timer_ != nullptr) {
+        // Defensive -- on_hide() already deletes this normally (see
+        // this screen's own comment there), but lv_obj_clean() above
+        // just destroyed whatever otp_value_label_ pointed to without
+        // touching the timer itself (LVGL timers aren't part of the
+        // object tree) -- a stale timer here would update a dangling
+        // label handle.
+        lv_timer_del(otp_refresh_timer_);
+        otp_refresh_timer_ = nullptr;
+    }
+    otp_value_label_ = nullptr;
     for (size_t i = 0; i < MAX_ACTIONS; ++i) {
         action_labels_[i] = nullptr;
     }
@@ -125,8 +158,19 @@ lv_coord_t AccountViewScreen::build_fields(lv_obj_t* parent)
     if (!entry_.totp_secret.empty()) {
         lv_obj_t* row = lv_label_create(parent);
         lv_obj_set_style_text_color(row, pal.secondary_text, 0);
-        lv_label_set_text(row, "OTP: configured");
         lv_obj_align(row, LV_ALIGN_TOP_LEFT, 4, y);
+        otp_value_label_ = row;
+        update_otp_label();
+
+        // Refresh once a second -- cheap (one HMAC-SHA-1 call, unlike
+        // the PBKDF2 checks elsewhere in this project that needed a
+        // background worker task) so a plain LVGL timer on the UI
+        // thread is fine. Deleted in on_hide() -- see that function's
+        // own comment for why leaving it running while this screen
+        // isn't visible would be wrong (dangling label handle after
+        // the next reload(), wasted work while hidden).
+        otp_refresh_timer_ = lv_timer_create(&AccountViewScreen::otp_refresh_timer_cb, 1000, this);
+
         y += FIELD_SPACING;
     }
 
@@ -155,6 +199,33 @@ void AccountViewScreen::update_password_label()
         // length, so the mask itself doesn't leak that.
         lv_label_set_text(password_value_label_, "Password: ********");
     }
+}
+
+void AccountViewScreen::update_otp_label()
+{
+    if (otp_value_label_ == nullptr) {
+        return;
+    }
+
+    char code[8];
+    if (totp::generate(entry_.totp_secret, code, sizeof(code))) {
+        lv_label_set_text_fmt(otp_value_label_, "OTP: %s (%us)", code,
+                               static_cast<unsigned>(totp::seconds_remaining()));
+    } else if (rtc_time::is_synced()) {
+        // Time is fine, so the secret itself is the problem (invalid
+        // Base32) -- shouldn't normally happen since AccountEditScreen
+        // takes whatever was typed as-is, but stay clear about which
+        // of the two failure reasons this is.
+        lv_label_set_text(otp_value_label_, "OTP: invalid secret");
+    } else {
+        lv_label_set_text(otp_value_label_, "OTP: no time sync (connect WiFi)");
+    }
+}
+
+void AccountViewScreen::otp_refresh_timer_cb(lv_timer_t* timer)
+{
+    auto* self = static_cast<AccountViewScreen*>(lv_timer_get_user_data(timer));
+    self->update_otp_label();
 }
 
 void AccountViewScreen::build_actions(lv_obj_t* parent, lv_coord_t y_start)
