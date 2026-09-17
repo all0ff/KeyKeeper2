@@ -80,6 +80,15 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
   .hidden { display: none; }
   label.checkbox { display: flex; align-items: center; gap: 8px; font-size: 0.95rem; }
   label.checkbox input { width: auto; margin: 0; }
+  .help-section { margin-bottom: 22px; }
+  .help-section h3 { margin: 0 0 6px; }
+  .help-section p, .help-section li { font-size: 0.92rem; line-height: 1.5; color: #374151; }
+  .help-section ul { margin: 4px 0; padding-left: 20px; }
+  kbd {
+    display: inline-block; padding: 1px 7px; border-radius: 4px; font-size: 0.85em;
+    background: #e5e7eb; border: 1px solid #d1d5db; font-family: inherit;
+  }
+  .note { background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 12px; font-size: 0.88rem; }
 </style>
 </head>
 <body>
@@ -97,6 +106,7 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     <div class="topbar">
       <h2>Accounts</h2>
       <div style="display:flex; gap:8px">
+        <button class="small secondary" onclick="showView('help-view')">Help</button>
         <button class="small secondary" onclick="openSettings()">Settings</button>
         <button class="small" onclick="openEdit(null)">+ New</button>
       </div>
@@ -225,6 +235,115 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     <button onclick="saveSettings('wifi')" style="margin-top:8px">Save WiFi</button>
   </div>
 
+  <div id="help-view" class="hidden">
+    <div class="topbar">
+      <h2>Help</h2>
+      <button class="small secondary" onclick="showView('list-view')">&larr; Back</button>
+    </div>
+
+    <div class="help-section">
+      <h3>Device controls</h3>
+      <p>The device has one rotary knob (turn / press) and one BACK button, each read as a short or long press:</p>
+      <ul>
+        <li><kbd>Rotate</kbd> &mdash; move the selection, or spin the current character while typing</li>
+        <li><kbd>OK</kbd> (short) &mdash; select / confirm a character / enter a menu</li>
+        <li><kbd>Hold OK</kbd> &mdash; finish typing a field, or a "hold" action shown in the on-device footer</li>
+        <li><kbd>BACK</kbd> (short) &mdash; go back one screen, or erase the last typed character</li>
+        <li><kbd>Hold BACK</kbd> &mdash; while typing, switches between character sets (lowercase, UPPERCASE,
+          digits, symbols, кириллица строчная/ПРОПИСНАЯ)</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Accounts</h3>
+      <p>Each entry has Login, Password, URL, Notes, TOTP Secret, Category and a Favorite flag. On the device: hold
+        <kbd>OK</kbd> on the account list to create a new entry; open an existing one to view, edit, delete, reveal
+        the password, or print a field over USB. This web page can do the same over the network &mdash; open an
+        entry to view or edit it, or use <strong>+ New</strong> above.</p>
+      <p>Cyrillic text is supported in every field, both typing it on the device and displaying it back &mdash;
+        the on-device font and character-set switch (see Device controls above) both handle it.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Password generator</h3>
+      <p>Settings &rarr; Password Gen sets the length and which character classes to use. From there,
+        <strong>Generate &amp; Type</strong> creates a fresh password and types it over USB immediately &mdash;
+        useful for a signup form on whatever computer the device is plugged into, without creating an account entry
+        at all. Inside an account's Password field, holding <kbd>OK</kbd> generates a new password for that entry
+        directly.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>TOTP (2FA) codes</h3>
+      <p>Paste the Base32 secret (the same string a "manual entry" QR code setup gives you, e.g.
+        <code>JBSWY3DPEHPK3PXP</code>) into an entry's TOTP Secret field. The device then shows a live, auto-refreshing
+        6-digit code on that entry's screen, and Print OTP types the current code over USB.</p>
+      <div class="note">This board has no battery-backed clock chip &mdash; the only time source is NTP over WiFi.
+        TOTP codes are only available once WiFi (Station mode) has connected and synced time at least once since the
+        device was last powered on; a full power loss resets that until the device reconnects again.</div>
+    </div>
+
+    <div class="help-section">
+      <h3>USB typing</h3>
+      <p>Printing a field types it as if from a USB keyboard into whatever computer the device is plugged into.
+        Settings &rarr; USB controls the delays between keystrokes and the print order, plus a Quick Password
+        shortcut reachable from the lock screen without unlocking (a deliberate convenience/security trade-off).</p>
+      <p>Typing Cyrillic text this way needs the receiving computer to actually have a Russian keyboard layout
+        available. Settings &rarr; USB &rarr; <strong>Auto-switch layout</strong> (off by default) makes the device
+        send Alt+Shift to try switching for you before and after each run of Cyrillic characters &mdash; best-effort,
+        since the device can't know what's configured on the computer it's plugged into. With it off, switch the
+        layout yourself on the computer before printing.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Backup, export &amp; import</h3>
+      <p>Two different things, both on a microSD card, both under Backup on the device:</p>
+      <ul>
+        <li><strong>Create/Restore Backup</strong> &mdash; a full, exact copy of the device's own internal vault
+          file. Only ever readable by another KeyKeeper2 device, not other apps.</li>
+        <li><strong>Export/Import Vault</strong> &mdash; a plain CSV file, readable by (or editable in) most other
+          password managers and spreadsheet apps. Import adds entries rather than replacing what's already there,
+          and is lenient about column names (<code>username</code>, <code>site</code>, <code>note</code>, etc. are
+          all recognized, not just this device's own exact header names).</li>
+      </ul>
+      <p>The device also has a Format SD Card action, useful if a card was shipped pre-formatted as exFAT &mdash;
+        common on 32GB+ cards &mdash; which this device can't read.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Security</h3>
+      <ul>
+        <li>Repeated wrong PIN attempts escalate: a temporary lockout, then eventually a full wipe of the vault
+          and PIN. This is deliberate and cannot be turned off.</li>
+        <li>A separate Duress PIN can be set up, which unlocks normally but silently wipes the vault first &mdash;
+          for being made to unlock the device under pressure.</li>
+        <li>Auto-Lock (Settings &rarr; Security) locks the device after a period of inactivity you choose.</li>
+        <li>Factory Reset erases everything: vault, PIN, all settings, WiFi credentials.</li>
+        <li>The vault file on the device (and in a Backup or CSV export) is <strong>not encrypted</strong> &mdash;
+          the PIN protects on-device access, not the data at rest. Treat a backup or export file with the same
+          care as the passwords it contains.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>WiFi &amp; this web page</h3>
+      <p>Settings &rarr; WiFi switches between Station (join an existing network, needed for TOTP's time sync) and
+        Access Point (the device hosts its own network). This page is served either way, at the device's IP address
+        &mdash; and, if a Secret Word is set (also under WiFi settings), only at <code>/&lt;secret word&gt;/</code>
+        rather than the bare address, as a lightweight extra layer against someone stumbling onto it by guessing the
+        IP.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Known limitations</h3>
+      <ul>
+        <li>The Language setting (General settings) doesn't translate anything yet &mdash; the on-device interface
+          is English-only regardless of what it's set to.</li>
+        <li>Search and Backup/Restore aren't available from this web page yet, only on the device itself.</li>
+      </ul>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -234,7 +353,7 @@ let editingId = null;
 let deleteConfirmPending = false;
 
 function showView(id) {
-  ['list-view', 'detail-view', 'edit-view', 'settings-view'].forEach(v => {
+  ['list-view', 'detail-view', 'edit-view', 'settings-view', 'help-view'].forEach(v => {
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
