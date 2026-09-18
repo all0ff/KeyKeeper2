@@ -87,7 +87,6 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Device": "Устройство",
     "Flash Encryption": "Шифрование Flash",
     "On": "Вкл.",
-    "Off": "Выкл.",
     "Free heap": "Свободная память",
     "Internal storage": "Внутреннее хранилище",
     "microSD": "microSD",
@@ -162,15 +161,20 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
       if (data && data.data && data.data.general && data.data.general.language === "russian") {
         document.documentElement.lang = "ru";
         translate(document.body);
+
+        // Observe only newly inserted DOM nodes. Do NOT observe characterData:
+        // translateTextNode() changes text nodes itself, which would otherwise
+        // trigger this observer again indefinitely and can hang the browser.
         const observer = new MutationObserver(function (mutations) {
           mutations.forEach(function (m) {
             m.addedNodes.forEach(function (node) {
-              if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) translate(node);
+              if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) {
+                translate(node);
+              }
             });
-            if (m.type === "characterData") translateTextNode(m.target);
           });
         });
-        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+        observer.observe(document.body, { childList: true, subtree: true });
       }
     } catch (_) {
       // Keep the original English Web UI if settings cannot be read.
