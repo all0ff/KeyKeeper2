@@ -271,18 +271,6 @@ bool initialize_wifi()
     state::set_boot_stage(state::BootStage::Wifi);
     logger::boot_stage("Wifi");
 
-    // rtc_time::init() just sets up the SNTP client (no network
-    // needed yet) -- folded into this stage rather than getting its
-    // own BootStage entry, since it's lightweight and tightly coupled
-    // to Wi-Fi anyway (rtc_time::start_sync() only ever gets called
-    // from wifi::'s own IP_EVENT_STA_GOT_IP handler). Not a hard
-    // failure if this doesn't succeed -- TOTP generation just stays
-    // unavailable (see totp::generate()'s own comment), nothing else
-    // depends on it.
-    if (!rtc_time::init()) {
-        logger::error("rtc_time::init() failed -- TOTP codes will be unavailable");
-    }
-
     if (!wifi::init()) {
         report_failure(
             state::BootStage::Wifi,
@@ -290,6 +278,21 @@ bool initialize_wifi()
             "WiFi initialization failed"
         );
         return false;
+    }
+
+    // rtc_time::init() must come AFTER wifi::init(), not before --
+    // real bug, confirmed on real hardware: wifi::init() is what
+    // actually calls esp_netif_init() + esp_event_loop_create_default(),
+    // and rtc_time::init()'s own esp_event_handler_register() call
+    // needs that default event loop to already exist. Called first
+    // (the original ordering here), it failed outright every boot
+    // ("Failed to register SNTP sync event handler" in the serial
+    // log) -- not fatal on its own (TOTP just silently stayed
+    // unavailable, matching what totp::generate() reports when
+    // rtc_time::is_synced() is false), but a real, now-fixed defect,
+    // not a design choice.
+    if (!rtc_time::init()) {
+        logger::error("rtc_time::init() failed -- TOTP codes will be unavailable");
     }
 
     // Brings up whatever mode was saved from a previous session

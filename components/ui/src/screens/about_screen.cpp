@@ -1,6 +1,5 @@
 #include "ui/screens/about_screen.hpp"
 
-#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 
 #include "esp_app_desc.h"
@@ -11,12 +10,12 @@ namespace ui::screens {
 
 const char* AboutScreen::title() const
 {
-    return i18n::tr(i18n::Key::About);
+    return "About";
 }
 
 const char* AboutScreen::footer_hint() const
 {
-    return i18n::tr(i18n::Key::BackReturn);
+    return "BACK  Return";
 }
 
 void AboutScreen::initialize(lv_obj_t* content_parent)
@@ -35,8 +34,7 @@ void AboutScreen::initialize(lv_obj_t* content_parent)
 
     char version_buf[48];
     const esp_app_desc_t* app_desc = esp_app_get_description();
-    std::snprintf(version_buf, sizeof(version_buf), "%s %s",
-                  i18n::tr(i18n::Key::Firmware),
+    std::snprintf(version_buf, sizeof(version_buf), "Firmware %s",
                   app_desc != nullptr ? app_desc->version : "unknown");
 
     lv_obj_t* version_label = lv_label_create(content_parent);
@@ -48,7 +46,7 @@ void AboutScreen::initialize(lv_obj_t* content_parent)
 bool AboutScreen::on_input(InputAction action)
 {
     (void)action;
-    return false;
+    return false; // read-only -- BackShort pops via default nav
 }
 
 } // namespace ui::screens

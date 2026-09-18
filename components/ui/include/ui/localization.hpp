@@ -28,8 +28,6 @@ enum class Key : uint8_t {
     Russian,
     Off,
     SaveFailed,
-    Firmware,
-    OkOpenBackReturn,
 };
 
 void set_language(settings::Language language);

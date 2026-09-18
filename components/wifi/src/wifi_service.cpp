@@ -3,6 +3,7 @@
 #include "event_bus/event_bus.hpp"
 #include "rtc_time/rtc_time.hpp"
 #include "settings/settings.hpp"
+#include "wifi/captive_dns.hpp"
 
 #include "esp_event.h"
 #include "esp_log.h"
@@ -202,6 +203,17 @@ bool start_access_point(const settings::WifiSettings& cfg)
     ap_client_count_value = 0;
     current_state = ConnectionState::ApRunning;
     publish(WifiEventId::ApStarted);
+
+    // Makes the AP self-explanatory to connect to -- see
+    // captive_dns.hpp's own file comment for the full mechanism (DNS
+    // hijack here + web_service.cpp's wildcard HTTP redirect). Not a
+    // hard failure if this doesn't start -- the AP and its own login
+    // page still work fine via a manually-typed IP either way, this
+    // is a convenience layer on top, not a dependency.
+    if (!captive_dns::start(ap_netif)) {
+        ESP_LOGW(TAG, "Captive DNS failed to start -- AP still usable via manual IP entry");
+    }
+
     return true;
 }
 
@@ -272,7 +284,11 @@ bool apply_settings()
 
     // Tear down whatever was running before applying a (possibly
     // different) mode -- safe to call even if the radio isn't
-    // currently started.
+    // currently started. Captive DNS specifically must never keep
+    // running past AP mode itself -- hijacking DNS while Station mode
+    // is connected to a real network would break normal browsing on
+    // it, not just be pointless.
+    captive_dns::stop();
     esp_wifi_stop();
     sta_retry_count = 0;
     ap_client_count_value = 0;
@@ -303,6 +319,7 @@ void stop()
     if (!initialized) {
         return;
     }
+    captive_dns::stop();
     esp_wifi_stop();
     esp_wifi_set_mode(WIFI_MODE_NULL);
     current_state = ConnectionState::Idle;

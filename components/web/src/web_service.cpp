@@ -69,6 +69,38 @@ esp_err_t handle_root(httpd_req_t* req)
     return ESP_OK;
 }
 
+// Catches every request that didn't match one of the specific routes
+// registered below (registered LAST, as the wildcard "/*" -- see the
+// uri_match_fn comment in start()) -- a 302 redirect to this device's
+// own root page instead of a bare 404.
+//
+// This is the HTTP half of the captive portal -- see
+// wifi/captive_dns.hpp's own file comment for the DNS half. Once
+// every DNS query resolves here (only while Access Point mode is up
+// -- see that file), a phone or laptop's OWN automatic "is this
+// network actually connected to the internet" probe (Apple's
+// captive.apple.com, Android's connectivitycheck.gstatic.com,
+// Windows' www.msftconnecttest.com, ...) lands on THIS handler
+// instead of getting the plain-success response it expects, which is
+// what makes the OS recognize "this network wants you to sign in
+// first" and pop its own captive-portal browser open automatically,
+// already pointed here via the redirect.
+//
+// Harmless and still useful outside AP mode too (DNS isn't hijacked
+// there, so this only ever fires for someone directly visiting an
+// unknown path on this device) -- a friendlier "take me to the actual
+// page" than a bare 404, not conditional on WiFi mode.
+esp_err_t handle_not_found(httpd_req_t* req)
+{
+    char location[64];
+    build_prefixed_path(location, sizeof(location), "/");
+    httpd_resp_set_status(req, "302 Found");
+    httpd_resp_set_hdr(req, "Location", location);
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    httpd_resp_send(req, nullptr, 0);
+    return ESP_OK;
+}
+
 esp_err_t handle_auth_status(httpd_req_t* req)
 {
     cJSON* data = cJSON_CreateObject();
@@ -176,6 +208,10 @@ bool start()
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 24;
     config.stack_size = 8192;
+    // Needed for the wildcard "/*" catch-all registered below --
+    // without this, httpd only ever matches a request's exact literal
+    // path, and an unmatched one just gets its own bare 404.
+    config.uri_match_fn = httpd_uri_match_wildcard;
 
     if (httpd_start(&server, &config) != ESP_OK) {
         ESP_LOGE(TAG, "httpd_start() failed");
@@ -213,6 +249,20 @@ bool start()
 
     register_vault_routes(server);
     register_settings_routes(server);
+
+    // Registered LAST and as a literal "/*" (NOT built via
+    // build_prefixed_path() -- the whole point is to catch requests
+    // that don't know about the secret-word prefix at all, e.g. an
+    // OS's own captive-portal probe) -- see handle_not_found()'s own
+    // comment. httpd's wildcard matching still prefers an exact match
+    // over this for any of the specific routes above, registration
+    // order here is just for clarity, not a correctness requirement.
+    static httpd_uri_t not_found_uri{};
+    not_found_uri.uri = "/*";
+    not_found_uri.method = HTTP_GET;
+    not_found_uri.handler = handle_not_found;
+    not_found_uri.user_ctx = nullptr;
+    httpd_register_uri_handler(server, &not_found_uri);
 
     ESP_LOGI(TAG, "HTTP server started");
     publish(WebEventId::ServerStarted);

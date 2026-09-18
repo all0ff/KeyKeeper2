@@ -37,9 +37,15 @@
 namespace rtc_time {
 
 /**
- * @brief Set up the underlying SNTP client. Call once at boot, after
- *        event_bus::init() (needed for the sync-completed event
- *        handler) and before wifi::init().
+ * @brief Set up the underlying SNTP client. Call once at boot,
+ *        AFTER wifi::init() -- confirmed on real hardware that this
+ *        matters, not just a suggestion: wifi::init() is what
+ *        actually calls esp_netif_init() +
+ *        esp_event_loop_create_default(), and the
+ *        esp_event_handler_register() call in here needs that
+ *        default event loop to already exist. Called before
+ *        wifi::init() (an earlier, wrong version of this comment
+ *        said to), it fails outright every boot.
  *
  * Does NOT start syncing by itself -- see start_sync().
  */

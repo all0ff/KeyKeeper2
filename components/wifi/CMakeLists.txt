@@ -1,6 +1,7 @@
 idf_component_register(
     SRCS
         "src/wifi_service.cpp"
+        "src/captive_dns.cpp"
 
     INCLUDE_DIRS
         "include"
@@ -12,6 +13,7 @@ idf_component_register(
         esp_wifi
         esp_netif
         esp_event
+        lwip
         log
 
     # esp_wifi/esp_netif/esp_event are standard, stable ESP-IDF
