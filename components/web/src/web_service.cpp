@@ -7,6 +7,7 @@
 #include "wifi/wifi_service.hpp"
 #include "web_app_html.hpp"
 #include "web_json_helpers.hpp"
+#include "web_russian_localization.hpp"
 #include "web_settings_routes.hpp"
 #include "web_vault_routes.hpp"
 
@@ -16,6 +17,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <string>
 
 namespace web {
 
@@ -36,7 +38,7 @@ void publish(WebEventId id)
 
 esp_err_t handle_root(httpd_req_t* req)
 {
-    httpd_resp_set_type(req, "text/html");
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
     // no-store -- without this, a browser can (and evidently did, in
     // practice) keep serving an OLD cached copy of this page after a
     // firmware update changed it, with no visible sign anything was
@@ -45,8 +47,25 @@ esp_err_t handle_root(httpd_req_t* req)
     // generated fresh from the running firmware on every request
     // anyway (APP_PAGE is a compiled-in constant, not a file read),
     // so there's no cost to never caching it.
+    //
+    // The localization script is deliberately injected here rather
+    // than changing the embedded HTML itself. It reads the persisted
+    // language through the existing settings API and translates only
+    // user-visible text. API paths, field names and JavaScript logic
+    // therefore remain unchanged.
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
-    httpd_resp_send(req, APP_PAGE, HTTPD_RESP_USE_STRLEN);
+
+    static const std::string page = [] {
+        std::string result(APP_PAGE);
+        const std::string marker = "</body>";
+        const size_t pos = result.find(marker);
+        if (pos != std::string::npos) {
+            result.insert(pos, RUSSIAN_LOCALIZATION_SCRIPT);
+        }
+        return result;
+    }();
+
+    httpd_resp_send(req, page.c_str(), HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
 }
 
@@ -84,9 +103,6 @@ esp_err_t handle_login(httpd_req_t* req)
         return ESP_OK;
     }
 
-    // security::lock::unlock() -- the SAME call LockScreen makes.
-    // See web_service.hpp's "SHARED SESSION MODEL" comment for what
-    // this means and doesn't mean.
     const security::pin::VerifyResult result = security::lock::unlock(pin_item->valuestring);
     cJSON_Delete(root);
 
@@ -101,24 +117,12 @@ esp_err_t handle_login(httpd_req_t* req)
         }
 
         case security::pin::VerifyResult::WipeRequired: {
-            // Deliberately NOT the same response as
-            // ui::screens::LockScreen's WipeRequired case. A remote
-            // brute-force attempt over the network doesn't need a
-            // destructive, irreversible response the way repeated
-            // physical-device guesses might -- disabling Wi-Fi cuts
-            // off the remote attack surface entirely (reversibly: the
-            // owner can re-enable it from WifiSettingsScreen) without
-            // touching the vault or the PIN at all. This still shares
-            // pin_manager's single failure counter with on-device
-            // attempts -- whichever channel happens to receive the
-            // 12th failure decides the outcome (wipe if on-device,
-            // Wi-Fi disabled if via this endpoint).
             ESP_LOGW(TAG, "PIN failure threshold reached via web login -- disabling WiFi instead of wiping");
 
             settings::WifiSettings disabled = settings::all().wifi;
             disabled.mode = settings::WifiMode::Disabled;
-            settings::set_wifi(disabled); // persisted -- stays off across reboots until re-enabled on-device
-            wifi::apply_settings();       // stop the radio right away, don't wait for a reboot
+            settings::set_wifi(disabled);
+            wifi::apply_settings();
 
             respond_error(req, "403 Forbidden", "Too many failed attempts -- WiFi disabled");
             return ESP_OK;
@@ -170,26 +174,7 @@ bool start()
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    // Default max_uri_handlers is 8. root/login/status (3) + 9 vault
-    // CRUD/recovery-code/seed-phrase routes + 5 settings routes
-    // (register_settings_routes()) = 17 already -- bumped well past
-    // that for real headroom against whatever's added next (search,
-    // backup/restore over REST), not just enough for what exists
-    // today.
     config.max_uri_handlers = 24;
-
-    // Default stack_size (4096 bytes on this ESP-IDF version) turned
-    // out to be too tight once handlers do real work -- a 2KB
-    // stack-local buffer in web_vault_routes.cpp's read_body() (now
-    // fixed to be heap-allocated instead, see that file) combined
-    // with cJSON's own parsing frames and vault::VaultEntry's several
-    // std::string members caused a genuine stack overflow -> panic ->
-    // full device reboot when saving an entry from the Web UI.
-    // Fixing read_body() alone removes the single biggest contributor,
-    // but bumping this too gives real headroom against whatever
-    // handler needs more stack next (search, import/export, ...),
-    // rather than relying on an unverified default staying just
-    // barely enough.
     config.stack_size = 8192;
 
     if (httpd_start(&server, &config) != ESP_OK) {
