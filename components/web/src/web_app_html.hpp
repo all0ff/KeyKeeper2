@@ -304,9 +304,14 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
   <div id="help-view" class="hidden">
     <div class="topbar">
       <h2>Help</h2>
-      <button class="small secondary" onclick="showView('list-view')">&larr; Back</button>
+      <div style="display:flex; gap:8px">
+        <button class="small secondary" onclick="setHelpLang('en')">EN</button>
+        <button class="small secondary" onclick="setHelpLang('ru')">RU</button>
+        <button class="small secondary" onclick="showView('list-view')">&larr; Back</button>
+      </div>
     </div>
 
+    <div id="help-content-en">
     <div class="help-section">
       <h3>Device controls</h3>
       <p>The device has one rotary knob (turn / press) and one BACK button, each read as a short or long press:</p>
@@ -337,6 +342,31 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         useful for a signup form on whatever computer the device is plugged into, without creating an account entry
         at all. Inside an account's Password field, holding <kbd>OK</kbd> generates a new password for that entry
         directly.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Recovery codes</h3>
+      <p>For the codes a service gives you as a backup way in if you lose access otherwise (GitHub's 2FA recovery
+        codes, a bank's, an exchange's, ...). This device does <strong>not</strong> generate these &mdash; only the
+        service itself can create codes it will actually accept back. On an entry's page, use
+        <strong>Set / Replace</strong> to paste the codes the service gave you (one per line), or
+        <strong>Import from file</strong> to load them from a .txt file the service let you download. Mark each one
+        used as you spend it; <strong>Copy unused</strong> copies whatever's left to your clipboard.</p>
+      <p>On the device itself this is view-and-print only &mdash; entering a whole set via the rotary knob isn't
+        practical, so setting or replacing the codes is web-only.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Seed phrase</h3>
+      <p>For a crypto wallet's own recovery phrase (BIP-39 &mdash; 12, 15, 18, 21 or 24 words). Same idea as recovery
+        codes: the wallet software generates this, not this device &mdash; paste or import the exact phrase the
+        wallet gave you, and the device checks every word against the real BIP-39 wordlist before accepting it.
+        Shown masked by default (like the password field) with a <strong>Reveal</strong> toggle, since this is more
+        sensitive than almost anything else stored here &mdash; whoever has it has full, irreversible control of the
+        wallet.</p>
+      <p>Same as recovery codes, only one phrase per entry, and setting or replacing it is web-only; the device can
+        view it (masked, <kbd>OK</kbd> toggles reveal) and print it over USB as one space-separated line, matching
+        how wallet software's own "paste your phrase" fields expect it.</p>
     </div>
 
     <div class="help-section">
@@ -403,10 +433,143 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     <div class="help-section">
       <h3>Known limitations</h3>
       <ul>
-        <li>The Language setting (General settings) doesn't translate anything yet &mdash; the on-device interface
-          is English-only regardless of what it's set to.</li>
+        <li>The on-device interface's own translation (General settings &rarr; Language) is a work in progress --
+          some screens are already in Russian when selected, others are still English-only regardless of the
+          setting.</li>
         <li>Search and Backup/Restore aren't available from this web page yet, only on the device itself.</li>
       </ul>
+    </div>
+    </div>
+
+    <div id="help-content-ru" style="display:none">
+    <div class="help-section">
+      <h3>Управление устройством</h3>
+      <p>У устройства один поворотный энкодер (вращение / нажатие) и одна кнопка BACK, у каждой есть короткое и
+        долгое нажатие:</p>
+      <ul>
+        <li><kbd>Поворот</kbd> &mdash; перемещение выбора, либо прокрутка текущего символа при вводе текста</li>
+        <li><kbd>OK</kbd> (коротко) &mdash; выбрать / подтвердить символ / открыть пункт меню</li>
+        <li><kbd>Удержание OK</kbd> &mdash; закончить ввод поля, либо действие "удержание", показанное внизу экрана</li>
+        <li><kbd>BACK</kbd> (коротко) &mdash; вернуться на экран назад, либо стереть последний введённый символ</li>
+        <li><kbd>Удержание BACK</kbd> &mdash; при вводе текста переключает набор символов (строчные, ЗАГЛАВНЫЕ,
+          цифры, символы, кириллица строчная/ПРОПИСНАЯ)</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>Учётные записи</h3>
+      <p>У каждой записи есть Login, Password, URL, Notes, TOTP Secret, Category и отметка Favorite. На устройстве:
+        удержание <kbd>OK</kbd> в списке записей создаёт новую; открытие существующей позволяет посмотреть,
+        отредактировать, удалить, показать пароль или напечатать поле через USB. Эта веб-страница делает то же самое
+        по сети &mdash; откройте запись для просмотра/редактирования, либо используйте <strong>+ New</strong>
+        выше.</p>
+      <p>Кириллица поддерживается в любом поле, и при вводе на устройстве, и при отображении &mdash; за это отвечают
+        шрифт устройства и переключение набора символов (см. "Управление устройством" выше).</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Генератор паролей</h3>
+      <p>Settings &rarr; Password Gen задаёт длину и какие наборы символов использовать. Там же
+        <strong>Generate &amp; Type</strong> создаёт новый пароль и сразу печатает его через USB &mdash; удобно для
+        формы регистрации на любом компьютере, куда воткнуто устройство, без создания записи в аккаунтах вообще.
+        Внутри поля Password у записи удержание <kbd>OK</kbd> генерирует новый пароль прямо для неё.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Коды восстановления</h3>
+      <p>Это коды, которые сервис даёт вам как запасной способ входа, если обычный способ потерян (2FA-коды GitHub,
+        коды банка, биржи и т.д.). Устройство их <strong>не создаёт</strong> само &mdash; только сам сервис может
+        выдать коды, которые он потом примет обратно. На экране записи кнопка <strong>Set / Replace</strong>
+        позволяет вставить коды, полученные от сервиса (по одному на строку), либо <strong>Import from file</strong>
+        &mdash; загрузить их из .txt-файла, который сервис дал скачать. Отмечайте каждый использованным по мере
+        траты; <strong>Copy unused</strong> копирует оставшиеся в буфер обмена.</p>
+      <p>На самом устройстве это только просмотр и печать &mdash; вводить весь набор кодов через энкодер
+        непрактично, поэтому задать или заменить их можно только через веб.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Seed-фраза</h3>
+      <p>Для фразы восстановления крипто-кошелька (BIP-39 &mdash; 12, 15, 18, 21 или 24 слова). Та же логика, что и
+        с кодами восстановления: фразу создаёт само приложение кошелька, не это устройство &mdash; вставьте или
+        импортируйте именно ту фразу, что дал кошелёк, и устройство проверит каждое слово по настоящему словарю
+        BIP-39 перед сохранением. По умолчанию скрыта (как и поле Password), с переключателем
+        <strong>Reveal</strong> &mdash; это чувствительнее почти всего остального, что тут хранится: у кого есть эта
+        фраза, у того полный и необратимый контроль над кошельком.</p>
+      <p>Как и с кодами восстановления, только одна фраза на запись, задать или заменить её можно только через веб;
+        устройство умеет её просматривать (скрыто, <kbd>OK</kbd> переключает показ) и печатать через USB одной
+        строкой через пробел &mdash; именно так большинство кошельков ожидают вставку фразы.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Коды TOTP (2FA)</h3>
+      <p>Вставьте Base32-секрет (та же строка, что даётся при настройке "вручную" вместо QR-кода, например
+        <code>JBSWY3DPEHPK3PXP</code>) в поле TOTP Secret записи. Устройство покажет живой, обновляющийся 6-значный
+        код прямо на экране записи, а Print OTP напечатает текущий код через USB.</p>
+      <div class="note">У этой платы нет батарейного чипа часов реального времени &mdash; единственный источник
+        времени — NTP через WiFi. Коды TOTP доступны только после того, как WiFi (режим Station) подключился и хотя
+        бы раз синхронизировал время с момента включения устройства; после полного отключения питания это сбрасывается
+        до следующего подключения.</div>
+    </div>
+
+    <div class="help-section">
+      <h3>Печать через USB</h3>
+      <p>Печать поля — это ввод текста как с USB-клавиатуры на тот компьютер, куда воткнуто устройство. Settings
+        &rarr; USB управляет задержками между нажатиями и порядком печати, плюс быстрый пароль, доступный с экрана
+        блокировки без разблокировки (осознанный компромисс удобства и безопасности).</p>
+      <p>Для печати кириллицы принимающему компьютеру нужна установленная русская раскладка. Settings &rarr; USB
+        &rarr; <strong>Auto-switch layout</strong> (по умолчанию выключено) заставляет устройство отправлять
+        Alt+Shift, пытаясь переключить раскладку самостоятельно до и после каждого кириллического участка &mdash;
+        это работает не гарантированно, так как устройство не может знать, что настроено на принимающем компьютере.
+        Если выключено — переключайте раскладку сами перед печатью.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Резервная копия, экспорт и импорт</h3>
+      <p>Две разные вещи, обе на microSD-карте, обе в разделе Backup на устройстве:</p>
+      <ul>
+        <li><strong>Create/Restore Backup</strong> &mdash; полная, точная копия внутреннего файла хранилища
+          устройства. Читается только другим устройством KeyKeeper2, не сторонними приложениями.</li>
+        <li><strong>Export/Import Vault</strong> &mdash; обычный CSV-файл, читаемый (или редактируемый) большинством
+          других менеджеров паролей и табличных редакторов. Импорт добавляет записи, не заменяя уже существующие, и
+          терпимо относится к названиям колонок (<code>username</code>, <code>site</code>, <code>note</code> и т.п.
+          распознаются наравне с собственными названиями устройства).</li>
+      </ul>
+      <p>На устройстве также есть действие Format SD Card — полезно, если карта пришла отформатированной в exFAT
+        (обычное дело для карт от 32ГБ), который устройство прочитать не может.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Безопасность</h3>
+      <ul>
+        <li>Повторные неверные попытки PIN усиливают реакцию: временная блокировка, затем полное стирание хранилища
+          и PIN. Это намеренно и не отключается.</li>
+        <li>Можно настроить отдельный PIN под принуждением — он разблокирует как обычно, но перед этим незаметно
+          стирает хранилище — на случай если вас заставляют разблокировать устройство.</li>
+        <li>Auto-Lock (Settings &rarr; Security) блокирует устройство после выбранного периода бездействия.</li>
+        <li>Factory Reset стирает всё: хранилище, PIN, все настройки, данные WiFi.</li>
+        <li>Файл хранилища на устройстве (и в резервной копии или CSV-экспорте) <strong>не зашифрован</strong>
+          &mdash; PIN защищает доступ на самом устройстве, но не данные как таковые. Обращайтесь с файлом резервной
+          копии или экспорта так же бережно, как с паролями внутри него.</li>
+      </ul>
+    </div>
+
+    <div class="help-section">
+      <h3>WiFi и эта веб-страница</h3>
+      <p>Settings &rarr; WiFi переключает между Station (подключение к существующей сети, нужно для синхронизации
+        времени TOTP) и Access Point (устройство создаёт свою собственную сеть). Эта страница доступна в обоих
+        режимах, по IP-адресу устройства &mdash; а если задано Secret Word (там же, в настройках WiFi), то только по
+        адресу <code>/&lt;secret word&gt;/</code>, а не по голому адресу — как лёгкий дополнительный барьер против
+        случайного попадания на страницу перебором IP.</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Известные ограничения</h3>
+      <ul>
+        <li>Перевод самого интерфейса устройства (General settings &rarr; Language) ещё в процессе — часть экранов
+          уже показывается по-русски при выборе языка, часть пока остаётся на английском независимо от настройки.</li>
+        <li>Поиск и Backup/Restore пока недоступны с этой веб-страницы, только на самом устройстве.</li>
+      </ul>
+    </div>
     </div>
   </div>
 
@@ -426,6 +589,11 @@ function showView(id) {
   ['list-view', 'detail-view', 'edit-view', 'settings-view', 'help-view'].forEach(v => {
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
+}
+
+function setHelpLang(lang) {
+  document.getElementById('help-content-en').style.display = lang === 'en' ? 'block' : 'none';
+  document.getElementById('help-content-ru').style.display = lang === 'ru' ? 'block' : 'none';
 }
 
 async function api(path, options) {
