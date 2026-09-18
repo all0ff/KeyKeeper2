@@ -9,104 +9,37 @@ namespace web {
 constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
 (function () {
   const RU = {
-    "Unlock": "Разблокировать",
-    "Accounts": "Учётные записи",
-    "Help": "Помощь",
-    "Settings": "Настройки",
-    "+ New": "+ Новая",
-    "Back": "Назад",
-    "Recovery Codes": "Коды восстановления",
-    "Import from file": "Импорт из файла",
-    "Save": "Сохранить",
-    "Cancel": "Отмена",
-    "Set / Replace": "Задать / заменить",
-    "Copy unused": "Копировать неиспользованные",
-    "Reveal": "Показать",
-    "Copy": "Копировать",
-    "Clear": "Очистить",
-    "Edit": "Изменить",
-    "Delete": "Удалить",
-    "Login": "Логин",
-    "Password": "Пароль",
-    "URL": "URL",
-    "Notes": "Заметки",
-    "TOTP Secret": "Секрет TOTP",
-    "Category": "Категория",
-    "Favorite": "Избранное",
-    "Seed Phrase": "Сид-фраза",
-    "English": "Английский",
-    "Russian": "Русский",
-    "General": "Общие",
-    "Language": "Язык",
-    "Display Brightness (0-100)": "Яркость дисплея (0–100)",
-    "Screen Timeout (seconds, 0 = off)": "Тайм-аут экрана (секунды, 0 = выкл.)",
-    "Save General": "Сохранить общие",
-    "USB": "USB",
+    "Unlock": "Разблокировать", "Accounts": "Учётные записи", "Help": "Помощь", "Settings": "Настройки",
+    "+ New": "+ Новая", "Back": "Назад", "Recovery Codes": "Коды восстановления", "Import from file": "Импорт из файла",
+    "Save": "Сохранить", "Cancel": "Отмена", "Set / Replace": "Задать / заменить", "Copy unused": "Копировать неиспользованные",
+    "Reveal": "Показать", "Copy": "Копировать", "Clear": "Очистить", "Edit": "Изменить", "Delete": "Удалить",
+    "Login": "Логин", "Password": "Пароль", "URL": "URL", "Notes": "Заметки", "TOTP Secret": "Секрет TOTP",
+    "Category": "Категория", "Favorite": "Избранное", "Seed Phrase": "Сид-фраза", "English": "Английский", "Russian": "Русский",
+    "General": "Общие", "Language": "Язык", "Display Brightness (0-100)": "Яркость дисплея (0–100)",
+    "Screen Timeout (seconds, 0 = off)": "Тайм-аут экрана (секунды, 0 = выкл.)", "Save General": "Сохранить общие", "USB": "USB",
     "Quick Password (no PIN required)": "Быстрый пароль (PIN не требуется)",
     "Auto-switch keyboard layout for Cyrillic (best-effort, Alt+Shift)": "Автопереключение раскладки для кириллицы (по возможности, Alt+Shift)",
-    "Save USB": "Сохранить USB",
-    "Security": "Безопасность",
-    "Auto Lock enabled": "Автоблокировка включена",
-    "Auto Lock timeout": "Тайм-аут автоблокировки",
-    "Off": "Выкл.",
-    "1 min": "1 мин",
-    "3 min": "3 мин",
-    "5 min": "5 мин",
-    "10 min": "10 мин",
-    "15 min": "15 мин",
-    "20 min": "20 мин",
-    "25 min": "25 мин",
-    "30 min": "30 мин",
-    "35 min": "35 мин",
-    "40 min": "40 мин",
-    "45 min": "45 мин",
-    "50 min": "50 мин",
-    "55 min": "55 мин",
-    "60 min": "60 мин",
-    "Web UI permissions": "Разрешения Web UI",
-    "View accounts": "Просмотр учётных записей",
-    "Edit accounts": "Изменение учётных записей",
-    "Export data": "Экспорт данных",
-    "Change settings": "Изменение настроек",
-    "Save Security": "Сохранить безопасность",
-    "Wi-Fi": "Wi-Fi",
-    "Mode": "Режим",
-    "Disabled": "Отключён",
-    "Station": "Станция",
-    "Access Point": "Точка доступа",
-    "STA SSID": "SSID станции",
-    "STA Password": "Пароль станции",
-    "AP SSID": "SSID точки доступа",
-    "AP Password": "Пароль точки доступа",
-    "Save Wi-Fi": "Сохранить Wi-Fi",
-    "Password Generator": "Генератор паролей",
-    "Password Gen": "Генератор паролей",
-    "System": "Система",
-    "About": "О программе",
-    "Firmware": "Прошивка",
-    "Device": "Устройство",
-    "Flash Encryption": "Шифрование Flash",
-    "On": "Вкл.",
-    "Off": "Выкл.",
-    "Free heap": "Свободная память",
-    "Internal storage": "Внутреннее хранилище",
-    "microSD": "microSD",
-    "unavailable": "недоступно",
-    "present, usage unavailable": "установлена, использование недоступно",
-    "not detected": "не обнаружена",
-    "Help & keyboard": "Помощь и клавиатура",
-    "Save failed": "Ошибка сохранения",
-    "Wrong PIN": "Неверный PIN",
-    "Locked out, try again later": "Ввод заблокирован, попробуйте позже",
-    "Not authenticated": "Не выполнена аутентификация",
+    "Save USB": "Сохранить USB", "Security": "Безопасность", "Auto Lock enabled": "Автоблокировка включена",
+    "Auto Lock timeout": "Тайм-аут автоблокировки", "Off": "Выкл.", "1 min": "1 мин", "3 min": "3 мин", "5 min": "5 мин",
+    "10 min": "10 мин", "15 min": "15 мин", "20 min": "20 мин", "25 min": "25 мин", "30 min": "30 мин", "35 min": "35 мин",
+    "40 min": "40 мин", "45 min": "45 мин", "50 min": "50 мин", "55 min": "55 мин", "60 min": "60 мин",
+    "Web UI permissions": "Разрешения Web UI", "View accounts": "Просмотр учётных записей", "Edit accounts": "Изменение учётных записей",
+    "Export data": "Экспорт данных", "Change settings": "Изменение настроек", "Save Security": "Сохранить безопасность",
+    "Wi-Fi": "Wi-Fi", "Mode": "Режим", "Disabled": "Отключён", "Station": "Станция", "Access Point": "Точка доступа",
+    "STA SSID": "SSID станции", "STA Password": "Пароль станции", "AP SSID": "SSID точки доступа", "AP Password": "Пароль точки доступа",
+    "Save Wi-Fi": "Сохранить Wi-Fi", "Password Generator": "Генератор паролей", "Password Gen": "Генератор паролей",
+    "System": "Система", "About": "О программе", "Firmware": "Прошивка", "Device": "Устройство", "Flash Encryption": "Шифрование Flash",
+    "On": "Вкл.", "Free heap": "Свободная память", "Internal storage": "Внутреннее хранилище", "microSD": "microSD",
+    "unavailable": "недоступно", "present, usage unavailable": "установлена, использование недоступно", "not detected": "не обнаружена",
+    "Help & keyboard": "Помощь и клавиатура", "Save failed": "Ошибка сохранения", "Wrong PIN": "Неверный PIN",
+    "Locked out, try again later": "Ввод заблокирован, попробуйте позже", "Not authenticated": "Не выполнена аутентификация",
     "No PIN configured yet -- set one up on the device first": "PIN ещё не настроен — сначала задайте его на устройстве",
     "Too many failed attempts -- WiFi disabled": "Слишком много неудачных попыток — Wi-Fi отключён",
-    "Missing 'pin' field": "Отсутствует поле PIN",
-    "Invalid JSON": "Недопустимый JSON",
-    "Failed to save": "Не удалось сохранить"
+    "Missing 'pin' field": "Отсутствует поле PIN", "Invalid JSON": "Недопустимый JSON", "Failed to save": "Не удалось сохранить"
   };
 
   const ATTRS = ["placeholder", "title", "aria-label"];
+  let observerStarted = false;
 
   function translateTextNode(node) {
     const text = node.nodeValue;
@@ -116,8 +49,6 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
       node.nodeValue = text.replace(trimmed, RU[trimmed]);
       return;
     }
-
-    // Common dynamic strings generated by the Web UI JavaScript.
     let out = text;
     out = out.replace(/^Firmware:\s*/, RU["Firmware"] + ": ");
     out = out.replace(/^Device:\s*/, RU["Device"] + ": ");
@@ -133,7 +64,6 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
     nodes.forEach(translateTextNode);
-
     if (root.nodeType === Node.ELEMENT_NODE) {
       ATTRS.forEach(function (attr) {
         if (root.hasAttribute && root.hasAttribute(attr)) {
@@ -154,34 +84,46 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     }
   }
 
-  async function applyRussianIfSelected() {
+  function startObserver() {
+    if (observerStarted || !document.body) return;
+    observerStarted = true;
+    translate(document.body);
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (m) {
+        m.addedNodes.forEach(function (node) {
+          if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) translate(node);
+        });
+        if (m.type === "characterData") translateTextNode(m.target);
+      });
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  }
+
+  async function checkLanguage() {
     try {
       const response = await fetch("api/v1/settings", { cache: "no-store" });
-      if (!response.ok) return;
+      if (!response.ok) return false;
       const data = await response.json();
       if (data && data.data && data.data.general && data.data.general.language === "russian") {
         document.documentElement.lang = "ru";
-        translate(document.body);
-        const observer = new MutationObserver(function (mutations) {
-          mutations.forEach(function (m) {
-            m.addedNodes.forEach(function (node) {
-              if (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.TEXT_NODE) translate(node);
-            });
-            if (m.type === "characterData") translateTextNode(m.target);
-          });
-        });
-        observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+        startObserver();
+        return true;
       }
     } catch (_) {
-      // Keep the original English Web UI if settings cannot be read.
+      // Settings is unavailable on the login screen; retry after login.
     }
+    return false;
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", applyRussianIfSelected);
-  } else {
-    applyRussianIfSelected();
+  function beginLocalization() {
+    checkLanguage();
+    const timer = setInterval(async function () {
+      if (await checkLanguage()) clearInterval(timer);
+    }, 1000);
   }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", beginLocalization);
+  else beginLocalization();
 })();
 </script>)JS";
 
