@@ -358,8 +358,11 @@ esp_err_t handle_set_recovery_codes(httpd_req_t* req)
         return ESP_OK;
     }
     if (codes.size() > vault::MAX_RECOVERY_CODES) {
-        respond_error(req, "400 Bad Request", "Too many codes (max " +
-                                                    std::to_string(vault::MAX_RECOVERY_CODES) + ")");
+        std::string error_message =
+            "Too many codes (max " +
+            std::to_string(vault::MAX_RECOVERY_CODES) + ")";
+
+        respond_error(req, "400 Bad Request", error_message.c_str());
         return ESP_OK;
     }
 
@@ -627,7 +630,7 @@ void register_vault_routes(httpd_handle_t server)
     httpd_register_uri_handler(server, &create_uri);
     httpd_register_uri_handler(server, &update_uri);
     httpd_register_uri_handler(server, &delete_uri);
-    httpd_register_uri_handler(server, &generate_codes_uri);
+    httpd_register_uri_handler(server, &set_codes_uri);
     httpd_register_uri_handler(server, &mark_code_uri);
     httpd_register_uri_handler(server, &set_seed_uri);
     httpd_register_uri_handler(server, &delete_seed_uri);
