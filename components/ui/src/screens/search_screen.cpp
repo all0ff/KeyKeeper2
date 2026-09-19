@@ -24,23 +24,6 @@ constexpr lv_coord_t STATUS_Y = 24;
 constexpr lv_coord_t RESULTS_Y_START = 40;
 constexpr lv_coord_t ROW_SPACING = 18;
 
-std::string to_lower_copy(const std::string& s)
-{
-    std::string out = s;
-    for (char& c : out) {
-        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-    }
-    return out;
-}
-
-bool contains_ci(const std::string& haystack, const std::string& needle_lower)
-{
-    if (needle_lower.empty()) {
-        return true;
-    }
-    return to_lower_copy(haystack).find(needle_lower) != std::string::npos;
-}
-
 } // namespace
 
 const char* SearchScreen::title() const
@@ -98,22 +81,18 @@ void SearchScreen::update_results()
     }
     results_.clear();
 
-    const std::string query_lower = to_lower_copy(current_query);
-
-    const size_t total = vault::entry_count();
-    const size_t scan_count = (total > SCAN_CAP) ? SCAN_CAP : total;
-
-    if (scan_count > 0) {
-        std::vector<vault::VaultEntry> scanned(scan_count);
-        vault::list_entries(scanned.data(), scan_count, 0);
-
-        for (const vault::VaultEntry& e : scanned) {
-            const bool matches = query_lower.empty() || contains_ci(e.login, query_lower) ||
-                                  contains_ci(e.url, query_lower) || contains_ci(e.notes, query_lower);
-            if (matches && results_.size() < MAX_ROWS) {
-                results_.push_back(e);
-            }
-        }
+    // vault::search_entries() scans the WHOLE vault (no SCAN_CAP-style
+    // ceiling on what's considered) and caps only the RESULT count at
+    // MAX_ROWS -- previously this screen capped what it even
+    // considered via SCAN_CAP, which could miss real matches sitting
+    // past that scan limit even when there was room left for more
+    // results. Same case-insensitive login/url/notes matching either
+    // way -- shared with the web search REST endpoint now, not a
+    // separate copy of the same logic.
+    vault::VaultEntry buf[MAX_ROWS];
+    const size_t found = vault::search_entries(current_query.c_str(), buf, MAX_ROWS);
+    for (size_t i = 0; i < found; ++i) {
+        results_.push_back(buf[i]);
     }
 
     selected_result_ = 0;
@@ -131,7 +110,7 @@ void SearchScreen::update_results()
     }
 
     if (results_.empty()) {
-        lv_label_set_text(status_label_, query_lower.empty() ? "Vault is empty" : "No matches");
+        lv_label_set_text(status_label_, current_query.empty() ? "Vault is empty" : "No matches");
     } else {
         lv_label_set_text_fmt(status_label_, "%u result%s", static_cast<unsigned>(results_.size()),
                                results_.size() == 1 ? "" : "s");

@@ -5,7 +5,9 @@
 
 #include "settings/settings.hpp"
 
+#include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -140,6 +142,32 @@ inline bool read_body(httpd_req_t* req, std::string& out)
     }
     out.assign(buf.data(), static_cast<size_t>(total));
     return true;
+}
+
+/**
+ * @brief Percent-decode a URL query VALUE in place (%XX -> that byte,
+ *        e.g. from JS's own encodeURIComponent()) -- needed for any
+ *        query parameter that can hold non-ASCII text (Cyrillic
+ *        search terms in particular; httpd_query_key_value() itself
+ *        returns the raw, still-encoded bytes). '+' is left as a
+ *        literal plus -- that's form-encoding's own space shorthand,
+ *        not standard URI percent-encoding, and encodeURIComponent()
+ *        never produces it.
+ */
+inline void url_decode_in_place(char* s)
+{
+    char* out = s;
+    while (*s != '\0') {
+        if (s[0] == '%' && std::isxdigit(static_cast<unsigned char>(s[1])) &&
+            std::isxdigit(static_cast<unsigned char>(s[2]))) {
+            char hex[3] = {s[1], s[2], '\0'};
+            *out++ = static_cast<char>(std::strtol(hex, nullptr, 16));
+            s += 3;
+        } else {
+            *out++ = *s++;
+        }
+    }
+    *out = '\0';
 }
 
 } // namespace web

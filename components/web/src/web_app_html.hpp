@@ -96,6 +96,13 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
   .recovery-code-row .code { font-family: ui-monospace, Consolas, monospace; flex: 1; }
   .recovery-code-row.used .code { text-decoration: line-through; color: #9ca3af; }
   .recovery-code-row button { width: auto; padding: 3px 10px; font-size: 0.78rem; margin: 0; }
+  .backup-row {
+    display: flex; align-items: center; gap: 8px; padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0; font-size: 0.92rem;
+  }
+  .backup-row .name { font-family: ui-monospace, Consolas, monospace; flex: 1; }
+  .backup-row .size { color: #6b7280; font-size: 0.85rem; }
+  .backup-row button { width: auto; padding: 4px 10px; font-size: 0.8rem; margin: 0; }
 </style>
 </head>
 <body>
@@ -114,10 +121,13 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
       <h2>Accounts</h2>
       <div style="display:flex; gap:8px">
         <button class="small secondary" onclick="showView('help-view')">Help</button>
+        <button class="small secondary" onclick="openBackup()">Backup</button>
         <button class="small secondary" onclick="openSettings()">Settings</button>
         <button class="small" onclick="openEdit(null)">+ New</button>
       </div>
     </div>
+    <input id="search-box" type="text" placeholder="Search login, URL, notes..." oninput="onSearchInput()"
+      style="margin-bottom:10px">
     <div id="msg"></div>
     <div id="entry-list"></div>
   </div>
@@ -299,6 +309,19 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     <input id="set-ap-password" type="text">
     <div id="set-wifi-msg"></div>
     <button onclick="saveSettings('wifi')" style="margin-top:8px">Save WiFi</button>
+  </div>
+
+  <div id="backup-view" class="hidden">
+    <div class="topbar">
+      <h2>Backup</h2>
+      <button class="small secondary" onclick="showView('list-view'); loadList();">&larr; Back</button>
+    </div>
+    <p style="font-size:0.88rem; color:#6b7280">A full, exact copy of the device's own internal vault file, on the
+      microSD card. Only ever readable by another KeyKeeper2 device, not other password managers or spreadsheet
+      apps -- for that, use Export Vault (CSV) on the device itself instead.</p>
+    <button onclick="createBackup()">Create Backup</button>
+    <div id="backup-list" style="margin-top:16px"></div>
+    <div id="backup-msg" style="font-size:0.85rem; margin-top:8px"></div>
   </div>
 
   <div id="help-view" class="hidden">
@@ -586,7 +609,7 @@ let seedRevealed = false;
 let seedClearConfirmPending = false;
 
 function showView(id) {
-  ['list-view', 'detail-view', 'edit-view', 'settings-view', 'help-view'].forEach(v => {
+  ['list-view', 'detail-view', 'edit-view', 'settings-view', 'backup-view', 'help-view'].forEach(v => {
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -645,23 +668,13 @@ function showApp() {
 
 // ---------- List ----------
 
-async function loadList() {
-  const msg = document.getElementById('msg');
+function renderEntryList(list_data, empty_message) {
+  entries = list_data;
   const list = document.getElementById('entry-list');
-  msg.textContent = 'Loading...';
   list.innerHTML = '';
 
-  const { ok, body } = await api('api/v1/entries');
-  if (!ok) {
-    msg.textContent = body.message || 'Failed to load';
-    return;
-  }
-
-  entries = body.data.entries || [];
-  msg.textContent = '';
-
   if (entries.length === 0) {
-    list.innerHTML = '<div class="empty">No accounts yet</div>';
+    list.innerHTML = '<div class="empty">' + empty_message + '</div>';
     return;
   }
 
@@ -677,6 +690,49 @@ async function loadList() {
       '<div class="meta">' + escapeHtml(e.url || '') + cat + otp + '</div>';
     list.appendChild(div);
   });
+}
+
+async function loadList() {
+  const msg = document.getElementById('msg');
+  msg.textContent = 'Loading...';
+  const searchBox = document.getElementById('search-box');
+  if (searchBox) searchBox.value = '';
+
+  const { ok, body } = await api('api/v1/entries');
+  if (!ok) {
+    msg.textContent = body.message || 'Failed to load';
+    return;
+  }
+
+  msg.textContent = '';
+  renderEntryList(body.data.entries || [], 'No accounts yet');
+}
+
+let searchDebounceTimer = null;
+
+function onSearchInput() {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(runSearch, 250);
+}
+
+async function runSearch() {
+  const q = document.getElementById('search-box').value.trim();
+  const msg = document.getElementById('msg');
+
+  if (!q) {
+    loadList();
+    return;
+  }
+
+  msg.textContent = 'Searching...';
+  const { ok, body } = await api('api/v1/search?q=' + encodeURIComponent(q));
+  if (!ok) {
+    msg.textContent = body.message || 'Search failed';
+    return;
+  }
+
+  msg.textContent = '';
+  renderEntryList(body.data.entries || [], 'No matches');
 }
 
 function escapeHtml(s) {
@@ -1186,6 +1242,116 @@ async function saveSettings(section) {
 
   msg.style.color = '#080';
   msg.textContent = 'Saved.';
+}
+
+// ---------- Backup ----------
+
+let backupRestoreConfirmPending = null; // filename currently pending a second confirm tap, or null
+
+function openBackup() {
+  backupRestoreConfirmPending = null;
+  showView('backup-view');
+  loadBackups();
+}
+
+async function loadBackups() {
+  const list = document.getElementById('backup-list');
+  const msg = document.getElementById('backup-msg');
+  list.innerHTML = 'Loading...';
+
+  const { ok, body } = await api('api/v1/backups');
+  if (!ok) {
+    list.innerHTML = '';
+    msg.textContent = body.message || 'Failed to load backups';
+    return;
+  }
+
+  const backups = body.data.backups || [];
+  list.innerHTML = '';
+
+  if (backups.length === 0) {
+    list.innerHTML = '<div class="empty">No backups yet.</div>';
+    return;
+  }
+
+  backups.forEach(b => {
+    const row = document.createElement('div');
+    row.className = 'backup-row';
+
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = b.filename;
+
+    const size = document.createElement('span');
+    size.className = 'size';
+    size.textContent = Math.round(b.size_bytes / 1024) + 'KB';
+
+    const restoreBtn = document.createElement('button');
+    restoreBtn.className = 'small secondary';
+    restoreBtn.textContent = (backupRestoreConfirmPending === b.filename) ? 'Tap again to confirm' : 'Restore';
+    restoreBtn.onclick = () => restoreBackup(b.filename);
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.className = 'small danger';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.onclick = () => deleteBackup(b.filename);
+
+    row.appendChild(name);
+    row.appendChild(size);
+    row.appendChild(restoreBtn);
+    row.appendChild(deleteBtn);
+    list.appendChild(row);
+  });
+}
+
+async function createBackup() {
+  const msg = document.getElementById('backup-msg');
+  msg.textContent = 'Creating...';
+  const { ok, body } = await api('api/v1/backups', { method: 'POST' });
+  if (!ok) {
+    msg.textContent = body.message || 'Failed to create backup';
+    return;
+  }
+  msg.textContent = 'Created: ' + body.data.filename;
+  loadBackups();
+}
+
+async function restoreBackup(filename) {
+  if (backupRestoreConfirmPending !== filename) {
+    // Overwrites the WHOLE vault and restarts the device -- same
+    // "tap again to confirm" pattern as Delete elsewhere in this app,
+    // not a silent one-tap action.
+    backupRestoreConfirmPending = filename;
+    loadBackups();
+    return;
+  }
+  backupRestoreConfirmPending = null;
+
+  const msg = document.getElementById('backup-msg');
+  msg.textContent = 'Restoring -- device will restart...';
+  const { ok, body } = await api(
+    'api/v1/backups/restore?filename=' + encodeURIComponent(filename),
+    { method: 'POST' }
+  );
+  if (!ok) {
+    msg.textContent = body.message || 'Restore failed';
+    return;
+  }
+  msg.textContent = 'Restoring. The device is restarting -- reconnect in a few seconds and log in again.';
+}
+
+async function deleteBackup(filename) {
+  const msg = document.getElementById('backup-msg');
+  const { ok, body } = await api(
+    'api/v1/backups?filename=' + encodeURIComponent(filename),
+    { method: 'DELETE' }
+  );
+  if (!ok) {
+    msg.textContent = body.message || 'Failed to delete backup';
+    return;
+  }
+  msg.textContent = '';
+  loadBackups();
 }
 
 checkAuth();

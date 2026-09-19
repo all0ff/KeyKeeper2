@@ -51,6 +51,24 @@ size_t list_entries(VaultEntry* out, size_t max_count, size_t offset = 0);
 
 bool get_entry(uint32_t id, VaultEntry& out);
 
+/**
+ * @brief Case-insensitive substring search across login/url/notes,
+ *        the same three fields and matching rule
+ *        ui::screens::SearchScreen's own on-device search uses (that
+ *        screen now calls this instead of keeping its own separate
+ *        copy of the same logic, and so does the web search REST
+ *        endpoint -- one implementation, not two that could drift).
+ *
+ * @param query May be nullptr or empty -- matches every entry, same
+ *              as SearchScreen's own empty-query behavior.
+ * @return Number of matches written to out (<= max_count). Scans the
+ *         WHOLE vault (no SearchScreen-style scan cap) -- fine for a
+ *         server-side REST call, which doesn't share the on-device
+ *         screen's own reason for capping (rendering that many rows
+ *         on a 320x172 display isn't useful past a point anyway).
+ */
+size_t search_entries(const char* query, VaultEntry* out, size_t max_count);
+
 /// @return The new entry's id, or vault::INVALID_ID on failure
 ///         (locked, validation failed, or the write to vault.db
 ///         failed). Publishes VaultEventId::EntryCreated on success.

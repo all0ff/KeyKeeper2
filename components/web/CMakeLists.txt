@@ -3,6 +3,7 @@ idf_component_register(
         "src/web_service.cpp"
         "src/web_vault_routes.cpp"
         "src/web_settings_routes.cpp"
+        "src/web_backup_routes.cpp"
 
     INCLUDE_DIRS
         "include"

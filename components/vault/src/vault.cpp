@@ -7,6 +7,9 @@
 
 #include "esp_log.h"
 
+#include <cctype>
+#include <string>
+
 namespace vault {
 
 namespace {
@@ -119,6 +122,61 @@ bool get_entry(uint32_t id, VaultEntry& out)
         return false;
     }
     return repository::get(id, out);
+}
+
+namespace {
+
+std::string to_lower_copy(const std::string& s)
+{
+    std::string out = s;
+    for (char& c : out) {
+        c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    }
+    return out;
+}
+
+bool contains_ci(const std::string& haystack, const std::string& needle_lower)
+{
+    if (needle_lower.empty()) {
+        return true;
+    }
+    return to_lower_copy(haystack).find(needle_lower) != std::string::npos;
+}
+
+} // namespace
+
+size_t search_entries(const char* query, VaultEntry* out, size_t max_count)
+{
+    if (!ensure_loaded() || out == nullptr || max_count == 0) {
+        return 0;
+    }
+
+    const std::string query_lower = to_lower_copy(query != nullptr ? query : "");
+
+    size_t found = 0;
+    constexpr size_t PAGE = 16;
+    VaultEntry buf[PAGE];
+    size_t offset = 0;
+
+    while (found < max_count) {
+        const size_t n = repository::list(buf, PAGE, offset);
+        if (n == 0) {
+            break;
+        }
+        for (size_t i = 0; i < n && found < max_count; ++i) {
+            const VaultEntry& e = buf[i];
+            if (contains_ci(e.login, query_lower) || contains_ci(e.url, query_lower) ||
+                contains_ci(e.notes, query_lower)) {
+                out[found++] = e;
+            }
+        }
+        offset += n;
+        if (n < PAGE) {
+            break;
+        }
+    }
+
+    return found;
 }
 
 uint32_t create_entry(const VaultEntry& entry)

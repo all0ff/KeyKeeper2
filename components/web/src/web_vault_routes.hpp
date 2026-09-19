@@ -6,11 +6,13 @@
 // web (internal) -- REST endpoints for the vault itself.
 //
 // docs/WEB.md section 7's "Supported Operations" list for the vault:
-// list/view/create/edit/delete/search. Search is NOT included here --
-// a separate endpoint, not built in this increment (the on-device
-// SearchScreen's substring-match logic isn't exposed over REST yet).
-// Backup/restore/settings over REST also aren't built yet -- this
-// increment is CRUD on individual entries only.
+// list/view/create/edit/delete/search. GET /api/v1/search?q=... now
+// covers search -- see handle_search()'s own comment, shares its
+// matching logic with ui::screens::SearchScreen via
+// vault::search_entries(), not a separate copy. Backup/restore over
+// REST live in web_backup_routes.hpp/.cpp instead (a different
+// domain -- SD-card files, not vault entries); settings over REST are
+// in web_settings_routes.hpp/.cpp.
 //
 // Every route here requires the device to be Unlocked
 // (security::lock::state()), same shared-session model as

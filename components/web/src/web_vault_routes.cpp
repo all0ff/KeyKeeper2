@@ -138,6 +138,44 @@ esp_err_t handle_list_entries(httpd_req_t* req)
     return ESP_OK;
 }
 
+// GET /api/v1/search?q=<query> -- same case-insensitive login/url/notes
+// substring match ui::screens::SearchScreen uses on the device (both
+// now call vault::search_entries(), one shared implementation).
+// Missing/empty q matches every entry, same as an empty query does
+// on-device.
+esp_err_t handle_search(httpd_req_t* req)
+{
+    if (!require_unlocked(req)) {
+        return ESP_OK;
+    }
+
+    char query_str[128] = "";
+    char raw_q[96] = "";
+    if (httpd_req_get_url_query_str(req, query_str, sizeof(query_str)) == ESP_OK) {
+        httpd_query_key_value(query_str, "q", raw_q, sizeof(raw_q));
+    }
+    url_decode_in_place(raw_q);
+
+    // Heap-allocated, NOT a stack array -- vault::VaultEntry holds
+    // several std::string/std::vector members, and MAX_LIST_ENTRIES
+    // (256) of those on this worker's 8192-byte stack would overflow
+    // it outright (the exact class of bug this project already hit
+    // once before, in read_body() -- see that function's own
+    // comment).
+    std::vector<vault::VaultEntry> matches(MAX_LIST_ENTRIES);
+    const size_t found = vault::search_entries(raw_q, matches.data(), MAX_LIST_ENTRIES);
+
+    cJSON* array = cJSON_CreateArray();
+    for (size_t i = 0; i < found; ++i) {
+        cJSON_AddItemToArray(array, entry_to_json_summary(matches[i]));
+    }
+
+    cJSON* data = cJSON_CreateObject();
+    cJSON_AddItemToObject(data, "entries", array);
+    respond_ok(req, data);
+    return ESP_OK;
+}
+
 esp_err_t handle_get_entry(httpd_req_t* req)
 {
     if (!require_unlocked(req)) {
@@ -571,6 +609,9 @@ void register_vault_routes(httpd_handle_t server)
     static char seed_phrase_path[64];
     build_prefixed_path(seed_phrase_path, sizeof(seed_phrase_path), "/api/v1/entry/seed_phrase");
 
+    static char search_path[64];
+    build_prefixed_path(search_path, sizeof(search_path), "/api/v1/search");
+
     static httpd_uri_t list_uri{};
     list_uri.uri = entries_path;
     list_uri.method = HTTP_GET;
@@ -625,6 +666,12 @@ void register_vault_routes(httpd_handle_t server)
     delete_seed_uri.handler = handle_delete_seed_phrase;
     delete_seed_uri.user_ctx = nullptr;
 
+    static httpd_uri_t search_uri{};
+    search_uri.uri = search_path;
+    search_uri.method = HTTP_GET;
+    search_uri.handler = handle_search;
+    search_uri.user_ctx = nullptr;
+
     httpd_register_uri_handler(server, &list_uri);
     httpd_register_uri_handler(server, &get_uri);
     httpd_register_uri_handler(server, &create_uri);
@@ -634,6 +681,7 @@ void register_vault_routes(httpd_handle_t server)
     httpd_register_uri_handler(server, &mark_code_uri);
     httpd_register_uri_handler(server, &set_seed_uri);
     httpd_register_uri_handler(server, &delete_seed_uri);
+    httpd_register_uri_handler(server, &search_uri);
 
     ESP_LOGI(TAG, "Vault REST routes registered");
 }

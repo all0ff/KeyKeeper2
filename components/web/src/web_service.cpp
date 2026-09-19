@@ -6,6 +6,7 @@
 #include "settings/settings.hpp"
 #include "wifi/wifi_service.hpp"
 #include "web_app_html.hpp"
+#include "web_backup_routes.hpp"
 #include "web_json_helpers.hpp"
 #include "web_russian_localization.hpp"
 #include "web_settings_routes.hpp"
@@ -206,7 +207,14 @@ bool start()
     }
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 24;
+    // Default is 8. Currently registers 23 handlers total across
+    // web_service.cpp (4: root, login, status, the "/*" catch-all)
+    // + web_vault_routes.cpp (10: CRUD, recovery codes, seed phrase,
+    // search) + web_backup_routes.cpp (4) + web_settings_routes.cpp
+    // (5) -- 23 was already right at the old cap of 24 with zero
+    // headroom left, so bumped further this time, not just to the
+    // current exact count.
+    config.max_uri_handlers = 32;
     config.stack_size = 8192;
     // Needed for the wildcard "/*" catch-all registered below --
     // without this, httpd only ever matches a request's exact literal
@@ -249,6 +257,7 @@ bool start()
 
     register_vault_routes(server);
     register_settings_routes(server);
+    register_backup_routes(server);
 
     // Registered LAST and as a literal "/*" (NOT built via
     // build_prefixed_path() -- the whole point is to catch requests

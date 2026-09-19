@@ -71,7 +71,6 @@ private:
     lv_obj_t* status_label_ = nullptr;
 
     static constexpr size_t MAX_ROWS = 24;
-    static constexpr size_t SCAN_CAP = 256; // same placeholder reasoning as FavoritesScreen
 
     std::vector<vault::VaultEntry> results_;
     lv_obj_t* result_labels_[MAX_ROWS]{};
