@@ -9,6 +9,7 @@ idf_component_register(
 
     REQUIRES
         bsp
+        display
         driver
         esp_driver_gpio
         esp_driver_pcnt
