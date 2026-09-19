@@ -15,10 +15,12 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Settings": "Настройки",
     "+ New": "+ Новая",
     "Back": "Назад",
+    "← Back": "← Назад",
     "Recovery Codes": "Коды восстановления",
     "Import from file": "Импорт из файла",
     "Save": "Сохранить",
     "Cancel": "Отмена",
+    "← Cancel": "← Отмена",
     "Set / Replace": "Задать / заменить",
     "Copy unused": "Копировать неиспользованные",
     "Reveal": "Показать",
@@ -60,6 +62,8 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Select a backup file": "Выберите файл резервной копии",
     "Invalid backup file": "Недопустимый файл резервной копии",
     "File selected": "Файл выбран",
+    "Tap again to confirm": "Нажмите ещё раз для подтверждения",
+    "Tap again to confirm restore": "Нажмите ещё раз для подтверждения восстановления",
     "English": "Английский",
     "Russian": "Русский",
     "General": "Общие",
@@ -147,6 +151,7 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Wrong PIN": "Неверный PIN",
     "Locked out, try again later": "Ввод заблокирован, попробуйте позже",
     "Not authenticated": "Не выполнена аутентификация",
+    "Not authenticated.": "Не выполнена аутентификация.",
     "No PIN configured yet -- set one up on the device first": "PIN ещё не настроен — сначала задайте его на устройстве",
     "Too many failed attempts -- WiFi disabled": "Слишком много неудачных попыток — Wi-Fi отключён",
     "Missing 'pin' field": "Отсутствует поле PIN",
@@ -186,6 +191,10 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     out = out.replace(/^Flash Encryption:\s*/, RU["Flash Encryption"] + ": ");
     out = out.replace(/^Free heap:\s*/, RU["Free heap"] + ": ");
     out = out.replace(/^Internal storage:\s*/, RU["Internal storage"] + ": ");
+    out = out.replace(/←\s*Back/g, "← Назад");
+    out = out.replace(/←\s*Cancel/g, "← Отмена");
+    out = out.replace(/Tap again to confirm restore/g, "Нажмите ещё раз для подтверждения восстановления");
+    out = out.replace(/Tap again to confirm/g, "Нажмите ещё раз для подтверждения");
     if (out !== text) node.nodeValue = out;
   }
 
