@@ -4,6 +4,7 @@
 #include "input/encoder.hpp"
 
 #include "bsp/pins.hpp"
+#include "display/display.hpp"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -35,6 +36,11 @@ TaskHandle_t task_handle = nullptr;
 // drains event_queue. See input::last_activity_ms().
 volatile uint32_t activity_ms = 0;
 
+// A button press that woke the display is consumed completely: the
+// wake-up action must not also activate the corresponding UI function.
+bool suppress_ok_until_release = false;
+bool suppress_back_until_release = false;
+
 uint32_t now_ms()
 {
     return static_cast<uint32_t>(esp_timer_get_time() / 1000);
@@ -55,10 +61,6 @@ void push_event(EventType type, int32_t encoder_delta = 0)
     }
 }
 
-/**
- * @brief Translate a generic Button event into a semantic input event
- *        for a specific physical button, and push it.
- */
 void handle_button_event(ButtonEvent be,
                           EventType down,
                           EventType click,
@@ -92,22 +94,62 @@ void input_task(void* /*arg*/)
     const TickType_t period = pdMS_TO_TICKS(POLL_PERIOD_MS);
 
     while (true) {
+        const bool display_was_off = !display::is_backlight_enabled();
+
         const int32_t delta = encoder.take_delta();
+        const ButtonEvent ok_event = button_ok.poll();
+        const ButtonEvent back_event = button_back.poll();
+
+        if (display_was_off) {
+            const bool input_detected =
+                delta != 0 || ok_event != ButtonEvent::None || back_event != ButtonEvent::None;
+
+            if (input_detected) {
+                // The first physical action after the display timeout is
+                // wake-only. It never reaches the normal UI event queue.
+                display::set_backlight(true);
+                activity_ms = now_ms();
+
+                if (ok_event != ButtonEvent::None) {
+                    suppress_ok_until_release = true;
+                }
+                if (back_event != ButtonEvent::None) {
+                    suppress_back_until_release = true;
+                }
+
+                continue;
+            }
+        }
+
+        // Finish consuming a button gesture that was used only to wake
+        // the display. A new press after release is handled normally.
+        if (suppress_ok_until_release) {
+            if (ok_event == ButtonEvent::Click || ok_event == ButtonEvent::Up) {
+                suppress_ok_until_release = false;
+            }
+        } else if (ok_event != ButtonEvent::None) {
+            handle_button_event(
+                ok_event,
+                EventType::ButtonOkDown, EventType::ButtonOkClick,
+                EventType::ButtonOkLongPress, EventType::ButtonOkRepeat,
+                EventType::ButtonOkUp);
+        }
+
+        if (suppress_back_until_release) {
+            if (back_event == ButtonEvent::Click || back_event == ButtonEvent::Up) {
+                suppress_back_until_release = false;
+            }
+        } else if (back_event != ButtonEvent::None) {
+            handle_button_event(
+                back_event,
+                EventType::ButtonBackDown, EventType::ButtonBackClick,
+                EventType::ButtonBackLongPress, EventType::ButtonBackRepeat,
+                EventType::ButtonBackUp);
+        }
+
         if (delta != 0) {
             push_event(EventType::EncoderRotate, delta);
         }
-
-        handle_button_event(
-            button_ok.poll(),
-            EventType::ButtonOkDown, EventType::ButtonOkClick,
-            EventType::ButtonOkLongPress, EventType::ButtonOkRepeat,
-            EventType::ButtonOkUp);
-
-        handle_button_event(
-            button_back.poll(),
-            EventType::ButtonBackDown, EventType::ButtonBackClick,
-            EventType::ButtonBackLongPress, EventType::ButtonBackRepeat,
-            EventType::ButtonBackUp);
 
         vTaskDelay(period);
     }
