@@ -26,12 +26,13 @@ enum class Language : uint8_t
     Russian,
 };
 
-/// Only "Dark Theme" is specified in docs/ARCHITECTURE.md's Theme
-/// System section -- extend this enum if/when a second theme is
-/// actually designed, don't add speculative options now.
+/// Two themes: Dark (the original, still the default) and Light,
+/// added alongside a real Light palette in ui::theme -- see that
+/// component's own file comment for the palette values themselves.
 enum class Theme : uint8_t
 {
     Dark,
+    Light,
 };
 
 /// REQUIREMENTS 12.2 names "print sequence" without specifying the
@@ -164,6 +165,17 @@ struct WifiSettings
     char sta_password[65] = ""; // WPA2 passphrase: max 63 chars + null terminator
     char ap_ssid[33] = "KeyKeeper2";
     char ap_password[65] = ""; // empty = open AP
+
+    // Whether entering AccessPoint mode also starts wifi::captive_dns
+    // (DNS-hijack) -- see that component's own file comment for the
+    // full mechanism. Defaults ON: this is what makes AP mode
+    // self-explanatory to connect to (a phone/laptop's own "sign in
+    // to this network" prompt pops up automatically) rather than
+    // requiring the person to already know to type in the device's
+    // IP themselves. Off is for anyone who'd rather their AP behave
+    // like a plain, unmodified access point -- e.g. if a specific
+    // client's own captive-portal detection misbehaves against it.
+    bool captive_portal_enabled = true;
 };
 
 // From KeyKeeper 1.90's own password generator, redesigned: 1.90 used

@@ -11,10 +11,11 @@
 // what would make a future second theme (or a user-selectable one)
 // impossible without touching every screen.
 //
-// Only Dark Theme exists (settings::Theme has one value, Theme::Dark)
-// -- current() returns it unconditionally for now. When a second
-// theme is actually designed, switch on settings::all().general.theme
-// here; nothing outside this file should need to change.
+// Two themes now (settings::Theme::Dark/Light) -- current() switches
+// on settings::all().general.theme. Palette values below are a
+// reasonable-looking placeholder pass, not a considered design one
+// (same caveat the ORIGINAL Dark-only palette already carried) --
+// revisit both once there's an actual opinion on visual identity.
 // =============================================================================
 
 namespace ui::theme {

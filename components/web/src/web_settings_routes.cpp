@@ -134,6 +134,7 @@ cJSON* wifi_to_json(const settings::WifiSettings& w)
     cJSON_AddStringToObject(obj, "sta_password", w.sta_password);
     cJSON_AddStringToObject(obj, "ap_ssid", w.ap_ssid);
     cJSON_AddStringToObject(obj, "ap_password", w.ap_password);
+    cJSON_AddBoolToObject(obj, "captive_portal_enabled", w.captive_portal_enabled);
     return obj;
 }
 
@@ -355,6 +356,10 @@ esp_err_t handle_put_wifi(httpd_req_t* req)
     if (ap_pw_item != nullptr && cJSON_IsString(ap_pw_item) && ap_pw_item->valuestring != nullptr) {
         std::strncpy(updated.ap_password, ap_pw_item->valuestring, sizeof(updated.ap_password) - 1);
         updated.ap_password[sizeof(updated.ap_password) - 1] = '\0';
+    }
+    const cJSON* captive_item = cJSON_GetObjectItemCaseSensitive(root, "captive_portal_enabled");
+    if (captive_item != nullptr && cJSON_IsBool(captive_item)) {
+        updated.captive_portal_enabled = cJSON_IsTrue(captive_item);
     }
     cJSON_Delete(root);
 

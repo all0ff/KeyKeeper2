@@ -50,6 +50,7 @@ void WifiSettingsScreen::initialize(lv_obj_t* content_parent)
     std::strncpy(sta_password_, w.sta_password, sizeof(sta_password_) - 1);
     std::strncpy(ap_ssid_, w.ap_ssid, sizeof(ap_ssid_) - 1);
     std::strncpy(ap_password_, w.ap_password, sizeof(ap_password_) - 1);
+    captive_portal_enabled_ = w.captive_portal_enabled;
     std::strncpy(secret_word_, settings::all().security.secret_word, sizeof(secret_word_) - 1);
 
     build_rows(content_parent_);
@@ -155,6 +156,10 @@ void WifiSettingsScreen::render_rows()
                 lv_label_set_text_fmt(row_labels_[i], "%sAP Password: %s", prefix,
                                        ap_password_[0] == '\0' ? "(open)" : "********");
                 break;
+            case Row::CaptivePortal:
+                lv_label_set_text_fmt(row_labels_[i], "%sCaptive Portal: %s", prefix,
+                                       captive_portal_enabled_ ? "on" : "off");
+                break;
             case Row::SecretWord:
                 lv_label_set_text_fmt(row_labels_[i], "%sSecret Word: %s", prefix,
                                        secret_word_[0] == '\0' ? "(disabled)" : secret_word_);
@@ -217,6 +222,11 @@ void WifiSettingsScreen::activate()
     }
     if (row == Row::Mode) {
         mode_ = Mode::Adjust;
+        render_rows();
+        return;
+    }
+    if (row == Row::CaptivePortal) {
+        captive_portal_enabled_ = !captive_portal_enabled_;
         render_rows();
         return;
     }
@@ -289,6 +299,7 @@ void WifiSettingsScreen::save()
     std::strncpy(updated.sta_password, sta_password_, sizeof(updated.sta_password) - 1);
     std::strncpy(updated.ap_ssid, ap_ssid_, sizeof(updated.ap_ssid) - 1);
     std::strncpy(updated.ap_password, ap_password_, sizeof(updated.ap_password) - 1);
+    updated.captive_portal_enabled = captive_portal_enabled_;
 
     if (!settings::set_wifi(updated)) {
         lv_label_set_text(status_label_, "Save failed");

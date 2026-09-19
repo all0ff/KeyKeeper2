@@ -204,6 +204,11 @@ bool start_access_point(const settings::WifiSettings& cfg)
     current_state = ConnectionState::ApRunning;
     publish(WifiEventId::ApStarted);
 
+    if (!cfg.captive_portal_enabled) {
+        ESP_LOGI(TAG, "Captive portal disabled in settings -- AP running as a plain access point");
+        return true;
+    }
+
     // Makes the AP self-explanatory to connect to -- see
     // captive_dns.hpp's own file comment for the full mechanism (DNS
     // hijack here + web_service.cpp's wildcard HTTP redirect). Not a

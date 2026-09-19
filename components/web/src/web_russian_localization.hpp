@@ -81,6 +81,7 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "AP SSID": "SSID точки доступа",
     "AP Password": "Пароль точки доступа",
     "Save Wi-Fi": "Сохранить Wi-Fi",
+    "Captive Portal (Access Point mode only)": "Captive Portal (только режим точки доступа)",
     "Password Generator": "Генератор паролей",
     "Password Gen": "Генератор паролей",
     "System": "Система",

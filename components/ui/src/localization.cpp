@@ -30,6 +30,8 @@ struct Strings {
     const char* russian;
     const char* off;
     const char* save_failed;
+    const char* dark;
+    const char* light;
 };
 
 constexpr Strings EN = {
@@ -37,7 +39,7 @@ constexpr Strings EN = {
     "General", "Language", "Theme", "Brightness", "Screen Timeout", "Save",
     "ROTATE  Select", "OK  Open", "BACK  Return", "ROTATE  Change",
     "OK/BACK  Confirm", "OK  Open    BACK  Cancel", "English", "Russian", "off",
-    "Save failed"
+    "Save failed", "Dark", "Light"
 };
 
 constexpr Strings RU = {
@@ -45,7 +47,7 @@ constexpr Strings RU = {
     "Общие", "Язык", "Тема", "Яркость", "Тайм-аут экрана", "Сохранить",
     "ПОВОРОТ  Выбор", "OK  Открыть", "НАЗАД  Возврат", "ПОВОРОТ  Изменить",
     "OK/НАЗАД  Подтвердить", "OK  Открыть    НАЗАД  Отмена", "English", "Русский", "выкл.",
-    "Ошибка сохранения"
+    "Ошибка сохранения", "Тёмная", "Светлая"
 };
 
 const Strings& strings()
@@ -93,6 +95,8 @@ const char* tr(Key key)
         case Key::Russian: return s.russian;
         case Key::Off: return s.off;
         case Key::SaveFailed: return s.save_failed;
+        case Key::Dark: return s.dark;
+        case Key::Light: return s.light;
     }
 
     return "";

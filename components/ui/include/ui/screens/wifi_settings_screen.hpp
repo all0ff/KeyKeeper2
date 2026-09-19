@@ -40,6 +40,12 @@
 // web::restart() so a changed word takes effect immediately (routes
 // bake the current word in as a literal path prefix at registration
 // time).
+//
+// Captive Portal row (settings::WifiSettings::captive_portal_enabled,
+// default on): toggles whether entering AccessPoint mode also starts
+// wifi::captive_dns -- see that component's own file comment for what
+// it does. Boolean toggle, same OkShort/adjust_value() pattern as
+// AccountEditScreen's Favorite row, not a TextEntry field.
 // =============================================================================
 
 namespace ui::screens {
@@ -62,10 +68,11 @@ private:
         StaPassword,
         ApSsid,
         ApPassword,
+        CaptivePortal,
         SecretWord,
         Save,
     };
-    static constexpr size_t ROW_COUNT = 7;
+    static constexpr size_t ROW_COUNT = 8;
 
     enum class Mode : uint8_t
     {
@@ -101,6 +108,7 @@ private:
     char sta_password_[65]{};
     char ap_ssid_[33]{};
     char ap_password_[65]{};
+    bool captive_portal_enabled_ = true;
     char secret_word_[33]{};
 
     widgets::TextEntry text_entry_;

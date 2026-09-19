@@ -99,8 +99,9 @@ void GeneralSettingsScreen::render()
                                           : i18n::tr(i18n::Key::Russian));
                 break;
             case Row::Theme:
-                lv_label_set_text_fmt(row_labels_[i], "%s%s: Dark", prefix,
-                                      i18n::tr(i18n::Key::Theme));
+                lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, i18n::tr(i18n::Key::Theme),
+                                      theme_ == settings::Theme::Light ? i18n::tr(i18n::Key::Light)
+                                                                        : i18n::tr(i18n::Key::Dark));
                 break;
             case Row::Brightness:
                 lv_label_set_text_fmt(row_labels_[i], "%s%s: %u%%", prefix,
@@ -156,6 +157,7 @@ void GeneralSettingsScreen::adjust_value(int32_t delta)
                                                                      : settings::Language::English;
             break;
         case Row::Theme:
+            theme_ = (theme_ == settings::Theme::Dark) ? settings::Theme::Light : settings::Theme::Dark;
             break;
         case Row::Brightness: {
             int32_t value = static_cast<int32_t>(brightness_) + delta * BRIGHTNESS_STEP;
