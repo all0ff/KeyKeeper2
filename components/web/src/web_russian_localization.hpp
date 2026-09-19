@@ -34,6 +34,8 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Category": "Категория",
     "Favorite": "Избранное",
     "Seed Phrase": "Сид-фраза",
+    "Search login, URL, notes...": "Поиск по логину, URL, заметкам...",
+    "Backup": "Резервная копия",
     "English": "Английский",
     "Russian": "Русский",
     "General": "Общие",
@@ -179,17 +181,16 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
         startObserver();
         return true;
       }
+      // Settings were read successfully and the language is not Russian.
+      // Stop polling; there is no reason to keep hitting the API.
+      return true;
     } catch (_) {
-      // Keep the original English Web UI if settings cannot be read.
+      // Authentication/network failure: retry later.
     }
     return false;
   }
 
   function startLocalization() {
-    // The settings endpoint is protected by authentication. On the
-    // initial page load the user is normally still on the PIN screen,
-    // so a single request would get 401. Retry until Web UI login has
-    // succeeded, then stop the timer and keep the DOM observer active.
     retryTimer = setInterval(async function () {
       if (await applyRussianIfSelected()) {
         clearInterval(retryTimer);
