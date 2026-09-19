@@ -46,6 +46,7 @@ idf_component_register(
         wifi
         rtc_time
         totp
+        imu
         web
         power
         esp_app_format

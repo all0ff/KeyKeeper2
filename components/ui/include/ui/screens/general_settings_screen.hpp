@@ -26,10 +26,14 @@
 // effect immediately) and reverted to the value that was active on
 // entry if you leave without saving.
 //
-// Only Language and Display Brightness/Screen Timeout are
-// meaningfully adjustable today: Theme has exactly one value
-// (Theme::Dark, see settings_types.hpp) so cycling it is a no-op,
-// kept for when a second theme exists rather than removed.
+// Orientation cycles Rotate0 -> Rotate180 -> Auto -> Rotate0. Auto
+// uses components/imu (this board's onboard QMI8658 accelerometer --
+// see that component's own file comment for its current confidence
+// level) to flip automatically; save() starts/stops
+// imu::start_auto_rotate()/stop_auto_rotate() to match, and applies
+// the chosen orientation immediately via lvgl_port::set_rotation()
+// either way, same "see the effect right away" reasoning as
+// Brightness -- not deferred until the NEXT boot.
 // =============================================================================
 
 namespace ui::screens {
@@ -50,11 +54,12 @@ private:
     {
         Language,
         Theme,
+        Orientation,
         Brightness,
         ScreenTimeout,
         Save,
     };
-    static constexpr size_t ROW_COUNT = 5;
+    static constexpr size_t ROW_COUNT = 6;
 
     enum class Mode : uint8_t
     {
@@ -78,6 +83,7 @@ private:
     // Save.
     settings::Language language_ = settings::Language::English;
     settings::Theme theme_ = settings::Theme::Dark;
+    settings::Orientation orientation_ = settings::Orientation::Rotate0;
     uint8_t brightness_ = 0;
     uint32_t screen_timeout_s_ = 0;
 

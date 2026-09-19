@@ -35,6 +35,21 @@ enum class Theme : uint8_t
     Light,
 };
 
+/// Screen orientation. Auto uses components/imu (the board's onboard
+/// QMI8658 accelerometer, confirmed present on this exact board) to
+/// flip automatically as the device is physically turned -- see that
+/// component's own file comment for what "flipped" means and its
+/// current confidence level (the exact axis/sign QMI8658 reports for
+/// a 180-degree flip on THIS board hasn't been verified against real
+/// hardware yet). Rotate0/Rotate180 work regardless of whether an IMU
+/// is even present.
+enum class Orientation : uint8_t
+{
+    Rotate0,
+    Rotate180,
+    Auto,
+};
+
 /// REQUIREMENTS 12.2 names "print sequence" without specifying the
 /// exact options -- placeholder, see README.md.
 enum class TypingOrder : uint8_t
@@ -84,6 +99,7 @@ struct GeneralSettings
 {
     Language language = Language::English;
     Theme theme = Theme::Dark;
+    Orientation orientation = Orientation::Rotate0;
     uint8_t display_brightness = 80; // 0-100
     uint32_t display_off_timeout_s = 30;
 };

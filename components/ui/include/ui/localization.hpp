@@ -30,6 +30,10 @@ enum class Key : uint8_t {
     SaveFailed,
     Dark,
     Light,
+    Orientation,
+    Rotate0,
+    Rotate180,
+    Auto,
 };
 
 void set_language(settings::Language language);

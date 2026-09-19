@@ -32,6 +32,10 @@ struct Strings {
     const char* save_failed;
     const char* dark;
     const char* light;
+    const char* orientation;
+    const char* rotate0;
+    const char* rotate180;
+    const char* auto_;
 };
 
 constexpr Strings EN = {
@@ -39,7 +43,7 @@ constexpr Strings EN = {
     "General", "Language", "Theme", "Brightness", "Screen Timeout", "Save",
     "ROTATE  Select", "OK  Open", "BACK  Return", "ROTATE  Change",
     "OK/BACK  Confirm", "OK  Open    BACK  Cancel", "English", "Russian", "off",
-    "Save failed", "Dark", "Light"
+    "Save failed", "Dark", "Light", "Orientation", "0\u00b0", "180\u00b0", "Auto"
 };
 
 constexpr Strings RU = {
@@ -47,7 +51,7 @@ constexpr Strings RU = {
     "Общие", "Язык", "Тема", "Яркость", "Тайм-аут экрана", "Сохранить",
     "ПОВОРОТ  Выбор", "OK  Открыть", "НАЗАД  Возврат", "ПОВОРОТ  Изменить",
     "OK/НАЗАД  Подтвердить", "OK  Открыть    НАЗАД  Отмена", "English", "Русский", "выкл.",
-    "Ошибка сохранения", "Тёмная", "Светлая"
+    "Ошибка сохранения", "Тёмная", "Светлая", "Ориентация", "0\u00b0", "180\u00b0", "Авто"
 };
 
 const Strings& strings()
@@ -97,6 +101,10 @@ const char* tr(Key key)
         case Key::SaveFailed: return s.save_failed;
         case Key::Dark: return s.dark;
         case Key::Light: return s.light;
+        case Key::Orientation: return s.orientation;
+        case Key::Rotate0: return s.rotate0;
+        case Key::Rotate180: return s.rotate180;
+        case Key::Auto: return s.auto_;
     }
 
     return "";

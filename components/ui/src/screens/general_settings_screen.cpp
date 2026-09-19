@@ -5,6 +5,8 @@
 #include "ui/ui_manager.hpp"
 
 #include "display/display.hpp"
+#include "display/lvgl_port.hpp"
+#include "imu/imu.hpp"
 #include "settings/settings.hpp"
 
 #include "esp_log.h"
@@ -43,6 +45,7 @@ void GeneralSettingsScreen::initialize(lv_obj_t* content_parent)
     const settings::GeneralSettings& g = settings::all().general;
     language_ = g.language;
     theme_ = g.theme;
+    orientation_ = g.orientation;
     brightness_ = g.display_brightness;
     screen_timeout_s_ = g.display_off_timeout_s;
     original_brightness_ = g.display_brightness;
@@ -103,6 +106,13 @@ void GeneralSettingsScreen::render()
                                       theme_ == settings::Theme::Light ? i18n::tr(i18n::Key::Light)
                                                                         : i18n::tr(i18n::Key::Dark));
                 break;
+            case Row::Orientation: {
+                const char* value = i18n::tr(i18n::Key::Rotate0);
+                if (orientation_ == settings::Orientation::Rotate180) value = i18n::tr(i18n::Key::Rotate180);
+                if (orientation_ == settings::Orientation::Auto) value = i18n::tr(i18n::Key::Auto);
+                lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, i18n::tr(i18n::Key::Orientation), value);
+                break;
+            }
             case Row::Brightness:
                 lv_label_set_text_fmt(row_labels_[i], "%s%s: %u%%", prefix,
                                       i18n::tr(i18n::Key::Brightness),
@@ -159,6 +169,13 @@ void GeneralSettingsScreen::adjust_value(int32_t delta)
         case Row::Theme:
             theme_ = (theme_ == settings::Theme::Dark) ? settings::Theme::Light : settings::Theme::Dark;
             break;
+        case Row::Orientation:
+            switch (orientation_) {
+                case settings::Orientation::Rotate0: orientation_ = settings::Orientation::Rotate180; break;
+                case settings::Orientation::Rotate180: orientation_ = settings::Orientation::Auto; break;
+                case settings::Orientation::Auto: orientation_ = settings::Orientation::Rotate0; break;
+            }
+            break;
         case Row::Brightness: {
             int32_t value = static_cast<int32_t>(brightness_) + delta * BRIGHTNESS_STEP;
             if (value < 0) value = 0;
@@ -195,12 +212,31 @@ void GeneralSettingsScreen::save()
     settings::GeneralSettings updated = settings::all().general;
     updated.language = language_;
     updated.theme = theme_;
+    updated.orientation = orientation_;
     updated.display_brightness = brightness_;
     updated.display_off_timeout_s = screen_timeout_s_;
 
     if (settings::set_general(updated)) {
         saved_ = true;
         i18n::set_language(language_);
+
+        // Applied right away, same "see the effect immediately"
+        // reasoning as Brightness above -- not deferred until the
+        // next boot.
+        if (orientation_ == settings::Orientation::Auto) {
+            if (!imu::start_auto_rotate()) {
+                // No IMU found (or this board revision doesn't have
+                // one) -- Auto was selectable regardless (see this
+                // screen's own header comment), so fall back to the
+                // normal orientation rather than silently doing
+                // nothing.
+                lvgl_port::set_rotation(false);
+            }
+        } else {
+            imu::stop_auto_rotate();
+            lvgl_port::set_rotation(orientation_ == settings::Orientation::Rotate180);
+        }
+
         ESP_LOGI(TAG, "General settings saved");
         manager().pop();
     } else {

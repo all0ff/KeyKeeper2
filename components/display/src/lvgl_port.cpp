@@ -241,4 +241,14 @@ void unlock()
     xSemaphoreGiveRecursive(lvgl_mutex);
 }
 
+void set_rotation(bool flipped)
+{
+    if (lv_disp == nullptr) {
+        return;
+    }
+    lock();
+    lv_display_set_rotation(lv_disp, flipped ? LV_DISPLAY_ROTATION_180 : LV_DISPLAY_ROTATION_0);
+    unlock();
+}
+
 } // namespace lvgl_port

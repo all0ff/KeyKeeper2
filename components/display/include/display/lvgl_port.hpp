@@ -43,4 +43,22 @@ void lock();
  */
 void unlock();
 
+/**
+ * @brief Flip the rendered UI 180 degrees (or back to normal) WITHOUT
+ *        touching the panel's own fixed electrical configuration
+ *        (display::internal::Panel's offset_rotation -- a physical
+ *        wiring characteristic of this exact board, not something
+ *        that should change at runtime). LVGL renders into the same
+ *        framebuffer either way; this only changes which end of it
+ *        is "up".
+ *
+ * Takes the LVGL lock itself -- safe to call from any task, including
+ * imu::'s own auto-rotate polling task, not just the LVGL task.
+ *
+ * @param flipped true for 180 degrees, false for the normal
+ *                 orientation this board's reference config was
+ *                 verified against.
+ */
+void set_rotation(bool flipped);
+
 } // namespace lvgl_port

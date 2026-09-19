@@ -21,6 +21,7 @@ idf_component_register(
         usb
         wifi
         rtc_time
+        imu
         web
         ui
         esp_timer

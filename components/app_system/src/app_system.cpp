@@ -3,6 +3,7 @@
 #include "bsp/bsp.hpp"
 #include "display/display.hpp"
 #include "display/lvgl_port.hpp"
+#include "imu/imu.hpp"
 #include "event_bus/event_bus.hpp"
 #include "input/input.hpp"
 #include "interfaces/status/system_status.hpp"
@@ -472,6 +473,26 @@ bool init()
      */
     if (!initialize_settings()) {
         return false;
+    }
+
+    // IMU + orientation -- folded in right here rather than getting
+    // its own BootStage, same reasoning as rtc_time:: (see
+    // initialize_wifi()'s own comment) -- lightweight, and tightly
+    // coupled to what it's immediately used for (applying the saved
+    // settings::GeneralSettings::orientation). Not a hard failure if
+    // no IMU is found (see imu::init()'s own comment) -- manual
+    // 0/180 orientation still works either way, only Auto becomes
+    // unavailable.
+    imu::init();
+    {
+        const settings::Orientation orientation = settings::all().general.orientation;
+        if (orientation == settings::Orientation::Auto) {
+            if (!imu::start_auto_rotate()) {
+                lvgl_port::set_rotation(false);
+            }
+        } else {
+            lvgl_port::set_rotation(orientation == settings::Orientation::Rotate180);
+        }
     }
 
     /*
