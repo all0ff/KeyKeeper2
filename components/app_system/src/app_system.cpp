@@ -3,6 +3,7 @@
 #include "bsp/bsp.hpp"
 #include "display/display.hpp"
 #include "display/lvgl_port.hpp"
+#include "imu/imu.hpp"
 #include "event_bus/event_bus.hpp"
 #include "input/input.hpp"
 #include "interfaces/status/system_status.hpp"
@@ -280,10 +281,27 @@ bool initialize_wifi()
         return false;
     }
 
+    // rtc_time::init() must come AFTER wifi::init(), not before --
+    // real bug, confirmed on real hardware: wifi::init() is what
+    // actually calls esp_netif_init() + esp_event_loop_create_default(),
+    // and rtc_time::init()'s own esp_event_handler_register() call
+    // needs that default event loop to already exist. Called first
+    // (the original ordering here), it failed outright every boot
+    // ("Failed to register SNTP sync event handler" in the serial
+    // log) -- not fatal on its own (TOTP just silently stayed
+    // unavailable, matching what totp::generate() reports when
+    // rtc_time::is_synced() is false), but a real, now-fixed defect,
+    // not a design choice.
     if (!rtc_time::init()) {
         logger::error("rtc_time::init() failed -- TOTP codes will be unavailable");
     }
 
+    // Brings up whatever mode was saved from a previous session
+    // (Disabled by default on first boot) -- not a hard failure if
+    // this doesn't succeed (e.g. a saved network is out of range):
+    // wifi::init() itself already succeeded, and the user can retry
+    // or change settings from the WiFi settings screen once one
+    // exists.
     if (!wifi::apply_settings()) {
         logger::error("WiFi apply_settings() did not start the configured mode");
     }
@@ -305,6 +323,10 @@ bool initialize_web()
         return false;
     }
 
+    // Placed after Security/Vault, not right after WiFi: the login
+    // handler's WipeRequired path calls vault::repository::wipe() and
+    // security::pin::wipe() directly, so both must already be ready
+    // before the HTTP server can possibly receive a login request.
     if (!web::start()) {
         logger::error("Web start() failed -- HTTP server not running");
     }
@@ -392,64 +414,161 @@ bool init()
 
     ESP_LOGI(TAG, "KeyKeeper2 system initialization started");
 
+    /*
+     * BSP
+     */
     if (!initialize_bsp()) {
         return false;
     }
 
+    /*
+     * Display
+     */
     if (!initialize_display()) {
         return false;
     }
 
+    /*
+     * LVGL
+     */
     if (!initialize_lvgl()) {
         return false;
     }
 
+    /*
+     * Input
+     */
     if (!initialize_input()) {
         return false;
     }
 
+    /*
+     * Storage must be initialized before Settings and Security.
+     *
+     * Power itself only needs Input, but its final configuration is
+     * derived from persisted security settings. Therefore the actual
+     * power initialization is intentionally performed after Settings.
+     *
+     * The physical dependency remains:
+     *
+     *     Input -> Power
+     *
+     * while the configuration dependency is:
+     *
+     *     Storage -> Settings -> Power
+     */
     if (!initialize_storage()) {
         return false;
     }
 
+    /*
+     * EventBus
+     */
     if (!initialize_event_bus()) {
         return false;
     }
 
+    /*
+     * Settings
+     */
     if (!initialize_settings()) {
         return false;
     }
 
+    // REVERTED -- applying lv_display_set_rotation() here caused a
+    // confirmed, serious regression: blank/dark display after boot
+    // (device otherwise fully functional -- WiFi, HTTP server, the
+    // web UI all worked normally, confirming this was specifically a
+    // rendering-path failure, not a boot hang). Suspected but not yet
+    // confirmed root cause: this display is configured with a
+    // PARTIAL draw buffer ("40-line double buffer", not a full-frame
+    // one -- see lvgl_port.cpp's own init()), and LVGL's software
+    // rotation (lv_display_set_rotation()) typically needs a
+    // full-frame buffer to rotate into before flushing; a partial
+    // buffer can't correctly reassemble a rotated frame across
+    // multiple flush calls. This was called unconditionally at every
+    // boot (even for Rotate0, the default), so it broke the display
+    // for anyone who hadn't touched the new Orientation setting at
+    // all -- not an edge case.
+    //
+    // imu::init() itself is NOT implicated (device still boots and
+    // runs normally otherwise) -- left running, so the sensor is
+    // still detected and settings::GeneralSettings::orientation is
+    // still saved/loaded correctly. Only the actual
+    // lvgl_port::set_rotation() call is removed, here and in
+    // GeneralSettingsScreen's own save() -- both need a real fix
+    // (likely: give lvgl_port a full-frame buffer, or rotate inside
+    // the flush callback instead of via LVGL's own rotation API)
+    // before either is safe to re-enable.
+    imu::init();
+
+    /*
+     * WiFi -- needs settings:: (mode/credentials) and event_bus::
+     * (state-change publishing), both already up by this point.
+     * Deliberately NOT a hard failure gate for anything after it: a
+     * failed connection attempt shouldn't prevent the rest of the
+     * device from working (see initialize_wifi()'s own comment).
+     */
     if (!initialize_wifi()) {
         return false;
     }
 
+    /*
+     * Power
+     */
     if (!initialize_power()) {
         return false;
     }
 
+    /*
+     * Refresh the unified low-level status after the hardware
+     * components are initialized.
+     */
     interfaces::status::refresh();
 
+    /*
+     * Security
+     */
     if (!initialize_security()) {
         return false;
     }
 
+    /*
+     * Vault
+     */
     if (!initialize_vault()) {
         return false;
     }
 
+    /*
+     * Web -- needs security:: and vault:: ready first (the login
+     * handler's automatic-wipe path calls into both directly).
+     */
     if (!initialize_web()) {
         return false;
     }
 
+    /*
+     * USB HID
+     */
     if (!initialize_usb()) {
         return false;
     }
 
+    /*
+     * UI
+     */
     if (!initialize_ui()) {
         return false;
     }
 
+    /*
+     * The device must start locked.
+     *
+     * security::lock::init() already starts in Locked state. We do
+     * not call unlock() here and deliberately do not modify that
+     * state.
+     */
     if (security::lock::state() == security::lock::State::Locked) {
         state::set_runtime(state::RuntimeState::Locked);
     } else {
@@ -458,6 +577,10 @@ bool init()
 
     state::set_ready();
 
+    /*
+     * set_ready() represents application readiness. The runtime state
+     * must remain Locked when the device starts locked.
+     */
     state::set_runtime(
         security::lock::state() == security::lock::State::Locked
             ? state::RuntimeState::Locked
@@ -478,6 +601,10 @@ bool init()
 
     ESP_LOGI(TAG, "KeyKeeper2 system initialization complete");
 
+    /*
+     * Publish BootComplete only after every mandatory component has
+     * reached its initialized state.
+     */
     if (event_bus::is_initialized()) {
         event_bus::Payload payload{};
         event_bus::publish(
@@ -509,6 +636,10 @@ const state::Snapshot& snapshot()
 
 void shutdown()
 {
+    /*
+     * The System layer does not implement sleep/shutdown itself.
+     * Power owns the ESP32 power-management mechanism.
+     */
     power::request_shutdown();
 }
 

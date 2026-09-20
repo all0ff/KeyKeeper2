@@ -171,15 +171,53 @@ bool get_blob(const char* ns, const char* key, void* out, size_t& inout_len)
         return false;
     }
 
-    const esp_err_t err = ::nvs_get_blob(h.get(), key, out, &inout_len);
-
-    if (err != ESP_OK && err != ESP_ERR_NVS_INVALID_LENGTH) {
+    // Query the REAL stored size first, always -- nvs_get_blob()'s
+    // own *length behavior only reliably reports the actual size back
+    // to the caller in two cases: this explicit "out=nullptr" query
+    // mode, or when the caller's buffer was too small (returns
+    // ESP_ERR_NVS_INVALID_LENGTH and updates *length to the size
+    // actually needed). When the caller's buffer is LARGER than what
+    // is actually stored, a direct read still returns ESP_OK, but
+    // *length is NOT shrunk down to the true (smaller) stored size --
+    // confirmed against ESP-IDF's own documented error semantics
+    // ("ESP_ERR_NVS_INVALID_LENGTH if length is not sufficient", only
+    // covering buffer-too-small). Skipping this query step and
+    // reading straight into a same-size-or-bigger buffer -- which is
+    // what this function used to do -- meant a caller like
+    // settings::load_section() comparing the post-read length against
+    // sizeof(T) could never actually detect "the stored blob is a
+    // different (smaller, older) shape than what's being read into
+    // now": the length would silently read back as whatever the
+    // caller's buffer size already was, not the true stored size,
+    // making the size-mismatch check it relies on a no-op. Real
+    // confirmed consequence: a struct field inserted in the MIDDLE of
+    // settings::GeneralSettings (not appended at the end) silently
+    // left later fields (display_brightness in this specific case)
+    // populated from bytes that used to belong to a DIFFERENT field
+    // at the old layout's offset, rather than cleanly falling back to
+    // defaults as intended -- not a hypothetical, this is what
+    // produced a real "brightness=0%, blank screen" boot after such a
+    // change, diagnosed from the affected person's own serial log.
+    size_t stored_len = 0;
+    esp_err_t err = ::nvs_get_blob(h.get(), key, nullptr, &stored_len);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
         return false;
     }
-    // ESP_ERR_NVS_INVALID_LENGTH: inout_len now holds the actual size
-    // the caller needs -- treated as a soft failure, not logged as an
-    // error, since "tell me the real size" is a normal usage pattern
-    // (call once with a null/zero-size buffer to size it, then again).
+    if (err != ESP_OK) {
+        return false;
+    }
+
+    if (stored_len != inout_len) {
+        // Report the true stored size back to the caller (matches
+        // this function's own documented contract) without touching
+        // `out` at all -- a caller like load_section() that requires
+        // an exact match should treat this as "not usable", not
+        // attempt a partial/reinterpreted read.
+        inout_len = stored_len;
+        return false;
+    }
+
+    err = ::nvs_get_blob(h.get(), key, out, &inout_len);
     return err == ESP_OK;
 }
 

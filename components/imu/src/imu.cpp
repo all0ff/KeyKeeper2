@@ -172,7 +172,14 @@ void auto_rotate_task(void* /*arg*/)
             ESP_LOGD(TAG, "accel x=%d y=%d z=%d", x, y, z);
             const bool flipped = decide_flipped(x, y, z);
             if (!have_last || flipped != last_flipped) {
-                lvgl_port::set_rotation(flipped);
+                // lvgl_port::set_rotation() call REMOVED here -- see
+                // app_system.cpp's own comment on the same revert
+                // (confirmed regression: blank/dark display). The
+                // task still runs and still logs raw accel values and
+                // detected flips at ESP_LOGD, which is useful on its
+                // own for verifying decide_flipped()'s axis/sign
+                // guess against real hardware -- it just doesn't
+                // actually rotate anything yet.
                 last_flipped = flipped;
                 have_last = true;
             }
