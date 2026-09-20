@@ -15,6 +15,7 @@ namespace power::internal {
 namespace {
 
 constexpr char TAG[] = "power";
+constexpr uint32_t DIAGNOSTIC_LOG_PERIOD_MS = 5000;
 
 uint32_t now_ms()
 {
@@ -75,12 +76,19 @@ void Manager::task_trampoline(void* arg)
 
 void Manager::task()
 {
+    uint32_t last_logged_timeout_s = UINT32_MAX;
+    bool last_logged_backlight_off = false;
+    uint32_t last_diagnostic_log_ms = now_ms();
+
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(TASK_POLL_MS));
 
         const uint32_t input_activity = input::last_activity_ms();
         const bool activity_advanced = input_activity > last_activity_ms_;
         if (activity_advanced) {
+            ESP_LOGI(TAG, "Input activity advanced: %u -> %u ms",
+                     static_cast<unsigned>(last_activity_ms_),
+                     static_cast<unsigned>(input_activity));
             last_activity_ms_ = input_activity;
         }
 
@@ -92,24 +100,53 @@ void Manager::task()
         // immediately without needing to reinitialize this component.
         const uint32_t display_off_timeout_s = settings::all().general.display_off_timeout_s;
 
+        if (display_off_timeout_s != last_logged_timeout_s) {
+            ESP_LOGI(TAG, "Screen timeout setting: %u s",
+                     static_cast<unsigned>(display_off_timeout_s));
+            last_logged_timeout_s = display_off_timeout_s;
+        }
+
         if (activity_advanced && backlight_off_) {
+            ESP_LOGI(TAG, "Wake from input activity: turning backlight ON");
             display::set_backlight(true);
             backlight_off_ = false;
         } else if (!backlight_off_ && display_off_timeout_s > 0) {
             const uint32_t idle_for = now_ms() - last_activity_ms_;
             if (idle_for >= display_off_timeout_s * 1000u) {
+                ESP_LOGI(TAG, "Screen timeout reached: idle=%u ms, turning backlight OFF",
+                         static_cast<unsigned>(idle_for));
                 display::set_backlight(false);
                 backlight_off_ = true;
             }
+        }
+
+        const uint32_t now = now_ms();
+        if (now - last_diagnostic_log_ms >= DIAGNOSTIC_LOG_PERIOD_MS) {
+            const uint32_t idle_for = now - last_activity_ms_;
+            ESP_LOGI(TAG,
+                     "Screen diagnostic: timeout=%u s, idle=%u ms, backlight_off=%s, activity=%u ms",
+                     static_cast<unsigned>(display_off_timeout_s),
+                     static_cast<unsigned>(idle_for),
+                     backlight_off_ ? "true" : "false",
+                     static_cast<unsigned>(last_activity_ms_));
+            last_diagnostic_log_ms = now;
+        }
+
+        if (backlight_off_ != last_logged_backlight_off) {
+            ESP_LOGI(TAG, "Logical backlight state changed: off=%s",
+                     backlight_off_ ? "true" : "false");
+            last_logged_backlight_off = backlight_off_;
         }
     }
 }
 
 void Manager::notify_activity()
 {
+    ESP_LOGI(TAG, "notify_activity() called");
     last_activity_ms_ = now_ms();
 
     if (backlight_off_) {
+        ESP_LOGI(TAG, "notify_activity(): turning backlight ON");
         display::set_backlight(true);
         backlight_off_ = false;
     }
