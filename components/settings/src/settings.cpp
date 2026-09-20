@@ -75,7 +75,29 @@ bool init()
     if (!load_section("general", current.general)) {
         current.general = GeneralSettings{};
         ESP_LOGI(TAG, "Using default General settings");
+    } else if (static_cast<uint8_t>(current.general.orientation) >
+               static_cast<uint8_t>(Orientation::Auto)) {
+        // Migration from the pre-orientation GeneralSettings layout.
+        // The old layout was:
+        //   language, theme, display_brightness, [padding], timeout
+        // The new layout inserted orientation before brightness, but the
+        // overall struct size stayed the same. Consequently an old saved
+        // blob passes the size check: its old brightness byte is read as
+        // orientation, while its old padding byte is read as brightness.
+        const uint8_t legacy_brightness =
+            static_cast<uint8_t>(current.general.orientation);
+
+        current.general.orientation = Orientation::Rotate0;
+        current.general.display_brightness = legacy_brightness;
+
+        if (!save_section("general", current.general)) {
+            ESP_LOGW(TAG, "Failed to persist migrated General settings");
+        } else {
+            ESP_LOGI(TAG, "Migrated General settings from pre-orientation layout (brightness=%u%%)",
+                     static_cast<unsigned>(current.general.display_brightness));
+        }
     }
+
     if (!load_section("usb", current.usb)) {
         current.usb = UsbSettings{};
         ESP_LOGI(TAG, "Using default USB settings");
