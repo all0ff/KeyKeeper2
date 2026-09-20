@@ -73,7 +73,11 @@ private:
     State state_ = State::Active;
 
     uint32_t last_activity_ms_ = 0;
-    bool backlight_off_ = false; // screen-timeout state -- see power.hpp's file comment
+    // No separate backlight_off_ tracked here anymore -- see task()'s
+    // own comment in power_manager.cpp: display::is_backlight_enabled()
+    // is asked directly instead, removing a second copy of the same
+    // state that could (and, confirmed on real hardware, did) desync
+    // from it.
 
     CallbackSlot callbacks_[MAX_CALLBACKS]{};
 
