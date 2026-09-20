@@ -182,6 +182,14 @@ void GeneralSettingsScreen::adjust_value(int32_t delta)
             if (value > 100) value = 100;
             brightness_ = static_cast<uint8_t>(value);
             display::set_brightness(brightness_);
+            // DIAGNOSTIC -- confirms both what this screen THINKS it
+            // just set and what display:: reports back right after,
+            // in one line -- if these two numbers ever disagree, or
+            // this line doesn't appear at all while rotating on this
+            // row, that directly narrows down where "brightness isn't
+            // syncing live" actually breaks, instead of guessing.
+            ESP_LOGI(TAG, "Brightness adjust: set %u%%, display::brightness() now reads %u%%",
+                     static_cast<unsigned>(brightness_), static_cast<unsigned>(display::brightness()));
             break;
         }
         case Row::ScreenTimeout: {

@@ -75,8 +75,11 @@ void Manager::task_trampoline(void* arg)
 
 void Manager::task()
 {
+    uint32_t poll_count = 0;
+
     while (true) {
         vTaskDelay(pdMS_TO_TICKS(TASK_POLL_MS));
+        ++poll_count;
 
         const uint32_t input_activity = input::last_activity_ms();
         const bool activity_advanced = input_activity > last_activity_ms_;
@@ -91,6 +94,22 @@ void Manager::task()
         // captured once at init(), so a settings change takes effect
         // immediately without needing to reinitialize this component.
         const uint32_t display_off_timeout_s = settings::all().general.display_off_timeout_s;
+        const uint32_t idle_for = now_ms() - last_activity_ms_;
+
+        // DIAGNOSTIC -- every ~2s (10 polls at TASK_POLL_MS=200) while
+        // idle-tracking is even possible (timeout > 0 and not already
+        // asleep), so a captured log directly shows whether this loop
+        // is running at all and what it sees, rather than needing to
+        // infer that from silence. Safe to leave in -- one line every
+        // 2s is negligible, and it directly disproves or confirms
+        // "the timeout check never runs" the next time this needs
+        // diagnosing.
+        if (display_off_timeout_s > 0 && !display::is_asleep() && (poll_count % 10) == 0) {
+            ESP_LOGI(TAG, "idle_for=%lums threshold=%lums asleep=%d",
+                     static_cast<unsigned long>(idle_for),
+                     static_cast<unsigned long>(display_off_timeout_s) * 1000UL,
+                     static_cast<int>(display::is_asleep()));
+        }
 
         // display::is_asleep() (NOT is_backlight_enabled()) is asked
         // here -- a real, confirmed bug on actual hardware came from
@@ -109,10 +128,13 @@ void Manager::task()
         // input:: 's own wake-detection touch, so a brightness of 0
         // can no longer be mistaken for idle-sleep.
         if (activity_advanced && display::is_asleep()) {
+            ESP_LOGI(TAG, "Activity while asleep -- waking display");
             display::set_asleep(false);
         } else if (!display::is_asleep() && display_off_timeout_s > 0) {
-            const uint32_t idle_for = now_ms() - last_activity_ms_;
             if (idle_for >= display_off_timeout_s * 1000u) {
+                ESP_LOGI(TAG, "Idle for %lums >= %lums threshold -- putting display to sleep",
+                         static_cast<unsigned long>(idle_for),
+                         static_cast<unsigned long>(display_off_timeout_s) * 1000UL);
                 display::set_asleep(true);
             }
         }
