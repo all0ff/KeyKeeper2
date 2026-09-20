@@ -24,6 +24,21 @@
 
 namespace app_system {
 
+// DIAGNOSTIC -- set true, rebuild, and reflash to skip USB HID
+// entirely (usb::init() never runs) while investigating anything that
+// needs an UNINTERRUPTED serial log across the point where USB
+// normally re-enumerates from plain CDC to composite CDC+HID -- that
+// re-enumeration is what makes idf.py monitor visibly drop and
+// reconnect at "Boot stage: USB" on every normal boot (a real,
+// separate, already-understood quirk of this board's single USB
+// peripheral serving both roles -- not a bug), which briefly loses
+// whatever log lines happen to print right around it. Sending a
+// password or TOTP code over USB obviously won't work while this is
+// true. Meant to be flipped back to false again once whatever's being
+// investigated is done -- not a permanent setting, so it's a
+// constexpr here rather than a proper settings::/Kconfig option.
+constexpr bool DIAGNOSTIC_SKIP_USB_HID = true;
+
 namespace {
 
 constexpr char TAG[] = "system";
@@ -372,6 +387,12 @@ bool initialize_usb()
 {
     state::set_boot_stage(state::BootStage::Usb);
     logger::boot_stage("USB");
+
+    if (DIAGNOSTIC_SKIP_USB_HID) {
+        ESP_LOGW(TAG, "DIAGNOSTIC_SKIP_USB_HID is true -- usb::init() skipped, "
+                       "Print/Generate&Type actions will not work until this is flipped back");
+        return true;
+    }
 
     if (!usb::init()) {
         report_failure(

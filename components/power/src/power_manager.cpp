@@ -92,28 +92,28 @@ void Manager::task()
         // immediately without needing to reinitialize this component.
         const uint32_t display_off_timeout_s = settings::all().general.display_off_timeout_s;
 
-        // display::is_backlight_enabled() is the ONLY tracked "is the
-        // backlight on" state now -- this used to keep its own
-        // parallel backlight_off_ member, but that could desync from
-        // reality: input::'s own "consume first input after timeout"
-        // handling (input.cpp) calls display::set_backlight(true)
-        // DIRECTLY when it detects input on an off display, bypassing
-        // this Manager entirely. With a separate backlight_off_ here,
-        // that left a window where display.cpp's own state said "on"
-        // but this Manager's copy still said "off" until its next
-        // poll happened to catch up via activity_advanced -- and if
-        // that catch-up ever failed to happen for any reason, this
-        // branch would never fire again (thinking the backlight was
-        // ALREADY off), permanently breaking screen-timeout, which is
-        // exactly the confirmed real symptom this was diagnosed from.
-        // Asking display.cpp directly here removes the second copy
-        // entirely, so there's nothing left to desync.
-        if (activity_advanced && !display::is_backlight_enabled()) {
-            display::set_backlight(true);
-        } else if (display::is_backlight_enabled() && display_off_timeout_s > 0) {
+        // display::is_asleep() (NOT is_backlight_enabled()) is asked
+        // here -- a real, confirmed bug on actual hardware came from
+        // using the brightness-derived is_backlight_enabled() for
+        // this: setting Brightness to exactly 0 via General Settings
+        // (legitimate, nothing to do with idle timeout) also made
+        // THAT function return false, which made this exact branch
+        // think the screen was already "asleep" from the very first
+        // poll after that, so idle-timeout's own check (the other
+        // branch below) never even ran again -- see
+        // display::is_backlight_enabled()'s own comment for the full
+        // chain, including how it ALSO permanently broke input
+        // (every action treated as a wake-only gesture, never
+        // reaching the UI). is_asleep() is a separate,
+        // brightness-independent flag that only this Manager and
+        // input:: 's own wake-detection touch, so a brightness of 0
+        // can no longer be mistaken for idle-sleep.
+        if (activity_advanced && display::is_asleep()) {
+            display::set_asleep(false);
+        } else if (!display::is_asleep() && display_off_timeout_s > 0) {
             const uint32_t idle_for = now_ms() - last_activity_ms_;
             if (idle_for >= display_off_timeout_s * 1000u) {
-                display::set_backlight(false);
+                display::set_asleep(true);
             }
         }
     }
@@ -123,8 +123,8 @@ void Manager::notify_activity()
 {
     last_activity_ms_ = now_ms();
 
-    if (!display::is_backlight_enabled()) {
-        display::set_backlight(true);
+    if (display::is_asleep()) {
+        display::set_asleep(false);
     }
 }
 

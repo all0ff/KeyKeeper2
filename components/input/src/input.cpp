@@ -94,7 +94,19 @@ void input_task(void* /*arg*/)
     const TickType_t period = pdMS_TO_TICKS(POLL_PERIOD_MS);
 
     while (true) {
-        const bool display_was_off = !display::is_backlight_enabled();
+        // display::is_asleep() (NOT is_backlight_enabled()) -- see
+        // display.hpp's own comment on is_backlight_enabled() for a
+        // real, confirmed bug this used to cause: setting Brightness
+        // to exactly 0 via General Settings also made
+        // is_backlight_enabled() return false, indistinguishable from
+        // an idle-timeout sleep, and this wake-handling code restoring
+        // brightness on "wake" restored it to that SAME 0 -- so it
+        // never looked awake again, and EVERY subsequent action got
+        // treated as a wake-only gesture forever, never reaching the
+        // UI event queue at all. is_asleep() is a separate,
+        // brightness-independent flag only power_manager::Manager and
+        // this wake-detection touch.
+        const bool display_was_off = display::is_asleep();
 
         const int32_t delta = encoder.take_delta();
         const ButtonEvent ok_event = button_ok.poll();
@@ -107,7 +119,7 @@ void input_task(void* /*arg*/)
             if (input_detected) {
                 // The first physical action after the display timeout is
                 // wake-only. It never reaches the normal UI event queue.
-                display::set_backlight(true);
+                display::set_asleep(false);
                 activity_ms = now_ms();
 
                 if (ok_event != ButtonEvent::None) {

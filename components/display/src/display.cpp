@@ -17,6 +17,10 @@ constexpr char TAG[] = "display";
 bool initialized = false;
 uint8_t current_brightness = 100;
 bool backlight_enabled = false;
+// Deliberately separate from backlight_enabled/current_brightness --
+// see set_asleep()'s own comment for why the two must not be
+// conflated.
+bool asleep = false;
 
 /*
  * Logical (post-rotation) config exposed to the rest of the firmware.
@@ -192,6 +196,20 @@ void set_backlight(bool enabled)
 bool is_backlight_enabled()
 {
     return backlight_enabled;
+}
+
+void set_asleep(bool value)
+{
+    if (asleep == value) {
+        return;
+    }
+    asleep = value;
+    set_backlight(!value);
+}
+
+bool is_asleep()
+{
+    return asleep;
 }
 
 void set_brightness(uint8_t percent)
