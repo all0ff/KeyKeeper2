@@ -73,21 +73,27 @@ bool init()
     }
 
     if (!load_section("general", current.general)) {
+        current.general = GeneralSettings{};
         ESP_LOGI(TAG, "Using default General settings");
     }
     if (!load_section("usb", current.usb)) {
+        current.usb = UsbSettings{};
         ESP_LOGI(TAG, "Using default USB settings");
     }
     if (!load_section("security", current.security)) {
+        current.security = SecuritySettings{};
         ESP_LOGI(TAG, "Using default Security settings");
     }
     if (!load_section("gui", current.gui)) {
+        current.gui = GuiSettings{};
         ESP_LOGI(TAG, "Using default GUI settings");
     }
     if (!load_section("wifi", current.wifi)) {
+        current.wifi = WifiSettings{};
         ESP_LOGI(TAG, "Using default WiFi settings");
     }
     if (!load_section("password_gen", current.password_gen)) {
+        current.password_gen = PasswordGenSettings{};
         ESP_LOGI(TAG, "Using default password generator settings");
     }
 
