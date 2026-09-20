@@ -44,13 +44,23 @@ void lock();
 void unlock();
 
 /**
- * @brief Flip the rendered UI 180 degrees (or back to normal) WITHOUT
- *        touching the panel's own fixed electrical configuration
- *        (display::internal::Panel's offset_rotation -- a physical
- *        wiring characteristic of this exact board, not something
- *        that should change at runtime). LVGL renders into the same
- *        framebuffer either way; this only changes which end of it
- *        is "up".
+ * @brief Flip the screen 180 degrees at the PANEL level (ST7789's own
+ *        MADCTL register, via LovyanGFX's setRotation() on
+ *        display::internal::lcd()) -- NOT LVGL's own software
+ *        rotation (lv_display_set_rotation()), which this function
+ *        used at first and caused a confirmed blank/dark-display
+ *        regression on real hardware, suspected to be this display's
+ *        partial (40-line) LVGL draw buffer being incompatible with
+ *        the full-frame buffer LVGL's software rotation typically
+ *        needs.
+ *
+ * Panel-level rotation sidesteps that: flush_cb() passes LVGL's own
+ * (always unrotated) logical coordinates straight through to
+ * LovyanGFX's setAddrWindow(), which is what actually applies the
+ * panel's CURRENT rotation when translating those coordinates to
+ * physical panel memory -- LVGL itself never needs to know rotation
+ * happened at all, so its partial-buffer flushing is unaffected
+ * either way.
  *
  * Takes the LVGL lock itself -- safe to call from any task, including
  * imu::'s own auto-rotate polling task, not just the LVGL task.

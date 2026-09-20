@@ -475,32 +475,40 @@ bool init()
         return false;
     }
 
-    // REVERTED -- applying lv_display_set_rotation() here caused a
-    // confirmed, serious regression: blank/dark display after boot
-    // (device otherwise fully functional -- WiFi, HTTP server, the
-    // web UI all worked normally, confirming this was specifically a
-    // rendering-path failure, not a boot hang). Suspected but not yet
-    // confirmed root cause: this display is configured with a
-    // PARTIAL draw buffer ("40-line double buffer", not a full-frame
-    // one -- see lvgl_port.cpp's own init()), and LVGL's software
-    // rotation (lv_display_set_rotation()) typically needs a
-    // full-frame buffer to rotate into before flushing; a partial
-    // buffer can't correctly reassemble a rotated frame across
-    // multiple flush calls. This was called unconditionally at every
-    // boot (even for Rotate0, the default), so it broke the display
-    // for anyone who hadn't touched the new Orientation setting at
-    // all -- not an edge case.
+    // lvgl_port::set_rotation() -- re-enabled here after being
+    // reverted (see git history/that function's own comment): the
+    // ORIGINAL implementation used LVGL's own software rotation
+    // (lv_display_set_rotation()), which caused a confirmed
+    // blank/dark-display regression on real hardware, suspected due
+    // to this display's partial (40-line) LVGL draw buffer being
+    // incompatible with the full-frame buffer software rotation
+    // typically needs. Re-implemented to rotate at the PANEL level
+    // instead (ST7789's own MADCTL register, via LovyanGFX) -- LVGL's
+    // own buffering is untouched either way, so this doesn't carry
+    // the same risk. Not yet confirmed on real hardware -- if the
+    // screen goes blank again after this specific change, this call
+    // (and the two others in GeneralSettingsScreen::save() and
+    // imu::'s own auto-rotate task) is exactly what to revert again.
     //
-    // imu::init() itself is NOT implicated (device still boots and
-    // runs normally otherwise) -- left running, so the sensor is
-    // still detected and settings::GeneralSettings::orientation is
-    // still saved/loaded correctly. Only the actual
-    // lvgl_port::set_rotation() call is removed, here and in
-    // GeneralSettingsScreen's own save() -- both need a real fix
-    // (likely: give lvgl_port a full-frame buffer, or rotate inside
-    // the flush callback instead of via LVGL's own rotation API)
-    // before either is safe to re-enable.
+    // IMU + orientation -- folded in right here rather than getting
+    // its own BootStage, same reasoning as rtc_time:: (see
+    // initialize_wifi()'s own comment) -- lightweight, and tightly
+    // coupled to what it's immediately used for (applying the saved
+    // settings::GeneralSettings::orientation). Not a hard failure if
+    // no IMU is found (see imu::init()'s own comment) -- manual
+    // 0/180 orientation still works either way, only Auto becomes
+    // unavailable.
     imu::init();
+    {
+        const settings::Orientation orientation = settings::all().general.orientation;
+        if (orientation == settings::Orientation::Auto) {
+            if (!imu::start_auto_rotate()) {
+                lvgl_port::set_rotation(false);
+            }
+        } else {
+            lvgl_port::set_rotation(orientation == settings::Orientation::Rotate180);
+        }
+    }
 
     /*
      * WiFi -- needs settings:: (mode/credentials) and event_bus::

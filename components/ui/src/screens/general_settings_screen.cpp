@@ -220,17 +220,24 @@ void GeneralSettingsScreen::save()
         saved_ = true;
         i18n::set_language(language_);
 
-        // set_rotation() calls REMOVED here -- see app_system.cpp's
-        // own comment on the same revert for why (confirmed
-        // regression: blank/dark display). imu::start_auto_rotate()/
-        // stop_auto_rotate() are kept -- not implicated, and this
-        // keeps the setting + sensor polling working correctly for
-        // whenever the actual display-rotation call is fixed and
-        // re-enabled.
+        // Applied right away, same "see the effect immediately"
+        // reasoning as Brightness above. lvgl_port::set_rotation()
+        // re-enabled here after a revert -- see that function's own
+        // comment: now rotates at the panel level instead of via
+        // LVGL's own software rotation, which is what caused a
+        // confirmed blank-display regression before.
         if (orientation_ == settings::Orientation::Auto) {
-            imu::start_auto_rotate();
+            if (!imu::start_auto_rotate()) {
+                // No IMU found (or this board revision doesn't have
+                // one) -- Auto was selectable regardless (see this
+                // screen's own header comment), so fall back to the
+                // normal orientation rather than silently doing
+                // nothing.
+                lvgl_port::set_rotation(false);
+            }
         } else {
             imu::stop_auto_rotate();
+            lvgl_port::set_rotation(orientation_ == settings::Orientation::Rotate180);
         }
 
         ESP_LOGI(TAG, "General settings saved");

@@ -10,25 +10,24 @@
 // accelerometer is used here -- for auto-rotate, gravity's direction
 // alone is enough, the gyroscope isn't needed.
 //
-// PINS: GPIO46/GPIO47, confirmed as the only two GPIOs with no
-// assigned function anywhere else on this board (cross-checked
-// against the schematic's own consolidated GPIO/LCD/SD Card/UART/
-// Other table -- every other pin on that table is accounted for by
-// something else already in this firmware; IO19/IO20, which also
-// looked free at first glance, turned out to be the native USB D-/D+
-// pins this project's own USB HID already uses).
+// PINS: SDA=GPIO48, SCL=GPIO47 -- confirmed directly from the
+// schematic's own GPIO summary table, which has a dedicated "IMU"
+// column explicitly naming IMU_SDA/IMU_SCL against these two pins (a
+// clearer copy of the table than an earlier version of this file had
+// access to). IMU_INT1=GPIO13, IMU_INT2=GPIO12 are also on that table
+// but unused here -- polling every ~400ms (see
+// AUTO_ROTATE_POLL_INTERVAL) is more than adequate for orientation,
+// no need for interrupt-driven reads.
 //
-// SDA vs SCL specifically (which of the two is which) could NOT be
-// confirmed from the schematic text extraction -- see init()'s own
-// comment for why, and how this handles that (tries both orderings
-// at boot, keeps whichever one actually gets a response, rather than
-// asking the person to verify this by hand).
+// An earlier version of this file guessed GPIO46/GPIO47 instead (the
+// only two GPIOs with no assigned function on a DIFFERENT,
+// IMU-column-less copy of the summary table) -- confirmed WRONG on
+// real hardware (a "QMI8658 not found" boot warning): GPIO46 is
+// actually LCD_BL, the backlight, not IMU-related at all.
 //
-// I2C address: 0x6B (SA0 high) by convention/default for this exact
-// chip on Waveshare's own similar boards -- confirmed against a
-// Waveshare-board-specific report of exactly this address, not just
-// the chip's own generic default. init() also tries 0x6A (SA0 low)
-// if 0x6B doesn't answer, same reasoning as the pin-order fallback.
+// I2C address: still tries both 0x6B (SA0 high) and 0x6A (SA0 low) --
+// the SA0 strap level wasn't legible even on the clearer schematic,
+// and trying both is cheap regardless.
 // =============================================================================
 
 namespace imu {

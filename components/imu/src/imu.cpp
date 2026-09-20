@@ -199,16 +199,19 @@ bool init()
         return true;
     }
 
-    // Neither which of GPIO46/GPIO47 is SDA vs SCL, nor which I2C
-    // address (0x6B vs 0x6A, i.e. the SA0 pin's strapped level on
-    // this board) could be confirmed from the schematic text
-    // extraction -- see this file's own top comment. Rather than
-    // guess once and silently fail if wrong, every combination is
-    // tried here; whichever one actually answers WHO_AM_I correctly
-    // is kept.
+    // SDA=GPIO48, SCL=GPIO47 -- confirmed directly from the board's
+    // own schematic GPIO summary table (its "IMU" column explicitly
+    // lists IMU_SDA/IMU_SCL against these two pins), not the
+    // process-of-elimination guess an earlier version of this file
+    // made from a table that didn't show an IMU column at all (that
+    // guess -- GPIO46/47 -- was wrong: GPIO46 is actually LCD_BL, the
+    // backlight, confirmed wrong on real hardware by a "QMI8658 not
+    // found" boot-log warning). Still trying both address
+    // possibilities (0x6B/0x6A -- SA0 strap level wasn't legible even
+    // on the clearer schematic) since that's a real, common per-board
+    // choice and cheap to just try both.
     const PinOrder pin_orders[] = {
-        {GPIO_NUM_46, GPIO_NUM_47},
-        {GPIO_NUM_47, GPIO_NUM_46},
+        {GPIO_NUM_48, GPIO_NUM_47},
     };
     const uint8_t addresses[] = {I2C_ADDR_HIGH, I2C_ADDR_LOW};
 
@@ -225,7 +228,7 @@ bool init()
     }
 
     if (!present) {
-        ESP_LOGW(TAG, "QMI8658 not found on GPIO46/47 (tried both pin orders, both I2C addresses) -- "
+        ESP_LOGW(TAG, "QMI8658 not found on GPIO48(SDA)/GPIO47(SCL) (tried both I2C addresses) -- "
                        "auto-rotate will be unavailable");
         return false;
     }

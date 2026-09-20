@@ -247,7 +247,18 @@ void set_rotation(bool flipped)
         return;
     }
     lock();
-    lv_display_set_rotation(lv_disp, flipped ? LV_DISPLAY_ROTATION_180 : LV_DISPLAY_ROTATION_0);
+    // offset_rotation=1 is baked into the panel's own config (see
+    // display.cpp's Panel() constructor) -- LovyanGFX composes that
+    // with whatever's passed to setRotation() here, so 0 lands on the
+    // board's normal effective rotation (1) and 2 lands on its 180-
+    // degree opposite (3), not requiring this function to know the
+    // offset value itself.
+    display::internal::lcd().setRotation(flipped ? 2 : 0);
+    // Nothing is otherwise marked dirty by a pure rotation change --
+    // force a full redraw so the NEXT flush (using the new rotation)
+    // actually happens now, rather than waiting for whatever UI
+    // change would naturally trigger one.
+    lv_obj_invalidate(lv_screen_active());
     unlock();
 }
 
