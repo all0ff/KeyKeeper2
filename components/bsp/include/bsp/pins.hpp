@@ -108,7 +108,19 @@ inline constexpr gpio_num_t LCD_SCLK = GPIO_NUM_40;
 inline constexpr gpio_num_t LCD_DC   = GPIO_NUM_41;
 inline constexpr gpio_num_t LCD_CS   = GPIO_NUM_42;
 inline constexpr gpio_num_t LCD_MOSI = GPIO_NUM_45;
-inline constexpr gpio_num_t LCD_BL   = GPIO_NUM_48;
+inline constexpr gpio_num_t LCD_BL   = GPIO_NUM_46;
+
+// -----------------------------------------------------------------------
+// QMI8658 IMU (owned by components/imu)
+// -----------------------------------------------------------------------
+//
+// Confirmed against the Waveshare ESP32-S3-LCD-1.47B schematic:
+// IMU_SCL = GPIO47, IMU_SDA = GPIO48, INT1 = GPIO13, INT2 = GPIO12.
+// The I2C lines are shared only with the onboard QMI8658.
+inline constexpr gpio_num_t IMU_SCL  = GPIO_NUM_47;
+inline constexpr gpio_num_t IMU_SDA  = GPIO_NUM_48;
+inline constexpr gpio_num_t IMU_INT1 = GPIO_NUM_13;
+inline constexpr gpio_num_t IMU_INT2 = GPIO_NUM_12;
 
 // -----------------------------------------------------------------------
 // UART
