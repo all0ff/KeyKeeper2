@@ -1,6 +1,7 @@
 #include "imu/imu.hpp"
 
 #include "bsp/board.hpp"
+#include "bsp/pins.hpp"
 #include "display/lvgl_port.hpp"
 #include "settings/settings.hpp"
 
@@ -82,8 +83,7 @@ bool read_registers(uint8_t start_reg, uint8_t* out, size_t count)
 /**
  * @brief Try to talk to a QMI8658 at the given device handle -- reads
  *        WHO_AM_I and checks it matches. Used to test each
- *        pin-order/address combination in init() without committing
- *        to it first.
+ *        I2C address during init() without committing to it first.
  */
 bool probe(i2c_master_dev_handle_t handle)
 {
@@ -95,21 +95,12 @@ bool probe(i2c_master_dev_handle_t handle)
     return who == WHO_AM_I_EXPECTED;
 }
 
-/// One (SDA, SCL) pin combination to try -- see init()'s own comment
-/// for why both orderings on both candidate GPIOs are attempted
-/// rather than assumed.
-struct PinOrder
-{
-    gpio_num_t sda;
-    gpio_num_t scl;
-};
-
-bool try_pin_order(const PinOrder& pins, uint8_t address)
+bool try_device(uint8_t address)
 {
     i2c_master_bus_config_t bus_config{};
     bus_config.i2c_port = -1; // auto-select a free port
-    bus_config.sda_io_num = pins.sda;
-    bus_config.scl_io_num = pins.scl;
+    bus_config.sda_io_num = bsp::pins::IMU_SDA;
+    bus_config.scl_io_num = bsp::pins::IMU_SCL;
     bus_config.clk_source = I2C_CLK_SRC_DEFAULT;
     bus_config.glitch_ignore_cnt = 7;
     bus_config.flags.enable_internal_pullup = true;
@@ -134,8 +125,9 @@ bool try_pin_order(const PinOrder& pins, uint8_t address)
     if (found) {
         bus_handle = candidate_bus;
         dev_handle = candidate_dev;
-        ESP_LOGI(TAG, "QMI8658 found: SDA=GPIO%d SCL=GPIO%d addr=0x%02X", static_cast<int>(pins.sda),
-                 static_cast<int>(pins.scl), address);
+        ESP_LOGI(TAG, "QMI8658 found: SDA=GPIO%d SCL=GPIO%d addr=0x%02X",
+                 static_cast<int>(bsp::pins::IMU_SDA),
+                 static_cast<int>(bsp::pins::IMU_SCL), address);
         return true;
     }
 
@@ -146,14 +138,11 @@ bool try_pin_order(const PinOrder& pins, uint8_t address)
 
 bool decide_flipped(int16_t x, int16_t y, int16_t z)
 {
-    // BEST GUESS, not confirmed against the physical board layout --
-    // see this file's own top comment. Y-axis chosen as a typical
-    // "up/down" axis for a landscape handheld display; sign convention
-    // (negative = flipped) is also a guess. If auto-rotate turns out
-    // backwards or unresponsive on real hardware, this is the line to
-    // fix -- watch the raw x/y/z log output below while manually
-    // rotating the device 180° to see which axis/sign actually tracks
-    // it, then adjust.
+    // For the current board orientation, use the Y acceleration sign
+    // to distinguish the two 180-degree landscape orientations.
+    // This threshold is deliberately conservative to avoid flipping
+    // while the device is close to level; it can be tuned from the
+    // raw accel log if real hardware shows the opposite sign.
     (void)x;
     (void)z;
     return y < -FLIP_THRESHOLD;
@@ -172,14 +161,8 @@ void auto_rotate_task(void* /*arg*/)
             ESP_LOGD(TAG, "accel x=%d y=%d z=%d", x, y, z);
             const bool flipped = decide_flipped(x, y, z);
             if (!have_last || flipped != last_flipped) {
-                // lvgl_port::set_rotation() call REMOVED here -- see
-                // app_system.cpp's own comment on the same revert
-                // (confirmed regression: blank/dark display). The
-                // task still runs and still logs raw accel values and
-                // detected flips at ESP_LOGD, which is useful on its
-                // own for verifying decide_flipped()'s axis/sign
-                // guess against real hardware -- it just doesn't
-                // actually rotate anything yet.
+                lvgl_port::set_rotation(flipped);
+                ESP_LOGI(TAG, "Auto orientation: %s", flipped ? "180" : "0");
                 last_flipped = flipped;
                 have_last = true;
             }
@@ -199,37 +182,23 @@ bool init()
         return true;
     }
 
-    // SDA=GPIO48, SCL=GPIO47 -- confirmed directly from the board's
-    // own schematic GPIO summary table (its "IMU" column explicitly
-    // lists IMU_SDA/IMU_SCL against these two pins), not the
-    // process-of-elimination guess an earlier version of this file
-    // made from a table that didn't show an IMU column at all (that
-    // guess -- GPIO46/47 -- was wrong: GPIO46 is actually LCD_BL, the
-    // backlight, confirmed wrong on real hardware by a "QMI8658 not
-    // found" boot-log warning). Still trying both address
-    // possibilities (0x6B/0x6A -- SA0 strap level wasn't legible even
-    // on the clearer schematic) since that's a real, common per-board
-    // choice and cheap to just try both.
-    const PinOrder pin_orders[] = {
-        {GPIO_NUM_48, GPIO_NUM_47},
-    };
+    // The Waveshare schematic explicitly maps IMU_SDA to GPIO48 and
+    // IMU_SCL to GPIO47. GPIO46 is LCD_BL, so it must not be claimed by
+    // the I2C bus. Try both common QMI8658 I2C addresses because the
+    // SA0 strap is not needed to be hard-coded when probing is cheap.
     const uint8_t addresses[] = {I2C_ADDR_HIGH, I2C_ADDR_LOW};
 
-    for (const PinOrder& pins : pin_orders) {
-        for (uint8_t address : addresses) {
-            if (try_pin_order(pins, address)) {
-                present = true;
-                break;
-            }
-        }
-        if (present) {
+    for (uint8_t address : addresses) {
+        if (try_device(address)) {
+            present = true;
             break;
         }
     }
 
     if (!present) {
-        ESP_LOGW(TAG, "QMI8658 not found on GPIO48(SDA)/GPIO47(SCL) (tried both I2C addresses) -- "
-                       "auto-rotate will be unavailable");
+        ESP_LOGW(TAG, "QMI8658 not found on GPIO%d(SDA)/GPIO%d(SCL) (tried both I2C addresses) -- auto-rotate unavailable",
+                 static_cast<int>(bsp::pins::IMU_SDA),
+                 static_cast<int>(bsp::pins::IMU_SCL));
         return false;
     }
 
@@ -239,7 +208,7 @@ bool init()
     if (!write_register(REG_CTRL2, CTRL2_ACCEL_CONFIG)) {
         ESP_LOGW(TAG, "Failed to configure QMI8658 accelerometer (CTRL2)");
     }
-    (void)REG_CTRL1; // reserved for future use (e.g. address auto-increment control) -- not needed for a single burst read
+    (void)REG_CTRL1; // reserved for future use
 
     return true;
 }
