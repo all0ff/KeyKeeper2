@@ -87,14 +87,57 @@ bool PinEntry::on_input(InputAction action)
 {
     switch (action) {
         case InputAction::RotateRight:
-            spin_value_ = static_cast<uint8_t>((spin_value_ + 1) % 10);
-            render();
-            return true;
+        case InputAction::RotateLeft: {
+            const bool this_is_right = (action == InputAction::RotateRight);
 
-        case InputAction::RotateLeft:
-            spin_value_ = (spin_value_ == 0) ? 9 : static_cast<uint8_t>(spin_value_ - 1);
+            if (!cfg_.dial_mode) {
+                spin_value_ = this_is_right ? static_cast<uint8_t>((spin_value_ + 1) % 10)
+                                             : (spin_value_ == 0 ? 9 : static_cast<uint8_t>(spin_value_ - 1));
+                render();
+                return true;
+            }
+
+            // Dial mode -- see this widget's own header comment for
+            // the full interaction model. Expected direction is a
+            // pure function of cursor_ (even slots expect Right, odd
+            // expect Left), not separately tracked state -- so
+            // BackShort (which only changes cursor_) never needs its
+            // own logic to keep this in sync.
+            const bool expect_right = (cursor_ % 2) == 0;
+            const bool is_last_digit = (cursor_ + 1 == cfg_.length);
+            // On dial_mode's last digit with reversal-confirm turned
+            // off (settings::SecuritySettings::dial_last_digit_reverses
+            // == false), that final slot behaves like Standard mode
+            // instead: either direction just spins, an explicit
+            // OkShort (handled below, unchanged either way) confirms
+            // it -- a deliberate, unambiguous "I'm done" gesture
+            // instead of one more direction-reversal.
+            const bool free_spin_last = is_last_digit && !cfg_.dial_last_reverses;
+
+            if (this_is_right == expect_right || free_spin_last) {
+                spin_value_ = this_is_right ? static_cast<uint8_t>((spin_value_ + 1) % 10)
+                                             : (spin_value_ == 0 ? 9 : static_cast<uint8_t>(spin_value_ - 1));
+                render();
+                return true;
+            }
+
+            // Reversal: confirms the CURRENT slot's spun value, same
+            // as OkShort below would, AND this same notch is applied
+            // as the first spin of the NEXT slot (whose expected
+            // direction is exactly this_is_right, the direction that
+            // just triggered this reversal) -- nothing wasted,
+            // matching how reversing a real combination dial feels.
+            buffer_[cursor_] = static_cast<char>('0' + spin_value_);
+            ++cursor_;
+            buffer_[cursor_] = '\0';
+            spin_value_ = this_is_right ? 1 : 9;
+
+            if (cfg_.finish_on_short && cursor_ >= cfg_.length) {
+                finished_ = true;
+            }
             render();
             return true;
+        }
 
         case InputAction::OkShort:
 

@@ -87,9 +87,11 @@ private:
         FactoryReset,
         AutoLock,
         WebUiViewAccounts,
+        PinEntryStyle,
+        DialLastDigit,
         Save,
     };
-    static constexpr size_t ROW_COUNT = 6;
+    static constexpr size_t ROW_COUNT = 8;
 
     enum class Mode : uint8_t
     {
@@ -150,6 +152,12 @@ private:
     ///bool auto_lock_enabled_ = true;
     uint32_t auto_lock_timeout_s_ = 30;
     bool web_ui_view_accounts_ = false;
+    // See settings::SecuritySettings::pin_entry_dial_mode/
+    // dial_last_digit_reverses's own comments, and
+    // widgets::PinEntry's file comment for the full interaction
+    // model these control.
+    bool pin_entry_dial_mode_ = false;
+    bool dial_last_digit_reverses_ = true;
 
     ChangePinStep change_step_ = ChangePinStep::Old;
     widgets::PinEntry pin_entry_;

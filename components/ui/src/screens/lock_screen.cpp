@@ -7,6 +7,7 @@
 
 #include "security/lock_manager.hpp"
 #include "security/pin_manager.hpp"
+#include "settings/settings.hpp"
 #include "vault/vault_repository.hpp"
 
 #include "esp_log.h"
@@ -49,6 +50,8 @@ void LockScreen::initialize(lv_obj_t* content_parent)
     }
     cfg.min_length = cfg.length;
     cfg.finish_on_short = true;
+    cfg.dial_mode = settings::all().security.pin_entry_dial_mode;
+    cfg.dial_last_reverses = settings::all().security.dial_last_digit_reverses;
 
     pin_entry_.init(content_parent, cfg);
 

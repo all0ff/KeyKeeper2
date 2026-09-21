@@ -56,6 +56,8 @@ void SetupPinScreen::initialize(lv_obj_t* content_parent)
     cfg.length = 6;
     cfg.min_length = 4;
     cfg.mask_confirmed = true;
+    cfg.dial_mode = settings::all().security.pin_entry_dial_mode;
+    cfg.dial_last_reverses = settings::all().security.dial_last_digit_reverses;
 
     pin_entry_.init(content_parent, cfg);
     lv_obj_align(pin_entry_.root(), LV_ALIGN_CENTER, 0, -10);

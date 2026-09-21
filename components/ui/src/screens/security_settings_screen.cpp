@@ -81,6 +81,8 @@ void SecuritySettingsScreen::initialize(lv_obj_t* content_parent)
     ///auto_lock_enabled_ = s.auto_lock_enabled;
     auto_lock_timeout_s_ = s.auto_lock_enabled ? s.auto_lock_timeout_s : 0;
     web_ui_view_accounts_ = (s.web_ui_permissions & settings::WEB_UI_VIEW_ACCOUNTS) != 0;
+    pin_entry_dial_mode_ = s.pin_entry_dial_mode;
+    dial_last_digit_reverses_ = s.dial_last_digit_reverses;
 
     build_rows();
 }
@@ -157,6 +159,16 @@ void SecuritySettingsScreen::render_rows()
                                     web_ui_view_accounts_ ? "Allowed" : "Off");
                 break;
 
+            case Row::PinEntryStyle:
+                lv_label_set_text_fmt(row_labels_[i], "%sPIN Entry: %s", prefix,
+                                    pin_entry_dial_mode_ ? "Dial" : "Standard");
+                break;
+
+            case Row::DialLastDigit:
+                lv_label_set_text_fmt(row_labels_[i], "%sDial Last Digit: %s", prefix,
+                                    dial_last_digit_reverses_ ? "Reverse" : "OkShort");
+                break;
+
             case Row::Save:
                 lv_label_set_text_fmt(row_labels_[i], "%sSave", prefix);
                 
@@ -213,6 +225,14 @@ void SecuritySettingsScreen::adjust_value(int32_t delta)
             web_ui_view_accounts_ = !web_ui_view_accounts_;
             break;
 
+        case Row::PinEntryStyle:
+            pin_entry_dial_mode_ = !pin_entry_dial_mode_;
+            break;
+
+        case Row::DialLastDigit:
+            dial_last_digit_reverses_ = !dial_last_digit_reverses_;
+            break;
+
         default:
             break;
     }
@@ -258,6 +278,8 @@ void SecuritySettingsScreen::save()
     updated.auto_lock_timeout_s = auto_lock_timeout_s_;
     updated.web_ui_permissions =
         web_ui_view_accounts_ ? settings::WEB_UI_VIEW_ACCOUNTS : settings::WEB_UI_NONE;
+    updated.pin_entry_dial_mode = pin_entry_dial_mode_;
+    updated.dial_last_digit_reverses = dial_last_digit_reverses_;
 
     if (settings::set_security(updated)) {
         ESP_LOGI(TAG, "Security settings saved");

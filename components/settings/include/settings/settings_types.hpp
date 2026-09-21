@@ -150,6 +150,27 @@ struct SecuritySettings
     uint32_t auto_lock_timeout_s = 30;
     uint32_t web_ui_permissions = WEB_UI_VIEW_ACCOUNTS;
 
+    // Combination-lock-style PIN entry (widgets::PinEntry's own
+    // Config::dial_mode -- see that widget's header for the full
+    // interaction model): rotate one direction to spin a digit,
+    // REVERSING direction confirms it and advances to the next digit,
+    // whose own spin direction is the opposite of the one just
+    // confirmed (alternating every digit, like a real combination
+    // dial). false (the default) keeps the original behavior: rotate
+    // to spin, OkShort confirms and advances. Applies to both
+    // LockScreen (unlocking) and SetupPinScreen (setting/changing the
+    // PIN) for a consistent feel -- the way you dial it in is the way
+    // you set it.
+    bool pin_entry_dial_mode = false;
+
+    // Only meaningful when pin_entry_dial_mode is true: whether the
+    // LAST digit also confirms via direction-reversal, same as every
+    // other digit (true), or requires an explicit OkShort instead
+    // (false) -- a deliberate, unambiguous "I'm done" action for the
+    // most security-critical confirmation, for anyone who'd rather
+    // not rely on a rotation gesture there.
+    bool dial_last_digit_reverses = true;
+
     // From KeyKeeper 1.90's own "secretword" feature: an optional
     // path-prefix all Web UI/REST routes require
     // (http://IP/<secret_word>/...) when non-empty -- a low-effort
