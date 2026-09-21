@@ -20,12 +20,6 @@ constexpr char NVS_NAMESPACE[] = "security";
 constexpr char NVS_KEY[] = "pin";
 constexpr char NVS_CHECKPOINT_KEY[] = "pin_ckpt";
 
-// Staged anti-bruteforce thresholds -- see pin_manager.hpp's verify()
-// doc comment. Checkpoint values persisted to flash are a plain 0-3
-// state (conceptually 2 bits -- "4 states" was the design goal, not
-// any particular bit pattern; a linear 0/1/2/3 enum is exactly as
-// compact and much more readable than trying to match a specific
-// non-sequential bit encoding).
 constexpr uint8_t FAILURE_CHECKPOINT_1 = 3;
 constexpr uint8_t FAILURE_LOCKOUT = 6;
 constexpr uint8_t FAILURE_CHECKPOINT_3 = 9;
@@ -42,7 +36,8 @@ enum class Checkpoint : uint32_t
 
 constexpr size_t SALT_LEN = 16;
 constexpr size_t HASH_LEN = 32;
-constexpr uint32_t PBKDF2_ITERATIONS = 100'000;
+// TEMPORARY TEST VALUE: restore to 100'000 for the production security profile.
+constexpr uint32_t PBKDF2_ITERATIONS = 10'000;
 constexpr uint32_t PIN_BLOB_MAGIC = 0x4B4B5032; // "KKP2"
 constexpr uint8_t PIN_BLOB_VERSION = 1;
 constexpr uint8_t DURESS_PIN_BLOB_VERSION = 2;
@@ -51,20 +46,6 @@ struct StoredPin
 {
     uint32_t magic;
     uint8_t version;
-    // Length of the PIN this hash was computed for -- written
-    // atomically in the SAME blob as the hash itself (same set_pin()
-    // call, same NVS write), so it can never disagree with what's
-    // actually stored the way a value kept in a SEPARATE, independently-
-    // mutable settings struct could. This is what
-    // ui::screens::LockScreen etc. now use for their PinEntry box
-    // count, instead of settings::all().security.pin_length.
-    //
-    // Reused one of the previously-unused reserved bytes -- doesn't
-    // change sizeof(StoredPin) at all, so blobs written before this
-    // field existed still pass the size check in init() and load
-    // normally; pin_length just reads as 0 for those until the next
-    // successful set_pin() (see init()'s loading code for the
-    // fallback used for the one load where it's still 0).
     uint8_t pin_length;
     uint8_t reserved[2];
     uint8_t salt[SALT_LEN];
@@ -75,10 +56,6 @@ bool initialized = false;
 bool pin_set = false;
 StoredPin stored{};
 
-// Duress PIN -- same StoredPin shape, different NVS key. The regular
-// PIN uses PBKDF2, while the duress PIN intentionally uses a single
-// salted SHA-256 pass because it is only a trigger for the duress
-// action, not a secret protecting the vault.
 constexpr char NVS_DURESS_KEY[] = "duress_pin";
 bool duress_pin_set = false;
 StoredPin stored_duress{};
@@ -164,27 +141,6 @@ void generate_salt(uint8_t out_salt[SALT_LEN])
     esp_fill_random(out_salt, SALT_LEN);
 }
 
-/**
- * @brief Loose format check: 4-6 numeric digits, nothing else.
- *        Deliberately does NOT compare against
- *        settings::all().security.pin_length -- see pin_length_ok()
- *        for the stricter check used only when SETTING a new PIN.
- *
- * verify()/verify_duress() use THIS, not pin_length_ok(): the stored
- * hash was computed at set-time against whatever length was chosen
- * then, and verifying should only depend on that hash actually
- * matching -- never on a SEPARATELY mutable setting also still
- * agreeing. This is a real fix, not a hypothetical: settings::
- * SecuritySettings once grew a new field (secret_word), which changed
- * its stored blob's size; settings.cpp's load_section() correctly
- * refuses to reinterpret a differently-shaped blob and falls back to
- * defaults (pin_length=6) -- but a 4-digit PIN's hash was completely
- * unaffected by any of that, and the OLD length-matching check here
- * would have permanently locked that PIN out even though it was still
- * the right PIN. Loosening this check to format-only fixes that
- * class of problem going forward, regardless of what causes the
- * setting and the actual stored PIN to disagree.
- */
 bool pin_format_ok(const char* pin)
 {
     if (pin == nullptr) {
@@ -205,17 +161,6 @@ bool pin_format_ok(const char* pin)
     return true;
 }
 
-/**
- * @brief Stricter check used only when SETTING a NEW pin (set_pin(),
- *        set_duress_pin()) -- the new value must match the currently
- *        configured length preference. Callers are expected to update
- *        that preference immediately before calling set_pin() (see
- *        ui::screens::SetupPinScreen/SecuritySettingsScreen), so this
- *        should already agree by construction; kept as a safety net
- *        for that one path. See pin_format_ok() for the check used
- *        everywhere else (verification), which does NOT do this
- *        comparison.
- */
 bool pin_length_ok(const char* pin)
 {
     if (!pin_format_ok(pin)) {
@@ -265,9 +210,6 @@ void reset_failure_state()
     locked_out = false;
     lockout_started_ms = 0;
 
-    // Avoid an unconditional flash write on every successful unlock --
-    // only touch flash if there was actually a checkpoint to clear.
-    // Reading first costs nothing (NVS reads don't wear flash).
     if (load_checkpoint_from_flash() != Checkpoint::None) {
         save_checkpoint_to_flash(Checkpoint::None);
     }
@@ -276,9 +218,6 @@ void reset_failure_state()
 void check_lockout_expiry()
 {
     if (locked_out && (now_ms() - lockout_started_ms >= LOCKOUT_DURATION_MS)) {
-        // The lockout expires, but the failure counter is deliberately
-        // retained so attempts 7..11 remain part of the same sequence
-        // toward the 12th-failure wipe -- see verify()'s doc comment.
         locked_out = false;
         lockout_started_ms = 0;
         ESP_LOGI(TAG, "Lockout expired, failure counter retained at %u",
@@ -292,9 +231,6 @@ void register_failure()
         ++consecutive_failures;
     }
 
-    // Checkpoint writes only happen at these three thresholds -- the
-    // 12th failure (WIPE_THRESHOLD) intentionally writes nothing;
-    // wipe() erases NVS_CHECKPOINT_KEY along with the PIN itself.
     if (consecutive_failures == FAILURE_CHECKPOINT_1) {
         save_checkpoint_to_flash(Checkpoint::At3);
     } else if (consecutive_failures == FAILURE_LOCKOUT) {
@@ -339,13 +275,6 @@ bool init()
         ESP_LOGI(TAG, "PIN loaded from NVS");
 
         if (stored.pin_length < 4 || stored.pin_length > 6) {
-            // Either an old blob written before StoredPin::pin_length
-            // existed (reads as 0, since that byte used to be part of
-            // "reserved") or something else implausible -- either way,
-            // fall back to the settings value for THIS session only.
-            // The next successful set_pin() call populates the real
-            // field properly; not rewriting it here avoids an NVS
-            // write during init() just to backfill a cosmetic default.
             const uint8_t fallback = settings::all().security.pin_length;
             stored.pin_length = (fallback >= 4 && fallback <= 6) ? fallback : 6;
             ESP_LOGI(TAG, "PIN blob predates pin_length -- using %u for this session",
@@ -365,22 +294,12 @@ bool init()
         duress_pin_set = false;
     }
 
-    // Restore failure progress from the flash checkpoint, NOT a plain
-    // reset -- see verify()'s doc comment for why: a reboot must never
-    // let an attacker regain attempts below the last checkpoint
-    // reached before the reboot.
     const Checkpoint saved_checkpoint = load_checkpoint_from_flash();
     consecutive_failures = checkpoint_failure_count(saved_checkpoint);
     locked_out = false;
     lockout_started_ms = 0;
 
     if (saved_checkpoint == Checkpoint::At6Lockout) {
-        // Rebooted during or shortly after the lockout window. We
-        // can't know how much of the original 30s had already
-        // elapsed (esp_timer_get_time() resets on reboot), so
-        // conservatively restart the full lockout from boot --
-        // rebooting can only ever cost an attacker more time, never
-        // less.
         locked_out = true;
         lockout_started_ms = now_ms();
         ESP_LOGW(TAG, "Restored lockout checkpoint from flash -- 30s lockout restarted from boot");
@@ -406,12 +325,9 @@ bool has_pin()
 uint8_t stored_pin_length()
 {
     if (!pin_set) {
-        return 6; // no PIN yet -- same fallback default used elsewhere for "unknown"
+        return 6;
     }
     if (stored.pin_length < 4 || stored.pin_length > 6) {
-        // Shouldn't happen -- init() already backfills this on load
-        // (see its own comment) -- but stay safe rather than return
-        // something PinEntry can't use.
         return 6;
     }
     return stored.pin_length;
@@ -441,12 +357,6 @@ bool store_new_pin(const char* new_pin)
     stored = next;
     pin_set = true;
     reset_failure_state();
-
-    // Any previously configured duress PIN is tied to the OLD regular
-    // PIN (same length requirement, chosen to be distinct from it) --
-    // clear it so the user must consciously re-configure it after any
-    // regular PIN change, rather than silently carrying over a value
-    // that may no longer even be the right length.
     clear_duress_pin();
 
     if (event_bus::is_initialized()) {
@@ -474,23 +384,6 @@ bool set_pin(const char* new_pin, const char* old_pin)
     return store_new_pin(new_pin);
 }
 
-/**
- * @brief Set a new PIN WITHOUT verifying the old one -- for callers
- *        who have ALREADY proven it themselves, separately (e.g.
- *        SecuritySettingsScreen's Change-PIN flow, which verifies the
- *        old PIN as its own explicit first step before ever asking
- *        for a new one). set_pin() re-verifying old_pin again right
- *        before hashing new_pin would cost a second, entirely
- *        redundant ~10s PBKDF2 pass for a foregone conclusion -- same
- *        reasoning as security::lock::unlock_after_pin_set().
- *
- * NOT a general bypass -- only call this immediately after
- * independently confirming the caller is authorized to change the
- * PIN. Still enforces the same format/length rule as set_pin()
- * (pin_length_ok()). Returns false (no-op) if no PIN exists yet --
- * this is specifically for the change-PIN case, not first-time setup
- * (use set_pin(new_pin, nullptr) for that).
- */
 bool set_pin_after_verify(const char* new_pin)
 {
     if (!initialized || !pin_set) {
@@ -605,18 +498,10 @@ bool store_duress_pin(const char* duress_pin, const char* current_pin)
         return false;
     }
     if (strlen(duress_pin) != strlen(current_pin)) {
-        // Must match the REGULAR pin's actual length -- deliberately
-        // NOT settings::all().security.pin_length, which could
-        // disagree with the real stored PIN for reasons that have
-        // nothing to do with the PIN itself. See pin_format_ok()'s
-        // comment for the same reasoning applied elsewhere.
         ESP_LOGW(TAG, "set_duress_pin: duress PIN must be the same length as the current PIN");
         return false;
     }
     if (std::strcmp(duress_pin, current_pin) == 0) {
-        // Identical to the regular PIN would mean every normal
-        // unlock also silently wipes the vault -- not what anyone
-        // wants.
         ESP_LOGW(TAG, "set_duress_pin: duress PIN must differ from the regular PIN");
         return false;
     }
@@ -655,24 +540,6 @@ bool set_duress_pin(const char* duress_pin, const char* current_pin)
     return store_duress_pin(duress_pin, current_pin);
 }
 
-/**
- * @brief Set the duress PIN WITHOUT re-verifying current_pin -- for
- *        callers who have ALREADY verified it themselves, separately,
- *        in the same logical flow (e.g. SecuritySettingsScreen's
- *        Duress-PIN setup, which verifies the current PIN as its own
- *        explicit first step). set_duress_pin() re-verifying it again
- *        right before hashing the new duress PIN would cost a second,
- *        entirely redundant ~10s PBKDF2 pass -- same reasoning as
- *        security::pin::set_pin_after_verify(). The duress hash
- *        itself is fast (SHA-256, see compute_duress_hash()), so this
- *        cuts a duress-setup flow's final step from ~10s down to
- *        near-instant.
- *
- * NOT a general bypass -- only call this immediately after
- * independently verifying current_pin. current_pin is still required
- * (its VALUE, not just proof of it) for the length-match and
- * distinctness checks store_duress_pin() performs.
- */
 bool set_duress_pin_after_verify(const char* duress_pin, const char* current_pin)
 {
     if (!initialized || !pin_set || current_pin == nullptr) {
@@ -688,7 +555,7 @@ bool clear_duress_pin()
         return false;
     }
     if (!duress_pin_set) {
-        return true; // nothing to do
+        return true;
     }
 
     if (!storage::nvs::erase_key(NVS_NAMESPACE, NVS_DURESS_KEY)) {
@@ -724,12 +591,9 @@ bool verify_duress(const char* pin)
 
 void consume_pbkdf2_time()
 {
-    // Fixed throwaway salt/input -- only the CPU cost matters here,
-    // not the result, so nothing about this needs to be random or
-    // secret. Calls the same compute_hash() the regular PIN path
-    // uses (PBKDF2, PBKDF2_ITERATIONS) so the cost tracks whatever
-    // that's currently configured to, automatically, without a
-    // separate hardcoded delay to keep in sync.
+    // Uses the same PBKDF2 cost as regular PIN verification. This is
+    // intentionally tied to PBKDF2_ITERATIONS so the test delay stays
+    // in sync with the configured cost.
     uint8_t dummy_salt[SALT_LEN]{};
     uint8_t dummy_hash[HASH_LEN]{};
     compute_hash(dummy_salt, "000000", dummy_hash);
