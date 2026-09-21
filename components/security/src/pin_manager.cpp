@@ -36,8 +36,12 @@ enum class Checkpoint : uint32_t
 
 constexpr size_t SALT_LEN = 16;
 constexpr size_t HASH_LEN = 32;
-// TEMPORARY TEST VALUE: restore to 100'000 for the production security profile.
-constexpr uint32_t PBKDF2_ITERATIONS = 10'000;
+// TEMPORARY TEST PROFILE: new PINs use 10k iterations.
+// Existing PIN blobs with reserved[0] == 0 remain on the original 100k cost.
+constexpr uint32_t PBKDF2_ITERATIONS_LEGACY = 100'000;
+constexpr uint32_t PBKDF2_ITERATIONS_TEST = 10'000;
+constexpr uint8_t PBKDF2_PROFILE_LEGACY = 0;
+constexpr uint8_t PBKDF2_PROFILE_TEST = 1;
 constexpr uint32_t PIN_BLOB_MAGIC = 0x4B4B5032; // "KKP2"
 constexpr uint8_t PIN_BLOB_VERSION = 1;
 constexpr uint8_t DURESS_PIN_BLOB_VERSION = 2;
@@ -71,7 +75,8 @@ uint32_t now_ms()
     return static_cast<uint32_t>(esp_timer_get_time() / 1000);
 }
 
-bool compute_hash(const uint8_t* salt, const char* pin_digits, uint8_t out_hash[HASH_LEN])
+bool compute_hash(const uint8_t* salt, const char* pin_digits,
+                  uint32_t iterations, uint8_t out_hash[HASH_LEN])
 {
     const size_t pin_len = strlen(pin_digits);
 
@@ -84,7 +89,7 @@ bool compute_hash(const uint8_t* salt, const char* pin_digits, uint8_t out_hash[
     }
 
     status = psa_key_derivation_input_integer(
-        &operation, PSA_KEY_DERIVATION_INPUT_COST, PBKDF2_ITERATIONS);
+        &operation, PSA_KEY_DERIVATION_INPUT_COST, iterations);
     if (status == PSA_SUCCESS) {
         status = psa_key_derivation_input_bytes(
             &operation, PSA_KEY_DERIVATION_INPUT_SALT, salt, SALT_LEN);
@@ -343,8 +348,9 @@ bool store_new_pin(const char* new_pin)
     next.magic = PIN_BLOB_MAGIC;
     next.version = PIN_BLOB_VERSION;
     next.pin_length = static_cast<uint8_t>(std::strlen(new_pin));
+    next.reserved[0] = PBKDF2_PROFILE_TEST;
     generate_salt(next.salt);
-    if (!compute_hash(next.salt, new_pin, next.hash)) {
+    if (!compute_hash(next.salt, new_pin, PBKDF2_ITERATIONS_TEST, next.hash)) {
         ESP_LOGE(TAG, "store_new_pin: PBKDF2 computation failed");
         return false;
     }
@@ -364,7 +370,7 @@ bool store_new_pin(const char* new_pin)
                             static_cast<uint32_t>(event_bus::SystemEventId::PinChanged));
     }
 
-    ESP_LOGI(TAG, "PIN changed");
+    ESP_LOGI(TAG, "PIN changed (temporary PBKDF2 profile: 10k iterations)");
     return true;
 }
 
@@ -435,8 +441,12 @@ VerifyResult verify(const char* pin)
         return VerifyResult::WrongPin;
     }
 
+    const uint32_t iterations =
+        (stored.reserved[0] == PBKDF2_PROFILE_TEST) ?
+        PBKDF2_ITERATIONS_TEST : PBKDF2_ITERATIONS_LEGACY;
+
     uint8_t candidate_hash[HASH_LEN]{};
-    if (!compute_hash(stored.salt, pin, candidate_hash)) {
+    if (!compute_hash(stored.salt, pin, iterations, candidate_hash)) {
         return VerifyResult::WrongPin;
     }
 
@@ -591,12 +601,9 @@ bool verify_duress(const char* pin)
 
 void consume_pbkdf2_time()
 {
-    // Uses the same PBKDF2 cost as regular PIN verification. This is
-    // intentionally tied to PBKDF2_ITERATIONS so the test delay stays
-    // in sync with the configured cost.
     uint8_t dummy_salt[SALT_LEN]{};
     uint8_t dummy_hash[HASH_LEN]{};
-    compute_hash(dummy_salt, "000000", dummy_hash);
+    compute_hash(dummy_salt, "000000", PBKDF2_ITERATIONS_TEST, dummy_hash);
     std::memset(dummy_hash, 0, sizeof(dummy_hash));
 }
 
