@@ -64,6 +64,20 @@ bool UiManager::init(lv_obj_t* lv_screen)
     footer_label_ = lv_label_create(footer_);
     lv_obj_set_style_text_color(footer_label_, pal.secondary_text, 0);
     lv_obj_set_style_text_font(footer_label_, &keykeeper_cyrillic_16, 0);
+    // Fixed width (not auto-sized to content, LVGL's default) is
+    // required for LV_LABEL_LONG_SCROLL_CIRCULAR below to have
+    // anything to detect an overflow AGAINST -- an auto-sized label
+    // would just keep growing past the visible footer bar instead of
+    // ever triggering the scroll, which is exactly what was
+    // happening before this (confirmed on real hardware: several of
+    // this project's own longer footer hints, and RU translations
+    // generally running longer than their EN originals, already don't
+    // fit this 320px-wide display at this font size). A hint that
+    // DOES fit just sits still, same as before -- LVGL only scrolls
+    // when the text is actually wider than this.
+    lv_obj_set_width(footer_label_, LV_PCT(96));
+    lv_label_set_long_mode(footer_label_, LV_LABEL_LONG_SCROLL_CIRCULAR);
+    lv_obj_set_style_text_align(footer_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_center(footer_label_);
 
     // -------------------------------------------------------------------

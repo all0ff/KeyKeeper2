@@ -37,7 +37,7 @@ namespace app_system {
 // true. Meant to be flipped back to false again once whatever's being
 // investigated is done -- not a permanent setting, so it's a
 // constexpr here rather than a proper settings::/Kconfig option.
-constexpr bool DIAGNOSTIC_SKIP_USB_HID = true;
+constexpr bool DIAGNOSTIC_SKIP_USB_HID = false;
 
 namespace {
 
