@@ -1,6 +1,7 @@
 #include "ui/screens/account_edit_screen.hpp"
 
 #include "display/fonts.hpp"
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -53,18 +54,18 @@ AccountEditScreen::AccountEditScreen(uint32_t entry_id) : entry_id_(entry_id) {}
 
 const char* AccountEditScreen::title() const
 {
-    return (entry_id_ == vault::INVALID_ID) ? "New Entry" : "Edit Entry";
+    return (entry_id_ == vault::INVALID_ID) ? i18n::tr(i18n::Key::NewEntryTitle) : i18n::tr(i18n::Key::EditEntryTitle);
 }
 
 const char* AccountEditScreen::footer_hint() const
 {
     if (mode_ == Mode::EditField) {
-        return "OK  Add char    Hold OK  Done    BACK  Erase    Hold BACK  Switch set";
+        return i18n::tr(i18n::Key::EditFooterTyping);
     }
     if (static_cast<FieldId>(selected_row_) == FieldId::Password) {
-        return "OK  Open    Hold OK  Generate    BACK  Cancel";
+        return i18n::tr(i18n::Key::EditFooterOtpSecret);
     }
-    return "OK  Open    BACK  Cancel (unsaved changes lost)";
+    return i18n::tr(i18n::Key::EditFooterViewUnsaved);
 }
 
 void AccountEditScreen::initialize(lv_obj_t* content_parent)
@@ -110,14 +111,14 @@ void AccountEditScreen::build_rows(lv_obj_t* parent)
 const char* AccountEditScreen::field_label(FieldId field) const
 {
     switch (field) {
-        case FieldId::Login:     return "Name/Username";
-        case FieldId::Password:  return "Password";
-        case FieldId::Url:       return "URL";
-        case FieldId::OtpSecret: return "OTP Secret";
-        case FieldId::Notes:     return "Notes";
-        case FieldId::Category:  return "Category";
-        case FieldId::Favorite:  return "Favorite";
-        case FieldId::Save:      return "Save";
+        case FieldId::Login:     return i18n::tr(i18n::Key::FieldNameUsername);
+        case FieldId::Password:  return i18n::tr(i18n::Key::FieldPassword);
+        case FieldId::Url:       return i18n::tr(i18n::Key::FieldUrl);
+        case FieldId::OtpSecret: return i18n::tr(i18n::Key::FieldOtpSecret);
+        case FieldId::Notes:     return i18n::tr(i18n::Key::FieldNotes);
+        case FieldId::Category:  return i18n::tr(i18n::Key::FieldCategory);
+        case FieldId::Favorite:  return i18n::tr(i18n::Key::FieldFavorite);
+        case FieldId::Save:      return i18n::tr(i18n::Key::Save);
         case FieldId::Count:     return "";
     }
     return "";
@@ -179,7 +180,7 @@ void AccountEditScreen::render_rows()
                 break;
             case FieldId::Favorite:
                 lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, field_label(field),
-                                       entry_.favorite ? "Yes" : "No");
+                                       entry_.favorite ? i18n::tr(i18n::Key::Yes) : i18n::tr(i18n::Key::No));
                 break;
             case FieldId::Save:
                 lv_label_set_text_fmt(row_labels_[i], "%s%s", prefix, field_label(field));
@@ -242,7 +243,7 @@ void AccountEditScreen::enter_edit_mode()
     const theme::Palette& pal = theme::current();
     edit_header_label_ = lv_label_create(content_parent_);
     lv_obj_set_style_text_color(edit_header_label_, pal.secondary_text, 0);
-    lv_label_set_text_fmt(edit_header_label_, "Editing: %s", field_label(field));
+    lv_label_set_text_fmt(edit_header_label_, i18n::tr(i18n::Key::EditingFmt), field_label(field));
     lv_obj_align(edit_header_label_, LV_ALIGN_TOP_LEFT, 4, 4);
 
     const std::string* current_value = nullptr;
@@ -296,17 +297,17 @@ void AccountEditScreen::apply_edited_field()
 void AccountEditScreen::try_save()
 {
     if (entry_.login.empty()) {
-        lv_label_set_text(status_label_, "Name/Username cannot be empty");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::NameUsernameCannotBeEmpty));
         return;
     }
 
     if (!is_plausible_base32(entry_.totp_secret)) {
-        lv_label_set_text(status_label_, "OTP secret: invalid Base32 format");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::OtpSecretInvalidBase32));
         return;
     }
 
     if (!vault::validate(entry_)) {
-        lv_label_set_text(status_label_, "A field is too long");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::FieldTooLong));
         return;
     }
 
@@ -323,7 +324,7 @@ void AccountEditScreen::try_save()
         ESP_LOGI(TAG, "Entry saved");
         manager().pop();
     } else {
-        lv_label_set_text(status_label_, "Save failed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::SaveFailed));
     }
 }
 
@@ -332,7 +333,7 @@ void AccountEditScreen::generate_password()
     char buf[password_gen::MAX_LENGTH + 1];
     if (!password_gen::generate(settings::all().password_gen, buf, sizeof(buf))) {
         if (status_label_ != nullptr) {
-            lv_label_set_text(status_label_, "Password generation failed");
+            lv_label_set_text(status_label_, i18n::tr(i18n::Key::PasswordGenerationFailed));
         }
         return;
     }
@@ -342,7 +343,7 @@ void AccountEditScreen::generate_password()
     render_rows();
 
     if (status_label_ != nullptr) {
-        lv_label_set_text(status_label_, "Password generated");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::PasswordGenerated));
     }
 }
 

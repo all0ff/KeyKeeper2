@@ -80,6 +80,53 @@ struct Strings {
     const char* entry_not_found;
     const char* favorite_label;
     const char* confirm_action_fmt;
+    const char* field_too_long;
+    const char* edit_entry_title;
+    const char* new_entry_title;
+    const char* editing_fmt;
+    const char* entry_saved;
+    const char* field_favorite;
+    const char* name_username_cannot_be_empty;
+    const char* field_name_username;
+    const char* yes;
+    const char* no;
+    const char* edit_footer_typing;
+    const char* edit_footer_view_unsaved;
+    const char* edit_footer_otp_secret;
+    const char* field_otp_secret;
+    const char* otp_secret_invalid_base32;
+    const char* password_generated;
+    const char* password_generation_failed;
+    const char* field_password;
+    const char* backup_title;
+    const char* create_backup;
+    const char* restore_backup_title;
+    const char* export_vault;
+    const char* import_vault;
+    const char* refresh_sd_card;
+    const char* format_sd_card;
+    const char* backup_footer_select_confirm;
+    const char* backup_footer_import;
+    const char* backup_footer_run;
+    const char* backup_created_fmt;
+    const char* backup_create_failed_locked_no_sd;
+    const char* exported_fmt;
+    const char* export_failed_locked_no_sd;
+    const char* sd_card_mounted_size_fmt;
+    const char* sd_card_mounted;
+    const char* sd_card_unreadable;
+    const char* no_sd_card_detected;
+    const char* confirm_erase_card;
+    const char* sd_card_formatted;
+    const char* format_failed;
+    const char* no_backups_found;
+    const char* confirm_overwrite_vault;
+    const char* restore_failed;
+    const char* restored_restarting;
+    const char* no_import_files;
+    const char* imported_skipped_fmt;
+    const char* confirm_backup_action_fmt;
+    const char* confirm_backup_file_action_fmt;
 };
 
 constexpr Strings EN = {
@@ -100,7 +147,28 @@ constexpr Strings EN = {
     "ROTATE  Scroll    BACK  Return", "ROTATE  Scroll    OK  Reveal/Hide    BACK  Return",
     "ROTATE  Select    OK  Run    BACK  Return",
     "Recovery Codes", "Seed Phrase", "Reveal Password",
-    "View Recovery Codes", "View Seed Phrase", "Entry not found", "* Favorite", "> %s (confirm?)"
+    "View Recovery Codes", "View Seed Phrase", "Entry not found", "* Favorite", "> %s (confirm?)",
+    "A field is too long", "Edit Entry", "New Entry", "Editing: %s", "Entry saved",
+    "Favorite", "Name/Username cannot be empty", "Name/Username", "Yes", "No",
+    "OK  Add char    Hold OK  Done    BACK  Erase    Hold BACK  Switch set",
+    "OK  Open    BACK  Cancel (unsaved changes lost)",
+    "OK  Open    Hold OK  Generate    BACK  Cancel",
+    "OTP Secret", "OTP secret: invalid Base32 format",
+    "Password generated", "Password generation failed", "Password",
+    "Backup", "Create Backup", "Restore Backup", "Export Vault", "Import Vault",
+    "Refresh SD Card", "Format SD Card",
+    "OK  Select/Confirm    BACK  Return", "OK  Import    BACK  Return", "OK  Run    BACK  Return",
+    "Created: %s", "Backup failed (locked or no SD card?)",
+    "Exported: %s", "Export failed (locked or no SD card?)",
+    "SD card mounted: %u / %u MB", "SD card mounted",
+    "Card found but unreadable -- try Format SD Card", "No SD card detected",
+    "This erases everything on the card. Press OK again to confirm.",
+    "SD card formatted and mounted", "Format failed -- no card, or a hardware fault",
+    "No backups found",
+    "This will overwrite the current vault. Press OK again to confirm.",
+    "Restore failed", "Restored. Restarting...",
+    "No files in /sdcard/vault/import", "Imported %u, skipped %u",
+    "> %s -- confirm?", "> %s (%uKB) -- confirm?"
 };
 
 constexpr Strings RU = {
@@ -121,7 +189,28 @@ constexpr Strings RU = {
     "ПОВОРОТ  Прокрутка    НАЗАД  Возврат", "ПОВОРОТ  Прокрутка    OK  Показать/Скрыть    НАЗАД  Возврат",
     "ПОВОРОТ  Выбор    OK  Выполнить    НАЗАД  Возврат",
     "Коды восстановления", "Seed-фраза", "Показать пароль",
-    "Коды восстановления", "Просмотр seed-фразы", "Запись не найдена", "* Избранное", "> %s (подтвердить?)"
+    "Коды восстановления", "Просмотр seed-фразы", "Запись не найдена", "* Избранное", "> %s (подтвердить?)",
+    "Поле слишком длинное", "Изменить запись", "Новая запись", "Редактирование: %s", "Запись сохранена",
+    "Избранное", "Имя/логин не может быть пустым", "Имя/Логин", "Да", "Нет",
+    "OK  Добавить символ    Удержание OK  Готово    НАЗАД  Стереть    Удержание НАЗАД  Набор",
+    "OK  Открыть    НАЗАД  Отмена (несохранённые изменения будут потеряны)",
+    "OK  Открыть    Удержание OK  Сгенерировать    НАЗАД  Отмена",
+    "OTP-секрет", "OTP-секрет: неверный формат Base32",
+    "Пароль сгенерирован", "Не удалось сгенерировать пароль", "Пароль",
+    "Резервная копия", "Создать резервную копию", "Восстановить из копии", "Экспорт хранилища", "Импорт хранилища",
+    "Обновить SD-карту", "Форматировать SD-карту",
+    "OK  Выбор/Подтвердить    НАЗАД  Возврат", "OK  Импорт    НАЗАД  Возврат", "OK  Выполнить    НАЗАД  Возврат",
+    "Создан: %s", "Ошибка резервного копирования (заблокировано или нет SD-карты?)",
+    "Экспортировано: %s", "Ошибка экспорта (заблокировано или нет SD-карты?)",
+    "SD-карта подключена: %u / %u МБ", "SD-карта подключена",
+    "Карта найдена, но не читается -- попробуйте Format SD Card", "SD-карта не обнаружена",
+    "Это сотрёт всё содержимое карты. Нажмите OK ещё раз для подтверждения.",
+    "SD-карта отформатирована и подключена", "Ошибка форматирования -- нет карты или аппаратный сбой",
+    "Резервных копий не найдено",
+    "Это перезапишет текущее хранилище. Нажмите OK ещё раз для подтверждения.",
+    "Ошибка восстановления", "Восстановлено. Перезагрузка...",
+    "Нет файлов в /sdcard/vault/import", "Импортировано %u, пропущено %u",
+    "> %s -- подтвердить?", "> %s (%uKB) -- подтвердить?"
 };
 
 const Strings& strings()
@@ -219,6 +308,53 @@ const char* tr(Key key)
         case Key::EntryNotFound: return s.entry_not_found;
         case Key::FavoriteLabel: return s.favorite_label;
         case Key::ConfirmActionFmt: return s.confirm_action_fmt;
+        case Key::FieldTooLong: return s.field_too_long;
+        case Key::EditEntryTitle: return s.edit_entry_title;
+        case Key::NewEntryTitle: return s.new_entry_title;
+        case Key::EditingFmt: return s.editing_fmt;
+        case Key::EntrySaved: return s.entry_saved;
+        case Key::FieldFavorite: return s.field_favorite;
+        case Key::NameUsernameCannotBeEmpty: return s.name_username_cannot_be_empty;
+        case Key::FieldNameUsername: return s.field_name_username;
+        case Key::Yes: return s.yes;
+        case Key::No: return s.no;
+        case Key::EditFooterTyping: return s.edit_footer_typing;
+        case Key::EditFooterViewUnsaved: return s.edit_footer_view_unsaved;
+        case Key::EditFooterOtpSecret: return s.edit_footer_otp_secret;
+        case Key::FieldOtpSecret: return s.field_otp_secret;
+        case Key::OtpSecretInvalidBase32: return s.otp_secret_invalid_base32;
+        case Key::PasswordGenerated: return s.password_generated;
+        case Key::PasswordGenerationFailed: return s.password_generation_failed;
+        case Key::FieldPassword: return s.field_password;
+        case Key::BackupTitle: return s.backup_title;
+        case Key::CreateBackup: return s.create_backup;
+        case Key::RestoreBackupTitle: return s.restore_backup_title;
+        case Key::ExportVault: return s.export_vault;
+        case Key::ImportVault: return s.import_vault;
+        case Key::RefreshSdCard: return s.refresh_sd_card;
+        case Key::FormatSdCard: return s.format_sd_card;
+        case Key::BackupFooterSelectConfirm: return s.backup_footer_select_confirm;
+        case Key::BackupFooterImport: return s.backup_footer_import;
+        case Key::BackupFooterRun: return s.backup_footer_run;
+        case Key::BackupCreatedFmt: return s.backup_created_fmt;
+        case Key::BackupCreateFailedLockedNoSd: return s.backup_create_failed_locked_no_sd;
+        case Key::ExportedFmt: return s.exported_fmt;
+        case Key::ExportFailedLockedNoSd: return s.export_failed_locked_no_sd;
+        case Key::SdCardMountedSizeFmt: return s.sd_card_mounted_size_fmt;
+        case Key::SdCardMounted: return s.sd_card_mounted;
+        case Key::SdCardUnreadable: return s.sd_card_unreadable;
+        case Key::NoSdCardDetected: return s.no_sd_card_detected;
+        case Key::ConfirmEraseCard: return s.confirm_erase_card;
+        case Key::SdCardFormatted: return s.sd_card_formatted;
+        case Key::FormatFailed: return s.format_failed;
+        case Key::NoBackupsFound: return s.no_backups_found;
+        case Key::ConfirmOverwriteVault: return s.confirm_overwrite_vault;
+        case Key::RestoreFailed: return s.restore_failed;
+        case Key::RestoredRestarting: return s.restored_restarting;
+        case Key::NoImportFiles: return s.no_import_files;
+        case Key::ImportedSkippedFmt: return s.imported_skipped_fmt;
+        case Key::ConfirmBackupActionFmt: return s.confirm_backup_action_fmt;
+        case Key::ConfirmBackupFileActionFmt: return s.confirm_backup_file_action_fmt;
     }
 
     return "";

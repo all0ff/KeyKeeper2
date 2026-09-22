@@ -1,6 +1,7 @@
 #include "ui/screens/backup_screen.hpp"
 
 #include "display/fonts.hpp"
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -20,33 +21,38 @@ constexpr char TAG[] = "ui.backup";
 constexpr lv_coord_t ROW_Y_START = 4;
 constexpr lv_coord_t ROW_SPACING = 20;
 
-constexpr const char* ACTION_NAMES[] = {
-    "Create Backup",
-    "Restore Backup",
-    "Export Vault",
-    "Import Vault",
-    "Refresh SD Card",
-    "Format SD Card",
-};
+// NOT constexpr -- i18n::tr() reads the current language at runtime.
+const char* action_name(size_t i)
+{
+    switch (i) {
+        case 0: return i18n::tr(i18n::Key::CreateBackup);
+        case 1: return i18n::tr(i18n::Key::RestoreBackupTitle);
+        case 2: return i18n::tr(i18n::Key::ExportVault);
+        case 3: return i18n::tr(i18n::Key::ImportVault);
+        case 4: return i18n::tr(i18n::Key::RefreshSdCard);
+        case 5: return i18n::tr(i18n::Key::FormatSdCard);
+        default: return "";
+    }
+}
 
 } // namespace
 
 const char* BackupScreen::title() const
 {
-    if (mode_ == Mode::BackupList) return "Restore Backup";
-    if (mode_ == Mode::ImportList) return "Import Vault";
-    return "Backup";
+    if (mode_ == Mode::BackupList) return i18n::tr(i18n::Key::RestoreBackupTitle);
+    if (mode_ == Mode::ImportList) return i18n::tr(i18n::Key::ImportVault);
+    return i18n::tr(i18n::Key::BackupTitle);
 }
 
 const char* BackupScreen::footer_hint() const
 {
     if (mode_ == Mode::BackupList) {
-        return "OK  Select/Confirm    BACK  Return";
+        return i18n::tr(i18n::Key::BackupFooterSelectConfirm);
     }
     if (mode_ == Mode::ImportList) {
-        return "OK  Import    BACK  Return";
+        return i18n::tr(i18n::Key::BackupFooterImport);
     }
-    return "OK  Run    BACK  Return";
+    return i18n::tr(i18n::Key::BackupFooterRun);
 }
 
 void BackupScreen::initialize(lv_obj_t* content_parent)
@@ -93,9 +99,9 @@ void BackupScreen::render_action_list()
         lv_obj_set_style_text_color(
             action_labels_[i], is_confirming ? pal.error : (is_selected ? pal.accent : pal.primary_text), 0);
         if (is_confirming) {
-            lv_label_set_text_fmt(action_labels_[i], "> %s -- confirm?", ACTION_NAMES[i]);
+            lv_label_set_text_fmt(action_labels_[i], i18n::tr(i18n::Key::ConfirmBackupActionFmt), action_name(i));
         } else {
-            lv_label_set_text_fmt(action_labels_[i], "%s%s", is_selected ? "> " : "", ACTION_NAMES[i]);
+            lv_label_set_text_fmt(action_labels_[i], "%s%s", is_selected ? "> " : "", action_name(i));
         }
     }
 
@@ -131,10 +137,10 @@ void BackupScreen::activate_action()
             char filename[32];
             if (vault::backup::create_backup(filename, sizeof(filename))) {
                 ESP_LOGI(TAG, "Backup created: %s", filename);
-                lv_label_set_text_fmt(status_label_, "Created: %s", filename);
+                lv_label_set_text_fmt(status_label_, i18n::tr(i18n::Key::BackupCreatedFmt), filename);
             } else {
                 ESP_LOGW(TAG, "Create backup failed");
-                lv_label_set_text(status_label_, "Backup failed (locked or no SD card?)");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::BackupCreateFailedLockedNoSd));
             }
             return;
         }
@@ -148,17 +154,17 @@ void BackupScreen::activate_action()
                 security::permission::check(security::permission::Operation::ExportVault);
             if (perm != security::permission::Result::Allowed) {
                 ESP_LOGI(TAG, "Export Vault denied (%d)", static_cast<int>(perm));
-                lv_label_set_text(status_label_, "Not allowed");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::NotAllowed));
                 return;
             }
 
             char filename[32];
             if (vault::csv::export_csv(filename, sizeof(filename))) {
                 ESP_LOGI(TAG, "Vault exported: %s", filename);
-                lv_label_set_text_fmt(status_label_, "Exported: %s", filename);
+                lv_label_set_text_fmt(status_label_, i18n::tr(i18n::Key::ExportedFmt), filename);
             } else {
                 ESP_LOGW(TAG, "Export vault failed");
-                lv_label_set_text(status_label_, "Export failed (locked or no SD card?)");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::ExportFailedLockedNoSd));
             }
             return;
         }
@@ -174,18 +180,18 @@ void BackupScreen::activate_action()
                 if (storage::sd::get_usage(total, used)) {
                     const unsigned used_mb = static_cast<unsigned>(used / (1024 * 1024));
                     const unsigned total_mb = static_cast<unsigned>(total / (1024 * 1024));
-                    lv_label_set_text_fmt(status_label_, "SD card mounted: %u / %u MB", used_mb, total_mb);
+                    lv_label_set_text_fmt(status_label_, i18n::tr(i18n::Key::SdCardMountedSizeFmt), used_mb, total_mb);
                 } else {
-                    lv_label_set_text(status_label_, "SD card mounted");
+                    lv_label_set_text(status_label_, i18n::tr(i18n::Key::SdCardMounted));
                 }
             } else if (storage::sd::mount_looked_unreadable()) {
                 // See storage::sd::mount_looked_unreadable()'s own
                 // comment -- this is a best-effort signal, not a
                 // guaranteed-precise diagnosis, but it's more useful
                 // than a flat "not inserted" when it applies.
-                lv_label_set_text(status_label_, "Card found but unreadable -- try Format SD Card");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::SdCardUnreadable));
             } else {
-                lv_label_set_text(status_label_, "No SD card detected");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::NoSdCardDetected));
             }
             return;
         }
@@ -194,16 +200,16 @@ void BackupScreen::activate_action()
             if (!format_confirm_pending_) {
                 format_confirm_pending_ = true;
                 render_action_list();
-                lv_label_set_text(status_label_, "This erases everything on the card. Press OK again to confirm.");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::ConfirmEraseCard));
                 return;
             }
 
             format_confirm_pending_ = false;
             ESP_LOGW(TAG, "Formatting SD card (user-requested)");
             if (storage::format_sdcard()) {
-                lv_label_set_text(status_label_, "SD card formatted and mounted");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::SdCardFormatted));
             } else {
-                lv_label_set_text(status_label_, "Format failed -- no card, or a hardware fault");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::FormatFailed));
             }
             render_action_list();
             return;
@@ -217,7 +223,7 @@ void BackupScreen::enter_backup_list()
         security::permission::check(security::permission::Operation::RestoreBackup);
     if (perm != security::permission::Result::Allowed) {
         ESP_LOGI(TAG, "Restore Backup denied (%d)", static_cast<int>(perm));
-        lv_label_set_text(status_label_, "Not allowed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::NotAllowed));
         return;
     }
 
@@ -238,7 +244,7 @@ void BackupScreen::build_backup_list()
     if (backup_count_ == 0) {
         lv_obj_t* empty = lv_label_create(content_parent_);
         lv_obj_set_style_text_color(empty, pal.secondary_text, 0);
-        lv_label_set_text(empty, "No backups found");
+        lv_label_set_text(empty, i18n::tr(i18n::Key::NoBackupsFound));
         lv_obj_center(empty);
     } else {
         for (size_t i = 0; i < backup_count_; ++i) {
@@ -269,7 +275,7 @@ void BackupScreen::render_backup_list()
 
         const unsigned kb = static_cast<unsigned>(backups_[i].size_bytes / 1024);
         if (is_confirming) {
-            lv_label_set_text_fmt(backup_labels_[i], "> %s (%uKB) -- confirm?", backups_[i].filename, kb);
+            lv_label_set_text_fmt(backup_labels_[i], i18n::tr(i18n::Key::ConfirmBackupFileActionFmt), backups_[i].filename, kb);
         } else {
             lv_label_set_text_fmt(backup_labels_[i], "%s%s (%uKB)", is_selected ? "> " : "",
                                    backups_[i].filename, kb);
@@ -314,7 +320,7 @@ void BackupScreen::activate_backup()
     if (!restore_confirm_pending_) {
         restore_confirm_pending_ = true;
         render_backup_list();
-        lv_label_set_text(status_label_, "This will overwrite the current vault. Press OK again to confirm.");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::ConfirmOverwriteVault));
         return;
     }
 
@@ -324,13 +330,13 @@ void BackupScreen::activate_backup()
     if (!vault::backup::restore_backup(filename)) {
         restore_confirm_pending_ = false;
         ESP_LOGE(TAG, "Restore failed");
-        lv_label_set_text(status_label_, "Restore failed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::RestoreFailed));
         render_backup_list();
         return;
     }
 
     ESP_LOGW(TAG, "Restore complete -- restarting now");
-    lv_label_set_text(status_label_, "Restored. Restarting...");
+    lv_label_set_text(status_label_, i18n::tr(i18n::Key::RestoredRestarting));
     esp_restart(); // does not return
 }
 
@@ -352,7 +358,7 @@ void BackupScreen::build_import_list()
     if (import_file_count_ == 0) {
         lv_obj_t* empty = lv_label_create(content_parent_);
         lv_obj_set_style_text_color(empty, pal.secondary_text, 0);
-        lv_label_set_text(empty, "No files in /sdcard/vault/import");
+        lv_label_set_text(empty, i18n::tr(i18n::Key::NoImportFiles));
         lv_obj_center(empty);
     } else {
         for (size_t i = 0; i < import_file_count_; ++i) {
@@ -423,7 +429,7 @@ void BackupScreen::activate_import()
     ESP_LOGI(TAG, "Importing CSV: %s", filename);
 
     const vault::csv::ImportResult result = vault::csv::import_csv(filename);
-    lv_label_set_text_fmt(status_label_, "Imported %u, skipped %u", static_cast<unsigned>(result.created),
+    lv_label_set_text_fmt(status_label_, i18n::tr(i18n::Key::ImportedSkippedFmt), static_cast<unsigned>(result.created),
                            static_cast<unsigned>(result.skipped));
 }
 
