@@ -127,6 +127,59 @@ struct Strings {
     const char* imported_skipped_fmt;
     const char* confirm_backup_action_fmt;
     const char* confirm_backup_file_action_fmt;
+    const char* checking;
+    const char* unlock_title;
+    const char* lock_screen_footer;
+    const char* locked_out_try_later;
+    const char* wipe_error;
+    const char* wrong_pin_left_fmt;
+    const char* wrong_pin_until_wipe_fmt;
+    const char* enter_new_pin;
+    const char* confirm_pin;
+    const char* setup_pin_title;
+    const char* setup_pin_footer;
+    const char* ok_retry;
+    const char* pins_do_not_match;
+    const char* failed_to_save_pin_length;
+    const char* failed_to_save_pin;
+    const char* unlock_failed_after_pin_set;
+    const char* change_pin_row_fmt;
+    const char* duress_pin_row_fmt;
+    const char* configured;
+    const char* not_set_value;
+    const char* factory_reset_confirm_row_fmt;
+    const char* factory_reset_row_fmt;
+    const char* auto_lock_off_row_fmt;
+    const char* auto_lock_min_row_fmt;
+    const char* web_ui_view_row_fmt;
+    const char* allowed_value;
+    const char* off_value;
+    const char* pin_entry_row_fmt;
+    const char* dial_value;
+    const char* standard_value;
+    const char* dial_last_digit_row_fmt;
+    const char* reverse_value;
+    const char* ok_short_value;
+    const char* save_row_fmt;
+    const char* duress_pin_set;
+    const char* duress_pin_setup_cancelled;
+    const char* duress_pin_setup_failed;
+    const char* duress_pins_did_not_match;
+    const char* factory_reset_failed;
+    const char* pin_change_cancelled;
+    const char* pin_change_failed;
+    const char* pin_changed;
+    const char* pins_did_not_match;
+    const char* reset_complete_restarting;
+    const char* confirm_erase_everything;
+    const char* security_title;
+    const char* adjust_footer;
+    const char* changing_pin_footer;
+    const char* enter_current_pin;
+    const char* confirm_new_pin;
+    const char* enter_duress_pin;
+    const char* confirm_duress_pin;
+    const char* too_many_failed_attempts;
 };
 
 constexpr Strings EN = {
@@ -168,7 +221,31 @@ constexpr Strings EN = {
     "This will overwrite the current vault. Press OK again to confirm.",
     "Restore failed", "Restored. Restarting...",
     "No files in /sdcard/vault/import", "Imported %u, skipped %u",
-    "> %s -- confirm?", "> %s (%uKB) -- confirm?"
+    "> %s -- confirm?", "> %s (%uKB) -- confirm?",
+    "Checking...", "Unlock", "ROTATE Digit  OK Next  Hold OK Done  BACK Erase",
+    "Locked out, try later", "Wipe error",
+    "Wrong PIN, %u left", "Wrong PIN! %u attempts until vault wipe",
+    "Enter new PIN", "Confirm PIN", "Setup PIN",
+    "ROTATE Digit OK Next Hold OK Done BACK Erase", "OK  Retry",
+    "PINs do not match!", "Failed to save PIN length setting",
+    "Failed to save PIN", "Unlock failed after PIN set",
+    "%sChange PIN", "%sDuress PIN: %s", "Configured", "Not set",
+    "%sFactory Reset (confirm?)", "%sFactory Reset",
+    "%sAuto Lock: off", "%sAuto Lock: %lu min",
+    "%sWeb UI View: %s", "Allowed", "Off",
+    "%sPIN Entry: %s", "Dial", "Standard",
+    "%sDial Last Digit: %s", "Reverse", "OkShort",
+    "%sSave",
+    "Duress PIN set", "Duress PIN setup cancelled", "Duress PIN setup failed",
+    "Duress PINs did not match", "Factory reset failed",
+    "PIN change cancelled", "PIN change failed", "PIN changed", "PINs did not match",
+    "Reset complete. Restarting...",
+    "This erases EVERYTHING. Press OK again to confirm.",
+    "Security", "ROTATE  Change    OK/BACK  Confirm",
+    "ROTATE Digit OK Next Hold OK Done BACK Erase/Cancel",
+    "OK  Open    BACK  Cancel",
+    "Enter current PIN", "Confirm new PIN", "Enter duress PIN", "Confirm duress PIN",
+    "Too many failed attempts"
 };
 
 constexpr Strings RU = {
@@ -210,7 +287,32 @@ constexpr Strings RU = {
     "Это перезапишет текущее хранилище. Нажмите OK ещё раз для подтверждения.",
     "Ошибка восстановления", "Восстановлено. Перезагрузка...",
     "Нет файлов в /sdcard/vault/import", "Импортировано %u, пропущено %u",
-    "> %s -- подтвердить?", "> %s (%uKB) -- подтвердить?"
+    "> %s -- подтвердить?", "> %s (%uKB) -- подтвердить?",
+    "Проверка...", "Разблокировка", "ПОВОРОТ Цифра  OK Далее  Удержание OK Готово  НАЗАД Стереть",
+    "Заблокировано, попробуйте позже", "Ошибка стирания",
+    "Неверный PIN, осталось %u", "Неверный PIN! Ещё %u попыток до стирания хранилища",
+    "Введите новый PIN", "Подтвердите PIN", "Установка PIN",
+    "ПОВОРОТ Цифра OK Далее Удержание OK Готово НАЗАД Стереть", "OK  Повторить",
+    "PIN не совпадают!", "Не удалось сохранить длину PIN",
+    "Не удалось сохранить PIN", "Ошибка разблокировки после установки PIN",
+    "%sСменить PIN", "%sPIN под принуждением: %s", "Настроен", "Не задан",
+    "%sСброс до заводских (подтвердить?)", "%sСброс до заводских",
+    "%sАвто-блокировка: выкл.", "%sАвто-блокировка: %lu мин",
+    "%sДоступ из веб: %s", "Разрешён", "Выкл.",
+    "%sНабор PIN: %s", "Лимбовый", "Обычный",
+    "%sПоследняя цифра: %s", "Разворот", "OkShort",
+    "%sСохранить",
+    "PIN под принуждением установлен", "Настройка PIN под принуждением отменена",
+    "Ошибка настройки PIN под принуждением",
+    "PIN под принуждением не совпадают", "Ошибка сброса до заводских",
+    "Смена PIN отменена", "Ошибка смены PIN", "PIN изменён", "PIN не совпадают",
+    "Сброс завершён. Перезагрузка...",
+    "Это сотрёт ВСЁ содержимое. Нажмите OK ещё раз для подтверждения.",
+    "Безопасность", "ПОВОРОТ  Изменить    OK/НАЗАД  Подтвердить",
+    "ПОВОРОТ Цифра OK Далее Удержание OK Готово НАЗАД Стереть/Отмена",
+    "OK  Открыть    НАЗАД  Отмена",
+    "Введите текущий PIN", "Подтвердите новый PIN", "Введите PIN под принуждением", "Подтвердите PIN под принуждением",
+    "Слишком много неудачных попыток"
 };
 
 const Strings& strings()
@@ -253,7 +355,6 @@ const char* tr(Key key)
         case Key::BackReturn: return s.back_return;
         case Key::RotateChange: return s.rotate_change;
         case Key::OkBackConfirm: return s.ok_back_confirm;
-        case Key::OkOpenBackCancel: return s.ok_open_back_cancel;
         case Key::English: return s.english;
         case Key::Russian: return s.russian;
         case Key::Off: return s.off;
@@ -355,6 +456,59 @@ const char* tr(Key key)
         case Key::ImportedSkippedFmt: return s.imported_skipped_fmt;
         case Key::ConfirmBackupActionFmt: return s.confirm_backup_action_fmt;
         case Key::ConfirmBackupFileActionFmt: return s.confirm_backup_file_action_fmt;
+        case Key::Checking: return s.checking;
+        case Key::UnlockTitle: return s.unlock_title;
+        case Key::LockScreenFooter: return s.lock_screen_footer;
+        case Key::LockedOutTryLater: return s.locked_out_try_later;
+        case Key::WipeError: return s.wipe_error;
+        case Key::WrongPinLeftFmt: return s.wrong_pin_left_fmt;
+        case Key::WrongPinUntilWipeFmt: return s.wrong_pin_until_wipe_fmt;
+        case Key::EnterNewPin: return s.enter_new_pin;
+        case Key::ConfirmPin: return s.confirm_pin;
+        case Key::SetupPinTitle: return s.setup_pin_title;
+        case Key::SetupPinFooter: return s.setup_pin_footer;
+        case Key::OkRetry: return s.ok_retry;
+        case Key::PinsDoNotMatch: return s.pins_do_not_match;
+        case Key::FailedToSavePinLength: return s.failed_to_save_pin_length;
+        case Key::FailedToSavePin: return s.failed_to_save_pin;
+        case Key::UnlockFailedAfterPinSet: return s.unlock_failed_after_pin_set;
+        case Key::ChangePinRowFmt: return s.change_pin_row_fmt;
+        case Key::DuressPinRowFmt: return s.duress_pin_row_fmt;
+        case Key::Configured: return s.configured;
+        case Key::NotSetValue: return s.not_set_value;
+        case Key::FactoryResetConfirmRowFmt: return s.factory_reset_confirm_row_fmt;
+        case Key::FactoryResetRowFmt: return s.factory_reset_row_fmt;
+        case Key::AutoLockOffRowFmt: return s.auto_lock_off_row_fmt;
+        case Key::AutoLockMinRowFmt: return s.auto_lock_min_row_fmt;
+        case Key::WebUiViewRowFmt: return s.web_ui_view_row_fmt;
+        case Key::AllowedValue: return s.allowed_value;
+        case Key::OffValue: return s.off_value;
+        case Key::PinEntryRowFmt: return s.pin_entry_row_fmt;
+        case Key::DialValue: return s.dial_value;
+        case Key::StandardValue: return s.standard_value;
+        case Key::DialLastDigitRowFmt: return s.dial_last_digit_row_fmt;
+        case Key::ReverseValue: return s.reverse_value;
+        case Key::OkShortValue: return s.ok_short_value;
+        case Key::SaveRowFmt: return s.save_row_fmt;
+        case Key::DuressPinSet: return s.duress_pin_set;
+        case Key::DuressPinSetupCancelled: return s.duress_pin_setup_cancelled;
+        case Key::DuressPinSetupFailed: return s.duress_pin_setup_failed;
+        case Key::DuressPinsDidNotMatch: return s.duress_pins_did_not_match;
+        case Key::FactoryResetFailed: return s.factory_reset_failed;
+        case Key::PinChangeCancelled: return s.pin_change_cancelled;
+        case Key::PinChangeFailed: return s.pin_change_failed;
+        case Key::PinChanged: return s.pin_changed;
+        case Key::PinsDidNotMatch: return s.pins_did_not_match;
+        case Key::ResetCompleteRestarting: return s.reset_complete_restarting;
+        case Key::ConfirmEraseEverything: return s.confirm_erase_everything;
+        case Key::SecurityTitle: return s.security_title;
+        case Key::AdjustFooter: return s.adjust_footer;
+        case Key::ChangingPinFooter: return s.changing_pin_footer;
+        case Key::EnterCurrentPin: return s.enter_current_pin;
+        case Key::ConfirmNewPin: return s.confirm_new_pin;
+        case Key::EnterDuressPin: return s.enter_duress_pin;
+        case Key::ConfirmDuressPin: return s.confirm_duress_pin;
+        case Key::TooManyFailedAttempts: return s.too_many_failed_attempts;
     }
 
     return "";

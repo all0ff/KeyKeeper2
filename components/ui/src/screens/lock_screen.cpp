@@ -1,5 +1,6 @@
 #include "ui/screens/lock_screen.hpp"
 
+#include "ui/localization.hpp"
 #include "ui/screens/main_menu.hpp"
 #include "ui/screens/setup_pin_screen.hpp"
 #include "ui/theme.hpp"
@@ -23,15 +24,15 @@ constexpr char TAG[] = "ui.lock_screen";
 
 const char* LockScreen::title() const
 {
-    return "Unlock";
+    return i18n::tr(i18n::Key::UnlockTitle);
 }
 
 const char* LockScreen::footer_hint() const
 {
     if (checking_) {
-        return "Checking...";
+        return i18n::tr(i18n::Key::Checking);
     }
-    return "ROTATE Digit  OK Next  Hold OK Done  BACK Erase";
+    return i18n::tr(i18n::Key::LockScreenFooter);
 }
 
 void LockScreen::initialize(lv_obj_t* content_parent)
@@ -92,7 +93,7 @@ bool LockScreen::on_input(InputAction action)
 void LockScreen::try_unlock()
 {
     checking_ = true;
-    lv_label_set_text(message_label_, "Checking...");
+    lv_label_set_text(message_label_, i18n::tr(i18n::Key::Checking));
 
     // pin_entry_.pin() is copied internally by AsyncPinCheck::start(),
     // so resetting pin_entry_ right after this call is safe -- same
@@ -132,14 +133,14 @@ void LockScreen::handle_result(security::pin::VerifyResult result)
             const uint8_t remaining = security::pin::attempts_remaining();
             char buf[48];
             if (remaining > 0) {
-                std::snprintf(buf, sizeof(buf), "Wrong PIN, %u left", static_cast<unsigned>(remaining));
+                std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::WrongPinLeftFmt), static_cast<unsigned>(remaining));
             } else {
                 // Past the first lockout threshold -- attempts_remaining()
                 // saturates at 0 here, which used to give the user no
                 // indication at all that they're getting closer to an
                 // irreversible automatic wipe. Escalate explicitly.
                 const uint8_t until_wipe = security::pin::attempts_until_wipe();
-                std::snprintf(buf, sizeof(buf), "Wrong PIN! %u attempts until vault wipe",
+                std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::WrongPinUntilWipeFmt),
                               static_cast<unsigned>(until_wipe));
             }
             lv_label_set_text(message_label_, buf);
@@ -148,7 +149,7 @@ void LockScreen::handle_result(security::pin::VerifyResult result)
         }
 
         case security::pin::VerifyResult::LockedOut:
-            lv_label_set_text(message_label_, "Locked out, try later");
+            lv_label_set_text(message_label_, i18n::tr(i18n::Key::LockedOutTryLater));
             ESP_LOGI(TAG, "Unlock denied: locked out");
             return;
 
@@ -161,7 +162,7 @@ void LockScreen::handle_result(security::pin::VerifyResult result)
             const bool pin_wiped = vault_wiped && security::pin::wipe();
 
             if (!pin_wiped) {
-                lv_label_set_text(message_label_, "Wipe error");
+                lv_label_set_text(message_label_, i18n::tr(i18n::Key::WipeError));
                 ESP_LOGE(TAG, "Automatic wipe failed (vault=%d, pin=%d)",
                          vault_wiped ? 1 : 0, pin_wiped ? 1 : 0);
                 return;

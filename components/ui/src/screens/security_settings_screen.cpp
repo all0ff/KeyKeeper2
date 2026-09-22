@@ -1,5 +1,6 @@
 #include "ui/screens/security_settings_screen.hpp"
 
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -53,23 +54,23 @@ size_t find_closest_auto_lock_index(uint32_t seconds)
 
 const char* SecuritySettingsScreen::title() const
 {
-    return "Security";
+    return i18n::tr(i18n::Key::SecurityTitle);
 }
 
 const char* SecuritySettingsScreen::footer_hint() const
 {
     if (checking_) {
-        return "Checking...";
+        return i18n::tr(i18n::Key::Checking);
     }
     switch (mode_) {
         case Mode::Adjust:
-            return "ROTATE  Change    OK/BACK  Confirm";
+            return i18n::tr(i18n::Key::AdjustFooter);
         case Mode::ChangingPin:
-            return "ROTATE Digit OK Next Hold OK Done BACK Erase/Cancel";
+            return i18n::tr(i18n::Key::ChangingPinFooter);
         case Mode::SettingDuressPin:
-            return "ROTATE Digit OK Next Hold OK Done BACK Erase/Cancel";
+            return i18n::tr(i18n::Key::ChangingPinFooter);
         default:
-            return "OK  Open    BACK  Cancel";
+            return i18n::tr(i18n::Key::OkOpenBackCancel);
     }
 }
 
@@ -125,59 +126,53 @@ void SecuritySettingsScreen::render_rows()
 
         switch (static_cast<Row>(i)) {
             case Row::ChangePin:
-                lv_label_set_text_fmt(row_labels_[i], "%sChange PIN", prefix);
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::ChangePinRowFmt), prefix);
                 break;
 
             case Row::DuressPin:
-                lv_label_set_text_fmt(row_labels_[i], "%sDuress PIN: %s", prefix,
-                                       security::pin::has_duress_pin() ? "Configured" : "Not set");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::DuressPinRowFmt), prefix,
+                                       security::pin::has_duress_pin() ? i18n::tr(i18n::Key::Configured)
+                                                                        : i18n::tr(i18n::Key::NotSetValue));
                 break;
 
             case Row::FactoryReset:
                 if (is_selected && factory_reset_confirm_pending_) {
                     lv_obj_set_style_text_color(row_labels_[i], pal.error, 0);
-                    lv_label_set_text_fmt(row_labels_[i], "%sFactory Reset (confirm?)", prefix);
+                    lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::FactoryResetConfirmRowFmt), prefix);
                 } else {
-                    lv_label_set_text_fmt(row_labels_[i], "%sFactory Reset", prefix);
+                    lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::FactoryResetRowFmt), prefix);
                 }
                 break;
 
             case Row::AutoLock:
                 if (auto_lock_timeout_s_ == 0) {
-                    lv_label_set_text_fmt(row_labels_[i], "%sAuto Lock: off", prefix);
+                    lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::AutoLockOffRowFmt), prefix);
                 } else {
                     lv_label_set_text_fmt(
                         row_labels_[i],
-                        "%sAuto Lock: %lu min",
+                        i18n::tr(i18n::Key::AutoLockMinRowFmt),
                         prefix,
                         static_cast<unsigned long>(auto_lock_timeout_s_ / 60));
                 }
                 break;
 
             case Row::WebUiViewAccounts:
-                lv_label_set_text_fmt(row_labels_[i], "%sWeb UI View: %s", prefix,
-                                    web_ui_view_accounts_ ? "Allowed" : "Off");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::WebUiViewRowFmt), prefix,
+                                    web_ui_view_accounts_ ? i18n::tr(i18n::Key::AllowedValue) : i18n::tr(i18n::Key::OffValue));
                 break;
 
             case Row::PinEntryStyle:
-                // DIAGNOSTIC -- same reasoning as adjust_value()'s own
-                // comment. If this DOESN'T print a new value right
-                // after adjust_value()'s own "after=" log for the same
-                // toggle, the bug is somewhere in render_rows()/LVGL
-                // rather than in the toggle logic itself.
-                ESP_LOGI(TAG, "PinEntryStyle render: value=%d", static_cast<int>(pin_entry_dial_mode_));
-                lv_label_set_text_fmt(row_labels_[i], "%sPIN Entry: %s", prefix,
-                                    pin_entry_dial_mode_ ? "Dial" : "Standard");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::PinEntryRowFmt), prefix,
+                                    pin_entry_dial_mode_ ? i18n::tr(i18n::Key::DialValue) : i18n::tr(i18n::Key::StandardValue));
                 break;
 
             case Row::DialLastDigit:
-                ESP_LOGI(TAG, "DialLastDigit render: value=%d", static_cast<int>(dial_last_digit_reverses_));
-                lv_label_set_text_fmt(row_labels_[i], "%sDial Last Digit: %s", prefix,
-                                    dial_last_digit_reverses_ ? "Reverse" : "OkShort");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::DialLastDigitRowFmt), prefix,
+                                    dial_last_digit_reverses_ ? i18n::tr(i18n::Key::ReverseValue) : i18n::tr(i18n::Key::OkShortValue));
                 break;
 
             case Row::Save:
-                lv_label_set_text_fmt(row_labels_[i], "%sSave", prefix);
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SaveRowFmt), prefix);
                 
                 break;
         }
@@ -281,7 +276,7 @@ void SecuritySettingsScreen::activate()
         if (!factory_reset_confirm_pending_) {
             factory_reset_confirm_pending_ = true;
             render_rows();
-            lv_label_set_text(status_label_, "This erases EVERYTHING. Press OK again to confirm.");
+            lv_label_set_text(status_label_, i18n::tr(i18n::Key::ConfirmEraseEverything));
             return;
         }
         perform_factory_reset();
@@ -310,7 +305,7 @@ void SecuritySettingsScreen::save()
         ESP_LOGI(TAG, "Security settings saved");
         manager().pop();
     } else {
-        lv_label_set_text(status_label_, "Save failed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::SaveFailed));
     }
 }
 
@@ -334,9 +329,9 @@ void SecuritySettingsScreen::show_pin_step(const char* error /* = nullptr */)
 
     const char* text = "";
     switch (change_step_) {
-        case ChangePinStep::Old:     text = "Enter current PIN"; break;
-        case ChangePinStep::New:     text = "Enter new PIN"; break;
-        case ChangePinStep::Confirm: text = "Confirm new PIN"; break;
+        case ChangePinStep::Old:     text = i18n::tr(i18n::Key::EnterCurrentPin); break;
+        case ChangePinStep::New:     text = i18n::tr(i18n::Key::EnterNewPin); break;
+        case ChangePinStep::Confirm: text = i18n::tr(i18n::Key::ConfirmNewPin); break;
     }
     lv_label_set_text(header, text);
     lv_obj_align(header, LV_ALIGN_TOP_MID, 0, 4);
@@ -381,7 +376,7 @@ void SecuritySettingsScreen::handle_pin_step_complete()
             // status_label_ is nullptr while in the PIN-step UI (see
             // show_pin_step()) -- reuse its own message-display path
             // instead of touching a null label directly.
-            show_pin_step("Checking...");
+            show_pin_step(i18n::tr(i18n::Key::Checking));
             async_check_.start(AsyncPinCheck::Kind::Verify, old_pin_.c_str(),
                                 &SecuritySettingsScreen::on_old_pin_check_done, this);
             return;
@@ -405,7 +400,7 @@ void SecuritySettingsScreen::handle_pin_step_complete()
                 lv_obj_clean(content_parent_);
                 build_rows();
                 ESP_LOGI(TAG, "PIN change cancelled -- confirmation did not match");
-                lv_label_set_text(status_label_, "PINs did not match");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::PinsDidNotMatch));
                 return;
             }
 
@@ -429,12 +424,12 @@ void SecuritySettingsScreen::handle_pin_step_complete()
                 mode_ = Mode::Browse;
                 lv_obj_clean(content_parent_);
                 build_rows();
-                lv_label_set_text(status_label_, "PIN change failed");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::PinChangeFailed));
                 return;
             }
 
             checking_ = true;
-            show_pin_step("Checking...");
+            show_pin_step(i18n::tr(i18n::Key::Checking));
             if (!old_pin_.empty()) {
                 // Normal case -- Old-PIN step already verified it
                 // (async), so set_pin() re-verifying it a second time
@@ -480,10 +475,10 @@ void SecuritySettingsScreen::handle_set_pin_result(security::pin::VerifyResult r
 
     if (ok) {
         ESP_LOGI(TAG, "PIN changed");
-        lv_label_set_text(status_label_, "PIN changed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::PinChanged));
     } else {
         ESP_LOGI(TAG, "PIN change failed");
-        lv_label_set_text(status_label_, "PIN change failed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::PinChangeFailed));
     }
 }
 
@@ -509,7 +504,7 @@ void SecuritySettingsScreen::handle_old_pin_result(security::pin::VerifyResult r
             // protected by a wipe here either way; this is a deliberate
             // scope decision, not an oversight -- flagged for you to
             // confirm it's the behavior you want.
-            show_pin_step("Too many failed attempts");
+            show_pin_step(i18n::tr(i18n::Key::TooManyFailedAttempts));
         } else {
             const uint8_t remaining = security::pin::attempts_remaining();
             char buf[48];
@@ -537,7 +532,7 @@ void SecuritySettingsScreen::cancel_change_pin()
     mode_ = Mode::Browse;
     lv_obj_clean(content_parent_);
     build_rows();
-    lv_label_set_text(status_label_, "PIN change cancelled");
+    lv_label_set_text(status_label_, i18n::tr(i18n::Key::PinChangeCancelled));
 }
 
 void SecuritySettingsScreen::begin_duress_pin_setup()
@@ -560,9 +555,9 @@ void SecuritySettingsScreen::show_duress_pin_step(const char* error /* = nullptr
 
     const char* text = "";
     switch (duress_step_) {
-        case DuressPinStep::CurrentPin: text = "Enter current PIN"; break;
-        case DuressPinStep::EnterNew:   text = "Enter duress PIN"; break;
-        case DuressPinStep::Confirm:    text = "Confirm duress PIN"; break;
+        case DuressPinStep::CurrentPin: text = i18n::tr(i18n::Key::EnterCurrentPin); break;
+        case DuressPinStep::EnterNew:   text = i18n::tr(i18n::Key::EnterDuressPin); break;
+        case DuressPinStep::Confirm:    text = i18n::tr(i18n::Key::ConfirmDuressPin); break;
     }
     lv_label_set_text(header, text);
     lv_obj_align(header, LV_ALIGN_TOP_MID, 0, 4);
@@ -621,7 +616,7 @@ void SecuritySettingsScreen::handle_duress_pin_step_complete()
             // cannot advance to Duress PIN configuration. The check is
             // asynchronous so the UI remains responsive during PBKDF2.
             checking_ = true;
-            show_duress_pin_step("Checking...");
+            show_duress_pin_step(i18n::tr(i18n::Key::Checking));
             async_check_.start(AsyncPinCheck::Kind::Verify, duress_current_pin_.c_str(),
                                &SecuritySettingsScreen::on_duress_current_pin_check_done, this);
             return;
@@ -643,12 +638,12 @@ void SecuritySettingsScreen::handle_duress_pin_step_complete()
                 mode_ = Mode::Browse;
                 lv_obj_clean(content_parent_);
                 build_rows();
-                lv_label_set_text(status_label_, "Duress PINs did not match");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::DuressPinsDidNotMatch));
                 return;
             }
 
             checking_ = true;
-            show_duress_pin_step("Checking...");
+            show_duress_pin_step(i18n::tr(i18n::Key::Checking));
             // CurrentPin step already verified duress_current_pin_
             // (async) -- set_duress_pin() re-verifying it again here
             // would be a redundant ~10s PBKDF2 pass for nothing
@@ -676,7 +671,7 @@ void SecuritySettingsScreen::handle_duress_current_pin_result(security::pin::Ver
         if (result == security::pin::VerifyResult::LockedOut) {
             show_duress_pin_step("Locked out, try later");
         } else if (result == security::pin::VerifyResult::WipeRequired) {
-            show_duress_pin_step("Too many failed attempts");
+            show_duress_pin_step(i18n::tr(i18n::Key::TooManyFailedAttempts));
         } else {
             const uint8_t remaining = security::pin::attempts_remaining();
             char buf[48];
@@ -716,7 +711,7 @@ void SecuritySettingsScreen::handle_duress_set_result(security::pin::VerifyResul
 
     if (ok) {
         ESP_LOGI(TAG, "Duress PIN configured");
-        lv_label_set_text(status_label_, "Duress PIN set");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::DuressPinSet));
     } else {
         // Covers both "current PIN was wrong" and "duress PIN equals
         // the regular PIN" (set_duress_pin() rejects both, see
@@ -724,7 +719,7 @@ void SecuritySettingsScreen::handle_duress_set_result(security::pin::VerifyResul
         // than distinguishing them, so a wrong-current-PIN attempt
         // here doesn't leak useful timing/feedback beyond "it failed".
         ESP_LOGW(TAG, "Duress PIN setup failed");
-        lv_label_set_text(status_label_, "Duress PIN setup failed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::DuressPinSetupFailed));
     }
 }
 
@@ -735,7 +730,7 @@ void SecuritySettingsScreen::cancel_duress_pin_setup()
     mode_ = Mode::Browse;
     lv_obj_clean(content_parent_);
     build_rows();
-    lv_label_set_text(status_label_, "Duress PIN setup cancelled");
+    lv_label_set_text(status_label_, i18n::tr(i18n::Key::DuressPinSetupCancelled));
 }
 
 void SecuritySettingsScreen::perform_factory_reset()
@@ -753,7 +748,7 @@ void SecuritySettingsScreen::perform_factory_reset()
         factory_reset_confirm_pending_ = false;
         ESP_LOGE(TAG, "Factory reset failed (vault=%d, pin=%d, settings=%d)", vault_wiped ? 1 : 0,
                   pin_wiped ? 1 : 0, settings_reset ? 1 : 0);
-        lv_label_set_text(status_label_, "Factory reset failed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::FactoryResetFailed));
         render_rows();
         return;
     }
@@ -765,7 +760,7 @@ void SecuritySettingsScreen::perform_factory_reset()
     wifi::apply_settings();
 
     ESP_LOGW(TAG, "Factory reset complete -- restarting");
-    lv_label_set_text(status_label_, "Reset complete. Restarting...");
+    lv_label_set_text(status_label_, i18n::tr(i18n::Key::ResetCompleteRestarting));
     esp_restart(); // does not return -- same pattern as BackupScreen's Restore, no delay needed
 }
 

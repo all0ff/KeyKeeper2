@@ -1,5 +1,6 @@
 #include "ui/screens/setup_pin_screen.hpp"
 
+#include "ui/localization.hpp"
 #include "ui/screens/main_menu.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
@@ -21,21 +22,21 @@ constexpr char TAG[] = "ui.setup_pin";
 
 const char* SetupPinScreen::title() const
 {
-    return "Setup PIN";
+    return i18n::tr(i18n::Key::SetupPinTitle);
 }
 
 const char* SetupPinScreen::footer_hint() const
 {
     if (checking_) {
-        return "Checking...";
+        return i18n::tr(i18n::Key::Checking);
     }
     switch (stage_) {
         case Stage::EnterNew:
-            return "ROTATE Digit OK Next Hold OK Done BACK Erase";
+            return i18n::tr(i18n::Key::SetupPinFooter);
         case Stage::Confirm:
-            return "ROTATE Digit OK Next Hold OK Done BACK Erase";
+            return i18n::tr(i18n::Key::SetupPinFooter);
         case Stage::MismatchError:
-            return "OK  Retry";
+            return i18n::tr(i18n::Key::OkRetry);
         default:
             return "";
     }
@@ -113,14 +114,14 @@ void SetupPinScreen::set_stage(Stage stage)
 
     switch (stage) {
         case Stage::EnterNew:
-            lv_label_set_text(prompt_label_, "Enter new PIN");
+            lv_label_set_text(prompt_label_, i18n::tr(i18n::Key::EnterNewPin));
             break;
         case Stage::Confirm:
-            lv_label_set_text(prompt_label_, "Confirm PIN");
+            lv_label_set_text(prompt_label_, i18n::tr(i18n::Key::ConfirmPin));
             break;
         case Stage::MismatchError:
             lv_label_set_text(prompt_label_, "");
-            show_message("PINs do not match!");
+            show_message(i18n::tr(i18n::Key::PinsDoNotMatch));
             break;
     }
 }
@@ -156,14 +157,14 @@ void SetupPinScreen::try_finish()
         updated.pin_length = static_cast<uint8_t>(std::strlen(first_pin_));
 
         if (!settings::set_security(updated)) {
-            show_message("Failed to save PIN length setting");
+            show_message(i18n::tr(i18n::Key::FailedToSavePinLength));
             ESP_LOGE(TAG, "set_security() failed before set_pin()");
             return;
         }
 
         // Match — save PIN (async, see setup_pin_screen.hpp)
         checking_ = true;
-        show_message("Checking...");
+        show_message(i18n::tr(i18n::Key::Checking));
         async_check_.start_set_pin(first_pin_, nullptr, &SetupPinScreen::on_set_pin_done, this);
 
         // Clear sensitive data from RAM -- start_set_pin() already
@@ -182,7 +183,7 @@ void SetupPinScreen::handle_set_pin_result(security::pin::VerifyResult result)
     checking_ = false;
 
     if (result != security::pin::VerifyResult::Success) {
-        show_message("Failed to save PIN");
+        show_message(i18n::tr(i18n::Key::FailedToSavePin));
         ESP_LOGE(TAG, "set_pin() failed");
         return;
     }
@@ -194,7 +195,7 @@ void SetupPinScreen::handle_set_pin_result(security::pin::VerifyResult result)
     // conclusion. See security::lock::unlock_after_pin_set()'s doc
     // comment.
     if (!security::lock::unlock_after_pin_set()) {
-        show_message("Unlock failed after PIN set");
+        show_message(i18n::tr(i18n::Key::UnlockFailedAfterPinSet));
         ESP_LOGE(TAG, "unlock_after_pin_set() failed after set_pin()");
         return;
     }
