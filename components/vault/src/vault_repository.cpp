@@ -1,9 +1,12 @@
 #include "vault/vault_repository.hpp"
 
+#include "security/vault_key.hpp"
 #include "storage/vaultfile.hpp"
 
 #include "esp_log.h"
+#include "esp_random.h"
 #include "esp_timer.h"
+#include "psa/crypto.h"
 
 #include <cstring>
 #include <vector>
@@ -19,6 +22,136 @@ constexpr char TAG[] = "vault.repository";
 // bytes 'K','K','V','T' in memory order -- that's enforced by
 // append_u32()/Reader::read_u32() instead.
 constexpr uint32_t MAGIC = 0x54564B4B;
+
+// =============================================================================
+// Encryption envelope (format v5) -- see vault_key.hpp's own file
+// comment for where the AES-256 key itself comes from. Wraps the
+// EXISTING plaintext v4 blob (MAGIC/VAULT_FORMAT_VERSION/entries, from
+// encode_all() below, completely unchanged) inside AES-256-GCM: this
+// outer layer only concerns itself with encrypt/decrypt-at-rest, not
+// the entry format itself, which stays exactly as it already was.
+//
+// On-disk layout: ENVELOPE_MAGIC(4) | ENVELOPE_VERSION(2) | NONCE(12)
+// | CIPHERTEXT(variable) | TAG(16). ENVELOPE_MAGIC+ENVELOPE_VERSION
+// are passed as AEAD "additional data" (authenticated, not encrypted)
+// so tampering with either is caught by the same GCM tag check as
+// tampering with the ciphertext itself, even though they're stored in
+// the clear (they have to be, to be readable before decryption can
+// even begin). A fresh random NONCE is generated for every single
+// save -- required for GCM: reusing a nonce with the same key is a
+// real, serious confidentiality break, not just a formality.
+//
+// A file starting with ENVELOPE_MAGIC is this format. A file starting
+// with the OLDER, plain MAGIC above is a pre-encryption v4 file --
+// load() migrates it in place (decodes as before, then re-persists,
+// which now always writes the encrypted envelope) the first time it's
+// opened after this update, not a separate one-time migration step
+// the person has to trigger themselves.
+constexpr uint32_t ENVELOPE_MAGIC = 0x32454B4B; // distinct from MAGIC -- never valid as the old format's own first 4 bytes
+constexpr uint16_t ENVELOPE_VERSION = 1;
+constexpr size_t ENVELOPE_HEADER_LEN = 4 + 2; // magic + version, exactly what's passed as AAD
+constexpr size_t GCM_NONCE_LEN = 12;
+constexpr size_t GCM_TAG_LEN = 16;
+
+/**
+ * @brief Encrypt `plaintext` into the on-disk envelope format
+ *        described above, using the current session's vault key.
+ *
+ * @return false if there is no vault key available right now (device
+ *         not actually unlocked, or key derivation failed earlier --
+ *         see vault_key.hpp) or the PSA encrypt call itself failed.
+ */
+bool encrypt_envelope(const std::vector<uint8_t>& plaintext, std::vector<uint8_t>& out)
+{
+    if (!security::vault_key::is_set()) {
+        ESP_LOGE(TAG, "encrypt_envelope: no vault key available");
+        return false;
+    }
+
+    uint8_t nonce[GCM_NONCE_LEN];
+    esp_fill_random(nonce, sizeof(nonce));
+
+    uint8_t aad[ENVELOPE_HEADER_LEN];
+    aad[0] = static_cast<uint8_t>(ENVELOPE_MAGIC & 0xFF);
+    aad[1] = static_cast<uint8_t>((ENVELOPE_MAGIC >> 8) & 0xFF);
+    aad[2] = static_cast<uint8_t>((ENVELOPE_MAGIC >> 16) & 0xFF);
+    aad[3] = static_cast<uint8_t>((ENVELOPE_MAGIC >> 24) & 0xFF);
+    aad[4] = static_cast<uint8_t>(ENVELOPE_VERSION & 0xFF);
+    aad[5] = static_cast<uint8_t>((ENVELOPE_VERSION >> 8) & 0xFF);
+
+    out.assign(ENVELOPE_HEADER_LEN + GCM_NONCE_LEN, 0);
+    std::memcpy(out.data(), aad, ENVELOPE_HEADER_LEN);
+    std::memcpy(out.data() + ENVELOPE_HEADER_LEN, nonce, GCM_NONCE_LEN);
+
+    const size_t cipher_capacity = plaintext.size() + GCM_TAG_LEN;
+    out.resize(out.size() + cipher_capacity);
+    size_t cipher_len_out = 0;
+
+    const psa_status_t status = psa_aead_encrypt(
+        security::vault_key::handle(), PSA_ALG_GCM, nonce, GCM_NONCE_LEN, aad, ENVELOPE_HEADER_LEN,
+        plaintext.data(), plaintext.size(), out.data() + ENVELOPE_HEADER_LEN + GCM_NONCE_LEN, cipher_capacity,
+        &cipher_len_out);
+
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "psa_aead_encrypt failed (status %d)", static_cast<int>(status));
+        return false;
+    }
+
+    out.resize(ENVELOPE_HEADER_LEN + GCM_NONCE_LEN + cipher_len_out);
+    return true;
+}
+
+/**
+ * @brief Decrypt an on-disk envelope (as produced by
+ *        encrypt_envelope()) back into the original plaintext v4
+ *        blob, using the current session's vault key.
+ *
+ * @return false if `in` is too short to be a valid envelope, its
+ *         header doesn't match ENVELOPE_MAGIC/ENVELOPE_VERSION, there
+ *         is no vault key available, or authentication fails (wrong
+ *         key -- i.e. wrong PIN's derived key somehow got this far,
+ *         which shouldn't normally be reachable -- or the file is
+ *         corrupt/tampered).
+ */
+bool decrypt_envelope(const uint8_t* in, size_t in_len, std::vector<uint8_t>& out)
+{
+    if (in_len < ENVELOPE_HEADER_LEN + GCM_NONCE_LEN + GCM_TAG_LEN) {
+        ESP_LOGE(TAG, "decrypt_envelope: file too short to be a valid envelope");
+        return false;
+    }
+
+    const uint16_t version = static_cast<uint16_t>(in[4]) | (static_cast<uint16_t>(in[5]) << 8);
+    if (version != ENVELOPE_VERSION) {
+        ESP_LOGE(TAG, "decrypt_envelope: unknown envelope version %u", static_cast<unsigned>(version));
+        return false;
+    }
+
+    if (!security::vault_key::is_set()) {
+        ESP_LOGE(TAG, "decrypt_envelope: no vault key available");
+        return false;
+    }
+
+    const uint8_t* aad = in; // the header itself IS the AAD, verbatim
+    const uint8_t* nonce = in + ENVELOPE_HEADER_LEN;
+    const uint8_t* ciphertext = in + ENVELOPE_HEADER_LEN + GCM_NONCE_LEN;
+    const size_t ciphertext_len = in_len - ENVELOPE_HEADER_LEN - GCM_NONCE_LEN;
+
+    out.assign(ciphertext_len, 0); // plaintext is always shorter than ciphertext (by GCM_TAG_LEN) -- generous capacity
+    size_t plain_len_out = 0;
+
+    const psa_status_t status = psa_aead_decrypt(security::vault_key::handle(), PSA_ALG_GCM, nonce, GCM_NONCE_LEN,
+                                                  aad, ENVELOPE_HEADER_LEN, ciphertext, ciphertext_len, out.data(),
+                                                  out.size(), &plain_len_out);
+
+    if (status != PSA_SUCCESS) {
+        ESP_LOGE(TAG, "psa_aead_decrypt failed (status %d) -- wrong key or corrupt/tampered file",
+                 static_cast<int>(status));
+        return false;
+    }
+
+    out.resize(plain_len_out);
+    return true;
+}
 
 bool initialized = false;
 bool loaded = false;
@@ -460,9 +593,19 @@ std::vector<uint8_t> encode_all(const std::vector<VaultEntry>& in)
 
 bool persist()
 {
-    std::vector<uint8_t> buf = encode_all(entries);
-    const bool written = storage::vaultfile::write_all(buf.data(), buf.size());
-    secure_clear_bytes(buf);
+    std::vector<uint8_t> plaintext = encode_all(entries);
+
+    std::vector<uint8_t> envelope;
+    const bool encrypted = encrypt_envelope(plaintext, envelope);
+    secure_clear_bytes(plaintext);
+
+    if (!encrypted) {
+        ESP_LOGE(TAG, "persist: encrypt_envelope failed -- vault.db NOT written");
+        return false;
+    }
+
+    const bool written = storage::vaultfile::write_all(envelope.data(), envelope.size());
+    secure_clear_bytes(envelope);
 
     if (!written) {
         ESP_LOGE(TAG, "persist: storage::vaultfile::write_all failed");
@@ -516,13 +659,49 @@ bool load()
         return false;
     }
 
-    if (!decode_all(buf.data(), read_size, entries)) {
+    // Format detection: the first 4 bytes distinguish the encrypted
+    // envelope (ENVELOPE_MAGIC) from an older, pre-encryption plain
+    // v4 file (the plain MAGIC) -- see ENVELOPE_MAGIC's own comment
+    // for why these two values can never collide. A file starting
+    // with anything else is corrupt/unrecognized either way.
+    uint32_t file_magic = 0;
+    if (read_size >= 4) {
+        file_magic = static_cast<uint32_t>(buf[0]) | (static_cast<uint32_t>(buf[1]) << 8) |
+                     (static_cast<uint32_t>(buf[2]) << 16) | (static_cast<uint32_t>(buf[3]) << 24);
+    }
+
+    std::vector<uint8_t> plaintext;
+    bool needs_migration = false;
+
+    if (file_magic == ENVELOPE_MAGIC) {
+        if (!decrypt_envelope(buf.data(), read_size, plaintext)) {
+            ESP_LOGE(TAG, "vault.db could not be decrypted -- wrong PIN's key, or the file is corrupt/tampered");
+            secure_clear_bytes(buf);
+            return false;
+        }
+    } else if (file_magic == MAGIC) {
+        // Pre-encryption vault.db -- migrate it to the encrypted
+        // envelope automatically, right now, rather than asking the
+        // person to do anything. plaintext IS just buf here (already
+        // decoded-ready), not a separate decrypt step.
+        ESP_LOGW(TAG, "vault.db predates encryption -- migrating to the encrypted format now");
+        plaintext = std::move(buf);
+        needs_migration = true;
+    } else {
+        ESP_LOGE(TAG, "vault.db has an unrecognized header -- corrupt or not a KeyKeeper2 vault file");
+        secure_clear_bytes(buf);
+        return false;
+    }
+
+    if (!decode_all(plaintext.data(), plaintext.size(), entries)) {
         ESP_LOGE(TAG, "vault.db is corrupt or unreadable");
+        secure_clear_bytes(plaintext);
         secure_clear_bytes(buf);
         clear_entries();
         return false;
     }
 
+    secure_clear_bytes(plaintext);
     secure_clear_bytes(buf);
 
     for (const VaultEntry& e : entries) {
@@ -533,6 +712,22 @@ bool load()
 
     loaded = true;
     ESP_LOGI(TAG, "Loaded %u entries from vault.db", static_cast<unsigned>(entries.size()));
+
+    if (needs_migration) {
+        // Re-persist NOW, while the key from this same unlock is
+        // still available -- persist() always writes the encrypted
+        // envelope, so this one call is the entire migration. Not a
+        // hard failure if it doesn't work (e.g. no vault key somehow)
+        // -- the in-memory vault this session is using is correct
+        // either way; the NEXT successful save (any normal edit)
+        // would just retry the same migration.
+        if (!persist()) {
+            ESP_LOGE(TAG, "Failed to migrate vault.db to the encrypted format -- will retry on the next save");
+        } else {
+            ESP_LOGI(TAG, "vault.db migrated to the encrypted format");
+        }
+    }
+
     return true;
 }
 
@@ -555,6 +750,14 @@ bool is_initialized()
 bool is_loaded()
 {
     return initialized && loaded;
+}
+
+bool persist_now()
+{
+    if (!initialized || !loaded) {
+        return false;
+    }
+    return persist();
 }
 
 size_t entry_count()
@@ -587,6 +790,14 @@ bool get(uint32_t id, VaultEntry& out)
         }
     }
     return false;
+}
+
+std::vector<uint8_t> export_plaintext()
+{
+    if (!initialized || !loaded) {
+        return {};
+    }
+    return encode_all(entries);
 }
 
 uint32_t add(VaultEntry entry)

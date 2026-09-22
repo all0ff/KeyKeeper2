@@ -102,7 +102,8 @@ bool PinEntry::on_input(InputAction action)
             // pure function of cursor_ (even slots expect Right, odd
             // expect Left), not separately tracked state -- so
             // BackShort (which only changes cursor_) never needs its
-            // own logic to keep this in sync.
+            // own logic to keep it in sync; it does still need to
+            // reset dial_engaged_ (see below) for the slot it reopens.
             const bool expect_right = (cursor_ % 2) == 0;
             const bool is_last_digit = (cursor_ + 1 == cfg_.length);
             // On dial_mode's last digit with reversal-confirm turned
@@ -114,22 +115,44 @@ bool PinEntry::on_input(InputAction action)
             // instead of one more direction-reversal.
             const bool free_spin_last = is_last_digit && !cfg_.dial_last_reverses;
 
-            if (this_is_right == expect_right || free_spin_last) {
+            if (this_is_right == expect_right) {
+                dial_engaged_ = true;
                 spin_value_ = this_is_right ? static_cast<uint8_t>((spin_value_ + 1) % 10)
                                              : (spin_value_ == 0 ? 9 : static_cast<uint8_t>(spin_value_ - 1));
                 render();
                 return true;
             }
 
-            // Reversal: confirms the CURRENT slot's spun value, same
+            if (free_spin_last || !dial_engaged_) {
+                // Wrong direction, but either this slot never got
+                // properly engaged in the first place (a free preview
+                // spin -- see this widget's own header comment: not a
+                // reversal, since there's no established direction to
+                // reverse FROM yet) or this is the free-spin last
+                // digit, which never treats either direction as a
+                // reversal at all. Spins normally either way; does
+                // NOT set dial_engaged_ here, so a genuine
+                // expected-direction notch is still needed to engage
+                // this slot for real.
+                spin_value_ = this_is_right ? static_cast<uint8_t>((spin_value_ + 1) % 10)
+                                             : (spin_value_ == 0 ? 9 : static_cast<uint8_t>(spin_value_ - 1));
+                render();
+                return true;
+            }
+
+            // Reversal: this slot was engaged (a real expected-
+            // direction notch happened first), and now a notch the
+            // other way confirms the CURRENT slot's spun value, same
             // as OkShort below would, AND this same notch is applied
             // as the first spin of the NEXT slot (whose expected
             // direction is exactly this_is_right, the direction that
-            // just triggered this reversal) -- nothing wasted,
-            // matching how reversing a real combination dial feels.
+            // just triggered this reversal) AND engages that next
+            // slot immediately -- nothing wasted, matching how
+            // reversing a real combination dial feels.
             buffer_[cursor_] = static_cast<char>('0' + spin_value_);
             ++cursor_;
             buffer_[cursor_] = '\0';
+            dial_engaged_ = true;
             spin_value_ = this_is_right ? 1 : 9;
 
             if (cfg_.finish_on_short && cursor_ >= cfg_.length) {
@@ -173,6 +196,7 @@ bool PinEntry::on_input(InputAction action)
             --cursor_;
             buffer_[cursor_] = '\0';
             spin_value_ = 0;
+            dial_engaged_ = false; // re-opened slot starts fresh -- see this file's own header comment
             render();
             return true;
 
@@ -186,6 +210,7 @@ void PinEntry::reset()
     cursor_ = 0;
     spin_value_ = 0;
     finished_ = false;
+    dial_engaged_ = false;
     
     for (char& c : buffer_) {
         c = '\0';

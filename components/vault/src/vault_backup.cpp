@@ -1,6 +1,7 @@
 #include "vault/vault_backup.hpp"
 
 #include "vault/vault.hpp"
+#include "vault/vault_repository.hpp"
 
 #include "security/lock_manager.hpp"
 #include "storage/storage.hpp"
@@ -75,12 +76,22 @@ bool create_backup(char* out_filename, size_t out_filename_size)
         return false;
     }
 
-    const size_t size = storage::vaultfile::size();
-
-    std::vector<uint8_t> buffer(size);
-    size_t actual = size;
-    if (size > 0 && !storage::vaultfile::read_all(buffer.data(), actual)) {
-        ESP_LOGE(TAG, "create_backup: failed to read vault.db");
+    // Plaintext, from the already-decrypted in-memory vault --
+    // deliberately NOT a raw copy of vault.db's own on-disk bytes
+    // (which are the AES-GCM-encrypted envelope, see
+    // vault_repository.cpp's own file comment). Backups are kept
+    // plaintext on purpose: a project decision that a backup should
+    // be usable/inspectable without needing this exact device's own
+    // derived key, unlike vault.db itself.
+    const std::vector<uint8_t> buffer = repository::export_plaintext();
+    const size_t size = buffer.size();
+    if (size == 0) {
+        // export_plaintext() only ever returns truly empty for "not
+        // loaded" -- even a genuinely empty (zero-entry) vault still
+        // encodes to a small non-zero header, so this specifically
+        // means the vault isn't actually available right now, not
+        // that it has no entries.
+        ESP_LOGE(TAG, "create_backup: vault not loaded");
         return false;
     }
 

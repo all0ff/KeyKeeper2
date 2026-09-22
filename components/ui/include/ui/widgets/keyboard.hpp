@@ -22,14 +22,18 @@
 // pin_entry_dial_mode, see that field's own comment): mimics a real
 // combination lock. Each digit slot has an EXPECTED spin direction
 // that strictly alternates starting with RotateRight for digit 0
-// (RotateRight, RotateLeft, RotateRight, ...) -- rotating a notch in
-// the expected direction spins that slot's value by one (wrapping
-// 0-9), same as Standard's spin. The moment a notch comes in going
-// the OPPOSITE way, that single notch does two things at once: it
-// CONFIRMS the current slot's spun value (same effect as Standard's
-// OkShort) AND, since the opposite direction is exactly what the next
-// slot expects, it also counts as that next slot's first spin notch
-// -- so reversing direction is both "confirm" and "start dialing the
+// (RotateRight, RotateLeft, RotateRight, ...). Rotating a notch in the
+// expected direction spins that slot's value by one (wrapping 0-9,
+// same as Standard's spin) AND engages the slot; rotating the
+// "wrong" way BEFORE the slot has been engaged is just a free preview
+// spin (the digit still visibly moves so there's some feedback, but
+// nothing is confirmed and the slot isn't considered engaged by it --
+// there's no direction dialed in yet to reverse FROM). Once engaged,
+// a notch the OTHER way is the real reversal: it CONFIRMS the current
+// slot's spun value (same effect as Standard's OkShort) AND, since
+// the opposite direction is exactly what the next slot expects, it
+// also engages that next slot and counts as its first spin notch --
+// so reversing direction is both "confirm" and "start dialing the
 // next digit" in one continuous motion, nothing wasted, matching how
 // a physical dial actually feels. cfg_.dial_last_reverses controls
 // whether this reversal-confirms behavior also applies to the FINAL
@@ -39,7 +43,9 @@
 // might want the more deliberate final confirmation. BackShort always
 // steps back one slot in both modes, restoring that slot's
 // previously-spun value so backing up and re-dialing isn't
-// destructive of anything except the slot(s) actually backed past.
+// destructive of anything except the slot(s) actually backed past --
+// and re-opens that slot not yet engaged, same as any other fresh
+// slot.
 // =============================================================================
 
 namespace ui::widgets {
@@ -116,6 +122,20 @@ public:
 
 private:
     void render();
+
+    // dial_mode only -- see this widget's own header comment. Whether
+    // this slot has seen a notch in its EXPECTED direction yet
+    // (cursor_'s parity -- even slots expect Right, odd expect Left).
+    // Rotating the "wrong" way before that has happened is just a
+    // free preview spin -- the digit still visibly moves, but it
+    // doesn't count as a reversal (there's nothing engaged yet to
+    // reverse FROM) and doesn't confirm anything. Only once a notch
+    // in the expected direction has engaged the slot does a
+    // subsequent notch the OTHER way become a real reversal-confirm.
+    // Set true by the first expected-direction notch, reset false
+    // whenever a fresh slot begins (after a confirm, after BackShort
+    // re-opens a slot, and by reset()).
+    bool dial_engaged_ = false;
 
     lv_obj_t* container_ = nullptr;
     lv_obj_t* digit_labels_[MAX_LENGTH]{};

@@ -56,8 +56,13 @@ void SetupPinScreen::initialize(lv_obj_t* content_parent)
     cfg.length = 6;
     cfg.min_length = 4;
     cfg.mask_confirmed = true;
-    cfg.dial_mode = settings::all().security.pin_entry_dial_mode;
-    cfg.dial_last_reverses = settings::all().security.dial_last_digit_reverses;
+    // Deliberately NOT applying settings::SecuritySettings::
+    // pin_entry_dial_mode here -- the project owner wants the dial
+    // interaction reserved for unlocking (LockScreen) only; setting a
+    // new PIN always uses Standard entry regardless of that setting,
+    // same reasoning SecuritySettingsScreen's own ChangePin/DuressPin
+    // flows already follow (their pin_entry_ never sets dial_mode
+    // either).
 
     pin_entry_.init(content_parent, cfg);
     lv_obj_align(pin_entry_.root(), LV_ALIGN_CENTER, 0, -10);

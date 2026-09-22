@@ -2,6 +2,7 @@
 
 #include "power/power.hpp"
 #include "security/lock_manager.hpp"
+#include "vault/vault_repository.hpp"
 
 #include "esp_log.h"
 
@@ -61,12 +62,41 @@ void AsyncPinCheck::task_entry(void* arg)
             // signature. Don't read anything more specific than
             // success/failure into this.
             result = ok ? security::pin::VerifyResult::Success : security::pin::VerifyResult::WrongPin;
+            if (ok && vault::repository::is_loaded()) {
+                // A successful set_pin() has ALREADY re-keyed
+                // security::vault_key internally (pin_manager.cpp's
+                // own store_new_pin(), see its comment) -- but that
+                // alone only changes what key the NEXT save uses.
+                // vault.db on disk right now is still encrypted under
+                // the OLD key, and the in-memory entries this
+                // Repository is holding were decrypted under it too.
+                // Re-persisting right here, immediately, re-encrypts
+                // those SAME already-decrypted entries under the NEW
+                // key and overwrites the file -- without this, the
+                // vault would become unreadable the next time it's
+                // loaded (wrong key for what's actually on disk),
+                // which would be silent data loss, not just an
+                // inconvenience. Skipped only when nothing is loaded
+                // yet (this device's very first PIN setup, before any
+                // vault.db exists at all) -- nothing to re-encrypt.
+                if (!vault::repository::persist_now()) {
+                    ESP_LOGE(TAG, "Failed to re-encrypt vault.db under the new PIN -- old vault.db may now be "
+                                  "unreadable; retry changing the PIN, or restore a backup");
+                }
+            }
             break;
         }
 
         case Kind::SetPinAfterVerify: {
             const bool ok = security::pin::set_pin_after_verify(state->pin);
             result = ok ? security::pin::VerifyResult::Success : security::pin::VerifyResult::WrongPin;
+            if (ok && vault::repository::is_loaded()) {
+                // Same reasoning as Kind::SetPin above.
+                if (!vault::repository::persist_now()) {
+                    ESP_LOGE(TAG, "Failed to re-encrypt vault.db under the new PIN -- old vault.db may now be "
+                                  "unreadable; retry changing the PIN, or restore a backup");
+                }
+            }
             break;
         }
 

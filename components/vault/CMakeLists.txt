@@ -17,5 +17,6 @@ idf_component_register(
         event_bus
         esp_timer
         esp_hw_support
+        mbedtls
         log
 )

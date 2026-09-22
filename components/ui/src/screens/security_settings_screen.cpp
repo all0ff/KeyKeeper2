@@ -160,11 +160,18 @@ void SecuritySettingsScreen::render_rows()
                 break;
 
             case Row::PinEntryStyle:
+                // DIAGNOSTIC -- same reasoning as adjust_value()'s own
+                // comment. If this DOESN'T print a new value right
+                // after adjust_value()'s own "after=" log for the same
+                // toggle, the bug is somewhere in render_rows()/LVGL
+                // rather than in the toggle logic itself.
+                ESP_LOGI(TAG, "PinEntryStyle render: value=%d", static_cast<int>(pin_entry_dial_mode_));
                 lv_label_set_text_fmt(row_labels_[i], "%sPIN Entry: %s", prefix,
                                     pin_entry_dial_mode_ ? "Dial" : "Standard");
                 break;
 
             case Row::DialLastDigit:
+                ESP_LOGI(TAG, "DialLastDigit render: value=%d", static_cast<int>(dial_last_digit_reverses_));
                 lv_label_set_text_fmt(row_labels_[i], "%sDial Last Digit: %s", prefix,
                                     dial_last_digit_reverses_ ? "Reverse" : "OkShort");
                 break;
@@ -222,15 +229,33 @@ void SecuritySettingsScreen::adjust_value(int32_t delta)
         }
 
         case Row::WebUiViewAccounts:
-            web_ui_view_accounts_ = !web_ui_view_accounts_;
+            web_ui_view_accounts_ = (delta > 0);
             break;
 
         case Row::PinEntryStyle:
-            pin_entry_dial_mode_ = !pin_entry_dial_mode_;
+            // DIAGNOSTIC -- logged before AND after the toggle so a
+            // captured log shows directly whether this handler is
+            // even being reached, how many times per physical click,
+            // and what value results each time -- a confirmed
+            // real-hardware report says this row (and DialLastDigit)
+            // don't visibly change on rotation while a same-pattern
+            // row elsewhere (WebUiViewAccounts, unmodified at the
+            // time) did, which rules out a simple "double-dispatch
+            // cancels an XOR toggle" explanation for THIS specific
+            // case -- switched from `!bool` to setting from delta's
+            // sign anyway (harmless and more robust either way), but
+            // the real cause is still unconfirmed pending this log.
+            ESP_LOGI(TAG, "PinEntryStyle adjust: delta=%d before=%d", static_cast<int>(delta),
+                     static_cast<int>(pin_entry_dial_mode_));
+            pin_entry_dial_mode_ = (delta > 0);
+            ESP_LOGI(TAG, "PinEntryStyle adjust: after=%d", static_cast<int>(pin_entry_dial_mode_));
             break;
 
         case Row::DialLastDigit:
-            dial_last_digit_reverses_ = !dial_last_digit_reverses_;
+            ESP_LOGI(TAG, "DialLastDigit adjust: delta=%d before=%d", static_cast<int>(delta),
+                     static_cast<int>(dial_last_digit_reverses_));
+            dial_last_digit_reverses_ = (delta > 0);
+            ESP_LOGI(TAG, "DialLastDigit adjust: after=%d", static_cast<int>(dial_last_digit_reverses_));
             break;
 
         default:

@@ -1,6 +1,7 @@
 #include "security/pin_manager.hpp"
 
 #include "event_bus/event_bus.hpp"
+#include "security/vault_key.hpp"
 #include "settings/settings.hpp"
 #include "storage/nvs_storage.hpp"
 
@@ -110,6 +111,41 @@ bool compute_hash(const uint8_t* salt, const char* pin_digits,
 
     if (status != PSA_SUCCESS) {
         ESP_LOGE(TAG, "PBKDF2 failed (status %d)", static_cast<int>(status));
+        return false;
+    }
+
+    return true;
+}
+
+// Domain-separated from the PIN's own verification hash: this SAME
+// PBKDF2 output (master_hash, i.e. compute_hash()'s own out_hash) is
+// used for two different purposes, and reusing that value AS the
+// vault key too would mean the value already sitting in NVS (as the
+// stored verification hash) directly WAS the encryption key -- so a
+// second, independent value is derived from it via one plain SHA-256
+// over the hash plus a fixed label, cheap enough to not add any
+// perceptible time to the existing ~10s PBKDF2 wait (a real,
+// deliberate concern raised and addressed before this was built --
+// a second full PBKDF2 pass was the first idea, and would have
+// doubled that wait). Equivalent in spirit to a one-step HKDF-Expand;
+// not literally PSA's own HKDF API, since master_hash already carries
+// full PBKDF2-stretched entropy and doesn't need HKDF-Extract's own
+// separate step.
+bool derive_vault_key(const uint8_t master_hash[HASH_LEN], uint8_t out_key[HASH_LEN])
+{
+    static constexpr char LABEL[] = "KeyKeeper2-vault-key-v1";
+
+    uint8_t buffer[HASH_LEN + sizeof(LABEL) - 1];
+    std::memcpy(buffer, master_hash, HASH_LEN);
+    std::memcpy(buffer + HASH_LEN, LABEL, sizeof(LABEL) - 1);
+
+    size_t hash_len_out = 0;
+    const psa_status_t status =
+        psa_hash_compute(PSA_ALG_SHA_256, buffer, sizeof(buffer), out_key, HASH_LEN, &hash_len_out);
+    std::memset(buffer, 0, sizeof(buffer));
+
+    if (status != PSA_SUCCESS || hash_len_out != HASH_LEN) {
+        ESP_LOGE(TAG, "derive_vault_key failed (status %d)", static_cast<int>(status));
         return false;
     }
 
@@ -365,6 +401,29 @@ bool store_new_pin(const char* new_pin)
     reset_failure_state();
     clear_duress_pin();
 
+    // Also covers the one case verify() itself can't: a BRAND NEW
+    // device's very first PIN setup, which transitions straight to
+    // Unlocked (lock_manager.cpp's unlock_after_pin_set()) without
+    // ever calling verify() at all -- there being no old PIN yet to
+    // verify. Hooking it here instead, right where a fresh hash was
+    // just computed for the new PIN anyway, covers every path that
+    // ends up storing a PIN uniformly (first-ever setup, a change via
+    // set_pin()'s own old-PIN verification above, and
+    // set_pin_after_verify()) -- not just the specific one that
+    // motivated adding it. Superseding whatever key verify() itself
+    // may have just set moments ago (set_pin()'s own internal
+    // verify(old_pin) call, for the "changing an existing PIN" path)
+    // is correct, not wasteful: the vault must end up keyed to the
+    // PIN that's actually current going forward, not the one just
+    // replaced.
+    uint8_t vault_key_bytes[HASH_LEN];
+    if (derive_vault_key(next.hash, vault_key_bytes)) {
+        vault_key::set(vault_key_bytes);
+    } else {
+        ESP_LOGE(TAG, "derive_vault_key failed after setting a new PIN -- vault will be unavailable");
+    }
+    std::memset(vault_key_bytes, 0, sizeof(vault_key_bytes));
+
     if (event_bus::is_initialized()) {
         event_bus::publish(event_bus::Category::System,
                             static_cast<uint32_t>(event_bus::SystemEventId::PinChanged));
@@ -457,6 +516,21 @@ VerifyResult verify(const char* pin)
 
     if (diff == 0) {
         reset_failure_state();
+        uint8_t vault_key[HASH_LEN];
+        if (derive_vault_key(candidate_hash, vault_key)) {
+            vault_key::set(vault_key);
+        } else {
+            // No vault key means vault::repository's own decrypt call
+            // will simply fail -- treated there as "vault
+            // unavailable", not silently proceeding with no
+            // encryption. Still a successful PIN verification (the
+            // PIN itself was correct), so still reported as Success
+            // here; this failure mode is expected to be extremely
+            // rare (PSA hashing failing at all) rather than something
+            // to turn into its own VerifyResult case.
+            ESP_LOGE(TAG, "derive_vault_key failed after a correct PIN -- vault will be unavailable");
+        }
+        std::memset(vault_key, 0, sizeof(vault_key));
         std::memset(candidate_hash, 0, sizeof(candidate_hash));
         return VerifyResult::Success;
     }
@@ -594,9 +668,24 @@ bool verify_duress(const char* pin)
     for (size_t i = 0; i < HASH_LEN; ++i) {
         diff |= static_cast<uint8_t>(candidate_hash[i] ^ stored_duress.hash[i]);
     }
+
+    const bool matched = (diff == 0);
+    if (matched) {
+        // Same reasoning as the real PIN's own verify() -- the vault
+        // stays usable (now empty, once the caller wipes it) for the
+        // rest of this duress-triggered session, keyed from the
+        // DURESS pin specifically. Whenever the real PIN is entered
+        // again later (an ordinary subsequent unlock), verify() sets
+        // its own key over this one, same as any other re-unlock.
+        uint8_t vault_key[HASH_LEN];
+        if (derive_vault_key(candidate_hash, vault_key)) {
+            vault_key::set(vault_key);
+        }
+        std::memset(vault_key, 0, sizeof(vault_key));
+    }
     std::memset(candidate_hash, 0, sizeof(candidate_hash));
 
-    return diff == 0;
+    return matched;
 }
 
 void consume_pbkdf2_time()

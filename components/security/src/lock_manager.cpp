@@ -1,6 +1,7 @@
 #include "security/lock_manager.hpp"
 
 #include "security/session_manager.hpp"
+#include "security/vault_key.hpp"
 
 #include "event_bus/event_bus.hpp"
 #include "input/input.hpp"
@@ -216,6 +217,10 @@ void lock()
 
     current_state = State::Locked;
     session::end_session();
+    // The device being Locked must never leave a usable vault
+    // encryption key sitting in memory -- see vault_key.hpp's own
+    // file comment.
+    vault_key::clear();
 
     if (event_bus::is_initialized()) {
         event_bus::publish(event_bus::Category::System,

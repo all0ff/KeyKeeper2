@@ -152,15 +152,16 @@ struct SecuritySettings
 
     // Combination-lock-style PIN entry (widgets::PinEntry's own
     // Config::dial_mode -- see that widget's header for the full
-    // interaction model): rotate one direction to spin a digit,
-    // REVERSING direction confirms it and advances to the next digit,
-    // whose own spin direction is the opposite of the one just
-    // confirmed (alternating every digit, like a real combination
-    // dial). false (the default) keeps the original behavior: rotate
-    // to spin, OkShort confirms and advances. Applies to both
-    // LockScreen (unlocking) and SetupPinScreen (setting/changing the
-    // PIN) for a consistent feel -- the way you dial it in is the way
-    // you set it.
+    // interaction model): each digit slot has a fixed expected spin
+    // direction (alternating by position, starting RotateRight for
+    // digit 0), and REVERSING from that direction confirms the digit
+    // and advances to the next one. false (the default) keeps the
+    // original behavior: rotate to spin, OkShort confirms and
+    // advances. LockScreen (unlocking) ONLY -- deliberately NOT
+    // applied to SetupPinScreen or SecuritySettingsScreen's own
+    // ChangePin/Duress PIN flows (the project owner's own call:
+    // setting a PIN always uses Standard entry, dial is reserved for
+    // the unlock gesture itself).
     bool pin_entry_dial_mode = false;
 
     // Only meaningful when pin_entry_dial_mode is true: whether the

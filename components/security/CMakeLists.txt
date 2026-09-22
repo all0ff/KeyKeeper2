@@ -5,6 +5,7 @@ idf_component_register(
         "src/lock_manager.cpp"
         "src/session_manager.cpp"
         "src/permission_manager.cpp"
+        "src/vault_key.cpp"
 
     INCLUDE_DIRS
         "include"
