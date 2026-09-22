@@ -1,5 +1,6 @@
 #include "ui/screens/accounts_screen.hpp"
 
+#include "ui/localization.hpp"
 #include "ui/screens/categories_screen.hpp"
 #include "ui/screens/favorites_screen.hpp"
 #include "ui/screens/search_screen.hpp"
@@ -16,18 +17,31 @@ namespace {
 constexpr lv_coord_t ITEM_Y_START = 4;
 constexpr lv_coord_t ITEM_SPACING = 20;
 
-constexpr const char* ITEM_NAMES[] = {"All", "Favorites", "Categories", "Search"};
+// NOT constexpr -- i18n::tr() reads the current language at runtime,
+// so this has to be built fresh each render() call rather than once
+// at compile time (a language change mid-session must be reflected
+// immediately, same as every other translated screen).
+const char* item_name(size_t i)
+{
+    switch (i) {
+        case 0: return i18n::tr(i18n::Key::All);
+        case 1: return i18n::tr(i18n::Key::Favorites);
+        case 2: return i18n::tr(i18n::Key::Categories);
+        case 3: return i18n::tr(i18n::Key::Search);
+        default: return "";
+    }
+}
 
 } // namespace
 
 const char* AccountsScreen::title() const
 {
-    return "Accounts";
+    return i18n::tr(i18n::Key::Accounts);
 }
 
 const char* AccountsScreen::footer_hint() const
 {
-    return "OK  Open    BACK  Return";
+    return i18n::tr(i18n::Key::OkOpenBackReturn);
 }
 
 void AccountsScreen::initialize(lv_obj_t* content_parent)
@@ -53,7 +67,7 @@ void AccountsScreen::render()
     for (size_t i = 0; i < ITEM_COUNT; ++i) {
         const bool is_selected = (i == selected_);
         lv_obj_set_style_text_color(item_labels_[i], is_selected ? pal.accent : pal.primary_text, 0);
-        lv_label_set_text_fmt(item_labels_[i], "%s%s", is_selected ? "> " : "", ITEM_NAMES[i]);
+        lv_label_set_text_fmt(item_labels_[i], "%s%s", is_selected ? "> " : "", item_name(i));
     }
 }
 

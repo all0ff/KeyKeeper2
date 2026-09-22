@@ -1,6 +1,7 @@
 #include "ui/screens/account_view_screen.hpp"
 
 #include "display/fonts.hpp"
+#include "ui/localization.hpp"
 #include "ui/screens/account_edit_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
@@ -43,20 +44,20 @@ AccountViewScreen::~AccountViewScreen()
 
 const char* AccountViewScreen::title() const
 {
-    if (mode_ == Mode::RecoveryCodesList) return "Recovery Codes";
-    if (mode_ == Mode::SeedPhraseView) return "Seed Phrase";
-    return "Account";
+    if (mode_ == Mode::RecoveryCodesList) return i18n::tr(i18n::Key::RecoveryCodesTitle);
+    if (mode_ == Mode::SeedPhraseView) return i18n::tr(i18n::Key::SeedPhraseTitle);
+    return i18n::tr(i18n::Key::AccountTitle);
 }
 
 const char* AccountViewScreen::footer_hint() const
 {
     if (mode_ == Mode::RecoveryCodesList) {
-        return "ROTATE  Scroll    BACK  Return";
+        return i18n::tr(i18n::Key::RotateScrollBackReturn);
     }
     if (mode_ == Mode::SeedPhraseView) {
-        return "ROTATE  Scroll    OK  Reveal/Hide    BACK  Return";
+        return i18n::tr(i18n::Key::RotateScrollOkRevealHideBackReturn);
     }
-    return "ROTATE  Select    OK  Run    BACK  Return";
+    return i18n::tr(i18n::Key::RotateSelectOkRunBackReturn);
 }
 
 void AccountViewScreen::initialize(lv_obj_t* content_parent)
@@ -112,7 +113,7 @@ void AccountViewScreen::reload()
         const theme::Palette& pal = theme::current();
         lv_obj_t* msg = lv_label_create(content_parent_);
         lv_obj_set_style_text_color(msg, pal.error, 0);
-        lv_label_set_text(msg, "Entry not found");
+        lv_label_set_text(msg, i18n::tr(i18n::Key::EntryNotFound));
         lv_obj_center(msg);
         return;
     }
@@ -151,9 +152,9 @@ lv_coord_t AccountViewScreen::build_fields(lv_obj_t* parent)
 
     // Per GUI.md 11: empty fields are not shown. "Username" is
     // VaultEntry::login (no separate Name field exists).
-    add_text_field("URL", entry_.url);
-    add_text_field("Username", entry_.login);
-    add_text_field("Category", entry_.category);
+    add_text_field(i18n::tr(i18n::Key::FieldUrl), entry_.url);
+    add_text_field(i18n::tr(i18n::Key::FieldUsername), entry_.login);
+    add_text_field(i18n::tr(i18n::Key::FieldCategory), entry_.category);
 
     if (!entry_.password.empty()) {
         lv_obj_t* row = lv_label_create(parent);
@@ -187,12 +188,12 @@ lv_coord_t AccountViewScreen::build_fields(lv_obj_t* parent)
     if (entry_.favorite) {
         lv_obj_t* row = lv_label_create(parent);
         lv_obj_set_style_text_color(row, pal.accent, 0);
-        lv_label_set_text(row, "* Favorite");
+        lv_label_set_text(row, i18n::tr(i18n::Key::FavoriteLabel));
         lv_obj_align(row, LV_ALIGN_TOP_LEFT, 4, y);
         y += FIELD_SPACING;
     }
 
-    add_text_field("Notes", entry_.notes);
+    add_text_field(i18n::tr(i18n::Key::FieldNotes), entry_.notes);
 
     return y;
 }
@@ -203,11 +204,11 @@ void AccountViewScreen::update_password_label()
         return;
     }
     if (password_revealed_) {
-        lv_label_set_text_fmt(password_value_label_, "Password: %s", entry_.password.c_str());
+        lv_label_set_text_fmt(password_value_label_, i18n::tr(i18n::Key::PasswordValueFmt), entry_.password.c_str());
     } else {
         // Fixed-width mask -- deliberately not matching the real
         // length, so the mask itself doesn't leak that.
-        lv_label_set_text(password_value_label_, "Password: ********");
+        lv_label_set_text(password_value_label_, i18n::tr(i18n::Key::PasswordMasked));
     }
 }
 
@@ -219,16 +220,16 @@ void AccountViewScreen::update_otp_label()
 
     char code[8];
     if (totp::generate(entry_.totp_secret, code, sizeof(code))) {
-        lv_label_set_text_fmt(otp_value_label_, "OTP: %s (%us)", code,
+        lv_label_set_text_fmt(otp_value_label_, i18n::tr(i18n::Key::OtpValueFmt), code,
                                static_cast<unsigned>(totp::seconds_remaining()));
     } else if (rtc_time::is_synced()) {
         // Time is fine, so the secret itself is the problem (invalid
         // Base32) -- shouldn't normally happen since AccountEditScreen
         // takes whatever was typed as-is, but stay clear about which
         // of the two failure reasons this is.
-        lv_label_set_text(otp_value_label_, "OTP: invalid secret");
+        lv_label_set_text(otp_value_label_, i18n::tr(i18n::Key::OtpInvalidSecret));
     } else {
-        lv_label_set_text(otp_value_label_, "OTP: no time sync (connect WiFi)");
+        lv_label_set_text(otp_value_label_, i18n::tr(i18n::Key::OtpNoTimeSync));
     }
 }
 
@@ -284,18 +285,19 @@ void AccountViewScreen::build_actions(lv_obj_t* parent, lv_coord_t y_start)
 const char* AccountViewScreen::action_name(Action action) const
 {
     switch (action) {
-        case Action::RevealPassword: return "Reveal Password";
-        case Action::ToggleFavorite: return entry_.favorite ? "Remove from Favorites" : "Add to Favorites";
-        case Action::PrintUrl:       return "Print URL";
-        case Action::PrintUsername:  return "Print Username";
-        case Action::PrintPassword:  return "Print Password";
-        case Action::PrintOtp:       return "Print OTP";
-        case Action::ViewRecoveryCodes:  return "View Recovery Codes";
-        case Action::PrintRecoveryCodes: return "Print Recovery Codes";
-        case Action::ViewSeedPhrase:     return "View Seed Phrase";
-        case Action::PrintSeedPhrase:    return "Print Seed Phrase";
-        case Action::Edit:           return "Edit";
-        case Action::Delete:         return "Delete";
+        case Action::RevealPassword: return i18n::tr(i18n::Key::RevealPassword);
+        case Action::ToggleFavorite: return entry_.favorite ? i18n::tr(i18n::Key::RemoveFromFavorites)
+                                                              : i18n::tr(i18n::Key::AddToFavorites);
+        case Action::PrintUrl:       return i18n::tr(i18n::Key::PrintUrl);
+        case Action::PrintUsername:  return i18n::tr(i18n::Key::PrintUsername);
+        case Action::PrintPassword:  return i18n::tr(i18n::Key::PrintPassword);
+        case Action::PrintOtp:       return i18n::tr(i18n::Key::PrintOtp);
+        case Action::ViewRecoveryCodes:  return i18n::tr(i18n::Key::ViewRecoveryCodes);
+        case Action::PrintRecoveryCodes: return i18n::tr(i18n::Key::PrintRecoveryCodes);
+        case Action::ViewSeedPhrase:     return i18n::tr(i18n::Key::ViewSeedPhrase);
+        case Action::PrintSeedPhrase:    return i18n::tr(i18n::Key::PrintSeedPhrase);
+        case Action::Edit:           return i18n::tr(i18n::Key::Edit);
+        case Action::Delete:         return i18n::tr(i18n::Key::Delete);
     }
     return "";
 }
@@ -315,7 +317,7 @@ void AccountViewScreen::render_actions()
 
         const char* name = action_name(available_actions_[i]);
         if (is_delete_confirm) {
-            lv_label_set_text_fmt(action_labels_[i], "> %s (confirm?)", name);
+            lv_label_set_text_fmt(action_labels_[i], i18n::tr(i18n::Key::ConfirmActionFmt), name);
         } else {
             lv_label_set_text_fmt(action_labels_[i], "%s%s", is_selected ? "> " : "", name);
         }
@@ -380,7 +382,7 @@ void AccountViewScreen::activate()
             } else {
                 ESP_LOGE(TAG, "Failed to toggle favorite for entry %lu",
                          static_cast<unsigned long>(entry_id_));
-                lv_label_set_text(status_label_, "Update failed");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::UpdateFailed));
             }
             return;
         }
@@ -414,7 +416,7 @@ void AccountViewScreen::activate()
                 lv_label_set_text(status_label_, usb::last_status());
             } else {
                 ESP_LOGI(TAG, "%s denied (%d)", action_name(action), static_cast<int>(result));
-                lv_label_set_text(status_label_, "Not allowed");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::NotAllowed));
             }
             return;
         }
@@ -428,7 +430,7 @@ void AccountViewScreen::activate()
                 security::permission::check(security::permission::Operation::PrintPassword);
             if (result != security::permission::Result::Allowed) {
                 ESP_LOGI(TAG, "%s denied (%d)", action_name(action), static_cast<int>(result));
-                lv_label_set_text(status_label_, "Not allowed");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::NotAllowed));
                 return;
             }
 
@@ -444,7 +446,7 @@ void AccountViewScreen::activate()
             }
 
             if (text.empty()) {
-                lv_label_set_text(status_label_, "No unused codes left");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::NoUnusedCodesLeft));
                 return;
             }
 
@@ -462,7 +464,7 @@ void AccountViewScreen::activate()
                 security::permission::check(security::permission::Operation::PrintPassword);
             if (result != security::permission::Result::Allowed) {
                 ESP_LOGI(TAG, "%s denied (%d)", action_name(action), static_cast<int>(result));
-                lv_label_set_text(status_label_, "Not allowed");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::NotAllowed));
                 return;
             }
 
@@ -490,7 +492,7 @@ void AccountViewScreen::activate()
             if (!delete_confirm_pending_) {
                 delete_confirm_pending_ = true;
                 render_actions();
-                lv_label_set_text(status_label_, "Press OK again to delete");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::PressOkAgainToDelete));
                 return;
             }
 
@@ -501,7 +503,7 @@ void AccountViewScreen::activate()
             } else {
                 ESP_LOGE(TAG, "Failed to delete entry %lu", static_cast<unsigned long>(entry_id_));
                 delete_confirm_pending_ = false;
-                lv_label_set_text(status_label_, "Delete failed");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::DeleteFailed));
                 render_actions();
             }
             return;

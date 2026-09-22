@@ -322,7 +322,9 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     </div>
     <p style="font-size:0.88rem; color:#6b7280">A full, exact copy of the device's own internal vault file, on the
       microSD card. Only ever readable by another KeyKeeper2 device, not other password managers or spreadsheet
-      apps -- for that, use Export Vault (CSV) on the device itself instead.</p>
+      apps -- for that, use Export Vault (CSV) on the device itself instead, though that CSV export leaves out
+      recovery codes and seed phrases (only login/password/url/notes/TOTP secret/category/favorite) -- a Backup
+      here is the only copy that includes everything.</p>
     <button onclick="createBackup()">Create Backup</button>
     <div id="backup-list" style="margin-top:16px"></div>
     <div id="backup-msg" style="font-size:0.85rem; margin-top:8px"></div>
@@ -427,7 +429,11 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         <li><strong>Export/Import Vault</strong> &mdash; a plain CSV file, readable by (or editable in) most other
           password managers and spreadsheet apps. Import adds entries rather than replacing what's already there,
           and is lenient about column names (<code>username</code>, <code>site</code>, <code>note</code>, etc. are
-          all recognized, not just this device's own exact header names).</li>
+          all recognized, not just this device's own exact header names). Only the basic fields
+          (login/password/url/notes/TOTP secret/category/favorite) round-trip through CSV -- recovery codes and
+          seed phrases are NOT included, by design (CSV is meant to move between different password managers, and
+          most others have nowhere to put those anyway). Create/Restore Backup above is the only copy that
+          includes everything.</li>
       </ul>
       <p>The device also has a Format SD Card action, useful if a card was shipped pre-formatted as exFAT &mdash;
         common on 32GB+ cards &mdash; which this device can't read.</p>
@@ -559,7 +565,11 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         <li><strong>Export/Import Vault</strong> &mdash; обычный CSV-файл, читаемый (или редактируемый) большинством
           других менеджеров паролей и табличных редакторов. Импорт добавляет записи, не заменяя уже существующие, и
           терпимо относится к названиям колонок (<code>username</code>, <code>site</code>, <code>note</code> и т.п.
-          распознаются наравне с собственными названиями устройства).</li>
+          распознаются наравне с собственными названиями устройства). Через CSV переносятся только базовые поля
+          (login/password/url/notes/TOTP secret/category/favorite) — коды восстановления и seed-фразы туда
+          намеренно не попадают (CSV предназначен для переноса между разными менеджерами паролей, а у большинства
+          из них и нет места для таких полей). Полную копию со всем содержимым даёт только Create/Restore Backup
+          выше.</li>
       </ul>
       <p>На устройстве также есть действие Format SD Card — полезно, если карта пришла отформатированной в exFAT
         (обычное дело для карт от 32ГБ), который устройство прочитать не может.</p>

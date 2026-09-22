@@ -1,6 +1,7 @@
 #include "ui/screens/vault_list_screen.hpp"
 
 #include "display/fonts.hpp"
+#include "ui/localization.hpp"
 #include "ui/screens/account_edit_screen.hpp"
 #include "ui/screens/account_view_screen.hpp"
 #include "ui/theme.hpp"
@@ -25,12 +26,12 @@ constexpr lv_coord_t ITEM_SPACING = 20;
 
 const char* VaultListScreen::title() const
 {
-    return "Vault";
+    return i18n::tr(i18n::Key::VaultTitle);
 }
 
 const char* VaultListScreen::footer_hint() const
 {
-    return "ROTATE  Select    OK  Open    Hold OK  New    BACK  Return";
+    return i18n::tr(i18n::Key::RotateSelectOkOpenHoldOkNewBackReturn);
 }
 
 void VaultListScreen::initialize(lv_obj_t* content_parent)
@@ -41,7 +42,7 @@ void VaultListScreen::initialize(lv_obj_t* content_parent)
 
     empty_label_ = lv_label_create(content_parent);
     lv_obj_set_style_text_color(empty_label_, pal.secondary_text, 0);
-    lv_label_set_text(empty_label_, "Vault is empty");
+    lv_label_set_text(empty_label_, i18n::tr(i18n::Key::VaultEmpty));
     lv_obj_center(empty_label_);
     lv_obj_add_flag(empty_label_, LV_OBJ_FLAG_HIDDEN);
 
