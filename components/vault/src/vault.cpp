@@ -9,6 +9,7 @@
 
 #include <cctype>
 #include <string>
+#include <vector>
 
 namespace vault {
 
@@ -154,12 +155,20 @@ size_t search_entries(const char* query, VaultEntry* out, size_t max_count)
     const std::string query_lower = to_lower_copy(query != nullptr ? query : "");
 
     size_t found = 0;
+    // Heap-allocated, NOT a stack array -- see
+    // components/vault/src/vault_csv.cpp's export_csv() for the exact
+    // same class of bug, confirmed as a real "stack overflow in task
+    // ui" panic + reboot on real hardware. This one is the same
+    // mistake made in this same function, in the same session --
+    // caught and fixed at the CALL site (web_vault_routes.cpp's
+    // handle_search()) at the time, but missed here, inside
+    // search_entries() itself.
     constexpr size_t PAGE = 16;
-    VaultEntry buf[PAGE];
+    std::vector<VaultEntry> buf(PAGE);
     size_t offset = 0;
 
     while (found < max_count) {
-        const size_t n = repository::list(buf, PAGE, offset);
+        const size_t n = repository::list(buf.data(), PAGE, offset);
         if (n == 0) {
             break;
         }

@@ -89,8 +89,15 @@ void SearchScreen::update_results()
     // results. Same case-insensitive login/url/notes matching either
     // way -- shared with the web search REST endpoint now, not a
     // separate copy of the same logic.
-    vault::VaultEntry buf[MAX_ROWS];
-    const size_t found = vault::search_entries(current_query.c_str(), buf, MAX_ROWS);
+    // Heap-allocated, NOT a stack array -- same class of bug as
+    // vault_csv.cpp's export_csv() (confirmed as a real "stack
+    // overflow in task ui" panic + reboot on real hardware) and
+    // vault.cpp's own search_entries() internal scan buffer, both
+    // fixed alongside this one -- MAX_ROWS (24) of these on this
+    // screen's own "ui" task stack is even larger than either of
+    // those.
+    std::vector<vault::VaultEntry> buf(MAX_ROWS);
+    const size_t found = vault::search_entries(current_query.c_str(), buf.data(), MAX_ROWS);
     for (size_t i = 0; i < found; ++i) {
         results_.push_back(buf[i]);
     }

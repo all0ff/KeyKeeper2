@@ -226,13 +226,22 @@ bool export_csv(char* out_filename, size_t out_filename_size)
 
     std::fputs("login,password,url,notes,totp_secret,category,favorite\n", f);
 
+    // Heap-allocated, NOT a stack array -- vault::VaultEntry holds
+    // several std::string/std::vector members (recovery_codes,
+    // seed_phrase), and PAGE (16) of those on the "ui" task's own
+    // stack overflowed it outright on real hardware (confirmed via a
+    // "stack overflow in task ui" panic + reboot triggered by this
+    // exact export). Same class of bug already caught and fixed
+    // elsewhere in this project (web_vault_routes.cpp's own
+    // handle_search(), see that file's comment) -- this one predates
+    // that fix and wasn't caught at the time.
     constexpr size_t PAGE = 16;
-    vault::VaultEntry buf[PAGE];
+    std::vector<vault::VaultEntry> buf(PAGE);
     size_t offset = 0;
     size_t total_written = 0;
 
     while (true) {
-        const size_t n = vault::list_entries(buf, PAGE, offset);
+        const size_t n = vault::list_entries(buf.data(), PAGE, offset);
         if (n == 0) {
             break;
         }
