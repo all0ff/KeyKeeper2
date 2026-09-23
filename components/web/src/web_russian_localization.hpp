@@ -103,12 +103,14 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Mode": "Режим",
     "Disabled": "Отключён",
     "Station": "Станция",
+    "Station SSID": "SSID клиента",
+    "Station Password": "Пароль клиента",
     "Access Point": "Точка доступа",
     "STA SSID": "SSID станции",
     "STA Password": "Пароль станции",
     "AP SSID": "SSID точки доступа",
     "AP Password": "Пароль точки доступа",
-    "Save Wi-Fi": "Сохранить Wi-Fi",
+    "Save WiFi": "Сохранить WiFi",
     "Captive Portal (Access Point mode only)": "Captive Portal (только режим точки доступа)",
     "Password Generator": "Генератор паролей",
     "Password Gen": "Генератор паролей",
@@ -157,7 +159,7 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Missing 'pin' field": "Отсутствует поле PIN",
     "Invalid JSON": "Недопустимый JSON",
     "Failed to save": "Не удалось сохранить",
-    "Saved": "Сохранено",
+    "Saved.": "Сохранено.",
     "Loading...": "Загрузка...",
     "Saving...": "Сохранение...",
     "Error": "Ошибка",
@@ -273,6 +275,15 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
       if (!response.ok) return false;
       const data = await response.json();
       if (data && data.data && data.data.general && data.data.general.language === "russian") {
+        try {
+          localStorage.setItem("kr_lang", "russian");
+        } catch (_) {
+          // Private browsing / storage disabled -- fine, this cache is
+          // purely a convenience for the pre-login screen (see
+          // startLocalization()'s own comment); the authenticated
+          // check right above already applied the real translation
+          // for this visit regardless.
+        }
         document.documentElement.lang = "ru";
         translate(document.body);
         startObserver();
@@ -292,7 +303,15 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
         }
         return true;
       }
-      // Settings were read successfully and the language is not Russian.
+      // Settings were read successfully and the language is not Russian
+      // -- clear any stale cached guess from an earlier visit when it
+      // WAS Russian, so a language change back to English is reflected
+      // on the pre-login screen too, not just everywhere past login.
+      try {
+        localStorage.removeItem("kr_lang");
+      } catch (_) {
+        // See the setItem try/catch above.
+      }
       // Stop polling; there is no reason to keep hitting the API.
       return true;
     } catch (_) {
@@ -302,6 +321,34 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
   }
 
   function startLocalization() {
+    // The authenticated check in applyRussianIfSelected() can only
+    // ever succeed AFTER unlocking -- GET /api/v1/settings requires a
+    // session (require_unlocked() server-side), which the login
+    // screen itself obviously doesn't have yet. Confirmed on real
+    // hardware: that made the WHOLE pre-login screen (the Unlock
+    // button, "Checking...", "Wrong PIN") stay English forever,
+    // regardless of what's in RU above -- the retry loop below kept
+    // firing every 500ms but could never succeed before login, and
+    // by the time it finally could, the screen it needed to translate
+    // was already gone. A cached guess from a PREVIOUS successful
+    // unlock (see the two localStorage lines in
+    // applyRussianIfSelected() above) sidesteps that entirely: applied
+    // synchronously, before the first paint, no server round-trip
+    // needed. Only ever wrong on the very first visit ever (nothing
+    // cached yet) or right after switching the language on some OTHER
+    // session -- both self-correct the moment the authenticated check
+    // below succeeds post-login.
+    try {
+      if (localStorage.getItem("kr_lang") === "russian") {
+        document.documentElement.lang = "ru";
+        translate(document.body);
+        startObserver();
+      }
+    } catch (_) {
+      // Private browsing / storage disabled -- falls through to the
+      // authenticated-only path below, same as before this existed.
+    }
+
     retryTimer = setInterval(async function () {
       if (await applyRussianIfSelected()) {
         clearInterval(retryTimer);
