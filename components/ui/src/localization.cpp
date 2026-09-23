@@ -180,6 +180,49 @@ struct Strings {
     const char* enter_duress_pin;
     const char* confirm_duress_pin;
     const char* too_many_failed_attempts;
+    const char* wifi_title;
+    const char* mode_disabled;
+    const char* mode_station;
+    const char* mode_access_point;
+    const char* wifi_idle;
+    const char* wifi_connecting;
+    const char* wifi_connected;
+    const char* wifi_disconnected;
+    const char* wifi_ap_running;
+    const char* wifi_failed;
+    const char* wifi_status_fmt;
+    const char* wifi_status_ap_fmt;
+    const char* mode_row_fmt;
+    const char* station_ssid_row_fmt;
+    const char* station_password_row_fmt;
+    const char* ap_ssid_row_fmt;
+    const char* ap_password_row_fmt;
+    const char* captive_portal_row_fmt;
+    const char* secret_word_row_fmt;
+    const char* save_apply_row_fmt;
+    const char* on_value;
+    const char* editing_ap_password;
+    const char* editing_ap_ssid;
+    const char* editing_secret_word;
+    const char* editing_station_password;
+    const char* editing_station_ssid;
+    const char* saved_but_failed_to_apply;
+    const char* wifi_settings_saved_applying;
+    const char* editing_password_shortcut;
+    const char* login_tab_password_enter;
+    const char* password_only_value;
+    const char* password_enter_value;
+    const char* usb_settings_saved;
+    const char* usb_title;
+    const char* password_shortcut_row_fmt;
+    const char* delay_before_typing_row_fmt;
+    const char* delay_between_chars_row_fmt;
+    const char* delay_between_fields_row_fmt;
+    const char* print_sequence_row_fmt;
+    const char* auto_switch_layout_row_fmt;
+    const char* empty_value;
+    const char* open_value;
+    const char* disabled_value;
 };
 
 constexpr Strings EN = {
@@ -244,7 +287,20 @@ constexpr Strings EN = {
     "Security", "ROTATE  Change    OK/BACK  Confirm",
     "ROTATE Digit OK Next Hold OK Done BACK Erase/Cancel",
     "Enter current PIN", "Confirm new PIN", "Enter duress PIN", "Confirm duress PIN",
-    "Too many failed attempts"
+    "Too many failed attempts",
+    "WiFi", "Disabled", "Station", "Access Point",
+    "Idle", "Connecting...", "Connected", "Disconnected", "AP running", "Failed",
+    "%s: %s", "%s: %s (%u client%s)",
+    "%sMode: %s", "%sStation SSID: %s", "%sStation Password: %s",
+    "%sAP SSID: %s", "%sAP Password: %s", "%sCaptive Portal: %s", "%sSecret Word: %s",
+    "%sSave & Apply", "on",
+    "Editing: AP Password", "Editing: AP SSID", "Editing: Secret Word",
+    "Editing: Station Password", "Editing: Station SSID",
+    "Saved, but failed to apply", "WiFi settings saved, applying...",
+    "Editing: Password Shortcut", "Login+Tab+Password+Enter", "Password Only", "Password+Enter",
+    "USB settings saved", "USB",
+    "%sPassword Shortcut: %s", "%sDelay Before Typing: %ums", "%sDelay Between Chars: %ums",
+    "%sDelay Between Fields: %ums", "%sPrint Sequence: %s", "%sAuto-switch layout: %s", "(empty)", "(open)", "(disabled)"
 };
 
 constexpr Strings RU = {
@@ -310,7 +366,20 @@ constexpr Strings RU = {
     "Безопасность", "ПОВОРОТ  Изменить    OK/НАЗАД  Подтвердить",
     "ПОВОРОТ Цифра OK Далее Удержание OK Готово НАЗАД Стереть/Отмена",
     "Введите текущий PIN", "Подтвердите новый PIN", "Введите PIN под принуждением", "Подтвердите PIN под принуждением",
-    "Слишком много неудачных попыток"
+    "Слишком много неудачных попыток",
+    "WiFi", "Выключен", "Клиент", "Точка доступа",
+    "Простой", "Подключение...", "Подключено", "Отключено", "Точка доступа активна", "Ошибка",
+    "%s: %s", "%s: %s (клиентов: %u)",
+    "%sРежим: %s", "%sSSID клиента: %s", "%sПароль клиента: %s",
+    "%sSSID точки доступа: %s", "%sПароль точки доступа: %s", "%sCaptive-портал: %s", "%sСекретное слово: %s",
+    "%sСохранить и применить", "вкл.",
+    "Изменение: пароль точки доступа", "Изменение: SSID точки доступа", "Изменение: секретное слово",
+    "Изменение: пароль клиента", "Изменение: SSID клиента",
+    "Сохранено, но не удалось применить", "Настройки WiFi сохранены, применяются...",
+    "Изменение: сочетание для пароля", "Логин+Tab+Пароль+Enter", "Только пароль", "Пароль+Enter",
+    "Настройки USB сохранены", "USB",
+    "%sСочетание для пароля: %s", "%sЗадержка перед вводом: %uмс", "%sЗадержка между символами: %uмс",
+    "%sЗадержка между полями: %uмс", "%sПоследовательность печати: %s", "%sАвто-раскладка (кириллица): %s", "(пусто)", "(открыта)", "(выключено)"
 };
 
 const Strings& strings()
@@ -508,6 +577,49 @@ const char* tr(Key key)
         case Key::EnterDuressPin: return s.enter_duress_pin;
         case Key::ConfirmDuressPin: return s.confirm_duress_pin;
         case Key::TooManyFailedAttempts: return s.too_many_failed_attempts;
+        case Key::WifiTitle: return s.wifi_title;
+        case Key::ModeDisabled: return s.mode_disabled;
+        case Key::ModeStation: return s.mode_station;
+        case Key::ModeAccessPoint: return s.mode_access_point;
+        case Key::WifiIdle: return s.wifi_idle;
+        case Key::WifiConnecting: return s.wifi_connecting;
+        case Key::WifiConnected: return s.wifi_connected;
+        case Key::WifiDisconnected: return s.wifi_disconnected;
+        case Key::WifiApRunning: return s.wifi_ap_running;
+        case Key::WifiFailed: return s.wifi_failed;
+        case Key::WifiStatusFmt: return s.wifi_status_fmt;
+        case Key::WifiStatusApFmt: return s.wifi_status_ap_fmt;
+        case Key::ModeRowFmt: return s.mode_row_fmt;
+        case Key::StationSsidRowFmt: return s.station_ssid_row_fmt;
+        case Key::StationPasswordRowFmt: return s.station_password_row_fmt;
+        case Key::ApSsidRowFmt: return s.ap_ssid_row_fmt;
+        case Key::ApPasswordRowFmt: return s.ap_password_row_fmt;
+        case Key::CaptivePortalRowFmt: return s.captive_portal_row_fmt;
+        case Key::SecretWordRowFmt: return s.secret_word_row_fmt;
+        case Key::SaveApplyRowFmt: return s.save_apply_row_fmt;
+        case Key::OnValue: return s.on_value;
+        case Key::EditingApPassword: return s.editing_ap_password;
+        case Key::EditingApSsid: return s.editing_ap_ssid;
+        case Key::EditingSecretWord: return s.editing_secret_word;
+        case Key::EditingStationPassword: return s.editing_station_password;
+        case Key::EditingStationSsid: return s.editing_station_ssid;
+        case Key::SavedButFailedToApply: return s.saved_but_failed_to_apply;
+        case Key::WifiSettingsSavedApplying: return s.wifi_settings_saved_applying;
+        case Key::EditingPasswordShortcut: return s.editing_password_shortcut;
+        case Key::LoginTabPasswordEnter: return s.login_tab_password_enter;
+        case Key::PasswordOnlyValue: return s.password_only_value;
+        case Key::PasswordEnterValue: return s.password_enter_value;
+        case Key::UsbSettingsSaved: return s.usb_settings_saved;
+        case Key::UsbTitle: return s.usb_title;
+        case Key::PasswordShortcutRowFmt: return s.password_shortcut_row_fmt;
+        case Key::DelayBeforeTypingRowFmt: return s.delay_before_typing_row_fmt;
+        case Key::DelayBetweenCharsRowFmt: return s.delay_between_chars_row_fmt;
+        case Key::DelayBetweenFieldsRowFmt: return s.delay_between_fields_row_fmt;
+        case Key::PrintSequenceRowFmt: return s.print_sequence_row_fmt;
+        case Key::AutoSwitchLayoutRowFmt: return s.auto_switch_layout_row_fmt;
+        case Key::EmptyValue: return s.empty_value;
+        case Key::OpenValue: return s.open_value;
+        case Key::DisabledValue: return s.disabled_value;
     }
 
     return "";

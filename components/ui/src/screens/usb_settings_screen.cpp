@@ -1,6 +1,7 @@
 #include "ui/screens/usb_settings_screen.hpp"
 
 #include "display/fonts.hpp"
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -27,18 +28,18 @@ constexpr int32_t DELAY_MAX_MS = 5000; // placeholder range, not spec'd anywhere
 
 const char* UsbSettingsScreen::title() const
 {
-    return "USB";
+    return i18n::tr(i18n::Key::UsbTitle);
 }
 
 const char* UsbSettingsScreen::footer_hint() const
 {
     switch (mode_) {
         case Mode::Adjust:
-            return "ROTATE  Change    OK/BACK  Confirm";
+            return i18n::tr(i18n::Key::AdjustFooter);
         case Mode::EditText:
-            return "OK  Add char    Hold OK  Done    BACK  Erase    Hold BACK  Switch set";
+            return i18n::tr(i18n::Key::EditFooterTyping);
         default:
-            return "OK  Open    BACK  Cancel";
+            return i18n::tr(i18n::Key::OkOpenBackCancel);
     }
 }
 
@@ -86,9 +87,9 @@ void UsbSettingsScreen::build_rows(lv_obj_t* parent)
 const char* UsbSettingsScreen::typing_order_label() const
 {
     switch (typing_order_) {
-        case settings::TypingOrder::LoginTabPasswordEnter: return "Login+Tab+Password+Enter";
-        case settings::TypingOrder::PasswordOnly:          return "Password Only";
-        case settings::TypingOrder::PasswordEnter:         return "Password+Enter";
+        case settings::TypingOrder::LoginTabPasswordEnter: return i18n::tr(i18n::Key::LoginTabPasswordEnter);
+        case settings::TypingOrder::PasswordOnly:          return i18n::tr(i18n::Key::PasswordOnlyValue);
+        case settings::TypingOrder::PasswordEnter:         return i18n::tr(i18n::Key::PasswordEnterValue);
     }
     return "";
 }
@@ -107,30 +108,30 @@ void UsbSettingsScreen::render_rows()
 
         switch (static_cast<Row>(i)) {
             case Row::PasswordShortcut:
-                lv_label_set_text_fmt(row_labels_[i], "%sPassword Shortcut: %s", prefix,
-                                       password_shortcut_[0] == '\0' ? "(empty)" : "********");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::PasswordShortcutRowFmt), prefix,
+                                       password_shortcut_[0] == '\0' ? i18n::tr(i18n::Key::EmptyValue) : "********");
                 break;
             case Row::DelayBeforeTyping:
-                lv_label_set_text_fmt(row_labels_[i], "%sDelay Before Typing: %ums", prefix,
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::DelayBeforeTypingRowFmt), prefix,
                                        static_cast<unsigned>(delay_before_typing_ms_));
                 break;
             case Row::DelayBetweenChars:
-                lv_label_set_text_fmt(row_labels_[i], "%sDelay Between Chars: %ums", prefix,
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::DelayBetweenCharsRowFmt), prefix,
                                        static_cast<unsigned>(delay_between_chars_ms_));
                 break;
             case Row::DelayBetweenFields:
-                lv_label_set_text_fmt(row_labels_[i], "%sDelay Between Fields: %ums", prefix,
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::DelayBetweenFieldsRowFmt), prefix,
                                        static_cast<unsigned>(delay_between_fields_ms_));
                 break;
             case Row::PrintSequence:
-                lv_label_set_text_fmt(row_labels_[i], "%sPrint Sequence: %s", prefix, typing_order_label());
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::PrintSequenceRowFmt), prefix, typing_order_label());
                 break;
             case Row::CyrillicAutoSwitch:
-                lv_label_set_text_fmt(row_labels_[i], "%sAuto-switch layout: %s", prefix,
-                                       cyrillic_auto_switch_layout_ ? "on" : "off");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::AutoSwitchLayoutRowFmt), prefix,
+                                       cyrillic_auto_switch_layout_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
                 break;
             case Row::Save:
-                lv_label_set_text_fmt(row_labels_[i], "%sSave", prefix);
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SaveRowFmt), prefix);
                 break;
         }
     }
@@ -238,7 +239,7 @@ void UsbSettingsScreen::enter_edit_password()
     const theme::Palette& pal = theme::current();
     lv_obj_t* header = lv_label_create(content_parent_);
     lv_obj_set_style_text_color(header, pal.secondary_text, 0);
-    lv_label_set_text(header, "Editing: Password Shortcut");
+    lv_label_set_text(header, i18n::tr(i18n::Key::EditingPasswordShortcut));
     lv_obj_align(header, LV_ALIGN_TOP_LEFT, 4, 4);
 
     widgets::TextEntry::Config cfg{};
@@ -277,7 +278,7 @@ void UsbSettingsScreen::save()
         ESP_LOGI(TAG, "USB settings saved");
         manager().pop();
     } else {
-        lv_label_set_text(status_label_, "Save failed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::SaveFailed));
     }
 }
 

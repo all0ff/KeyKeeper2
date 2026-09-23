@@ -1,6 +1,7 @@
 #include "ui/screens/wifi_settings_screen.hpp"
 
 #include "display/fonts.hpp"
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -25,18 +26,18 @@ constexpr lv_coord_t ROW_SPACING = 20;
 
 const char* WifiSettingsScreen::title() const
 {
-    return "WiFi";
+    return i18n::tr(i18n::Key::WifiTitle);
 }
 
 const char* WifiSettingsScreen::footer_hint() const
 {
     switch (mode_) {
         case Mode::Adjust:
-            return "ROTATE  Change    OK/BACK  Confirm";
+            return i18n::tr(i18n::Key::AdjustFooter);
         case Mode::EditText:
-            return "OK  Add char    Hold OK  Done    BACK  Erase    Hold BACK  Switch set";
+            return i18n::tr(i18n::Key::EditFooterTyping);
         default:
-            return "OK  Open    BACK  Cancel";
+            return i18n::tr(i18n::Key::OkOpenBackCancel);
     }
 }
 
@@ -83,9 +84,9 @@ void WifiSettingsScreen::build_rows(lv_obj_t* parent)
 const char* WifiSettingsScreen::mode_label() const
 {
     switch (wifi_mode_) {
-        case settings::WifiMode::Disabled:    return "Disabled";
-        case settings::WifiMode::Station:     return "Station";
-        case settings::WifiMode::AccessPoint: return "Access Point";
+        case settings::WifiMode::Disabled:    return i18n::tr(i18n::Key::ModeDisabled);
+        case settings::WifiMode::Station:     return i18n::tr(i18n::Key::ModeStation);
+        case settings::WifiMode::AccessPoint: return i18n::tr(i18n::Key::ModeAccessPoint);
     }
     return "";
 }
@@ -93,12 +94,12 @@ const char* WifiSettingsScreen::mode_label() const
 const char* WifiSettingsScreen::state_label() const
 {
     switch (wifi::state()) {
-        case wifi::ConnectionState::Idle:         return "Idle";
-        case wifi::ConnectionState::Connecting:   return "Connecting...";
-        case wifi::ConnectionState::Connected:    return "Connected";
-        case wifi::ConnectionState::Disconnected: return "Disconnected";
-        case wifi::ConnectionState::ApRunning:    return "AP running";
-        case wifi::ConnectionState::Failed:       return "Failed";
+        case wifi::ConnectionState::Idle:         return i18n::tr(i18n::Key::WifiIdle);
+        case wifi::ConnectionState::Connecting:   return i18n::tr(i18n::Key::WifiConnecting);
+        case wifi::ConnectionState::Connected:    return i18n::tr(i18n::Key::WifiConnected);
+        case wifi::ConnectionState::Disconnected: return i18n::tr(i18n::Key::WifiDisconnected);
+        case wifi::ConnectionState::ApRunning:    return i18n::tr(i18n::Key::WifiApRunning);
+        case wifi::ConnectionState::Failed:       return i18n::tr(i18n::Key::WifiFailed);
     }
     return "";
 }
@@ -112,13 +113,13 @@ void WifiSettingsScreen::refresh_status()
     const wifi::ConnectionState state = wifi::state();
 
     if (state == wifi::ConnectionState::Connected) {
-        lv_label_set_text_fmt(status_label_, "%s: %s", state_label(), wifi::ip_address());
+        lv_label_set_text_fmt(status_label_, i18n::tr(i18n::Key::WifiStatusFmt), state_label(), wifi::ip_address());
     } else if (state == wifi::ConnectionState::ApRunning) {
-        lv_label_set_text_fmt(status_label_, "%s: %s (%u client%s)", state_label(), wifi::ip_address(),
+        lv_label_set_text_fmt(status_label_, i18n::tr(i18n::Key::WifiStatusApFmt), state_label(), wifi::ip_address(),
                                static_cast<unsigned>(wifi::ap_client_count()),
                                wifi::ap_client_count() == 1 ? "" : "s");
     } else if (state == wifi::ConnectionState::Failed) {
-        lv_label_set_text_fmt(status_label_, "%s: %s", state_label(), wifi::last_error());
+        lv_label_set_text_fmt(status_label_, i18n::tr(i18n::Key::WifiStatusFmt), state_label(), wifi::last_error());
     } else {
         lv_label_set_text(status_label_, state_label());
     }
@@ -138,34 +139,34 @@ void WifiSettingsScreen::render_rows()
 
         switch (static_cast<Row>(i)) {
             case Row::Mode:
-                lv_label_set_text_fmt(row_labels_[i], "%sMode: %s", prefix, mode_label());
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::ModeRowFmt), prefix, mode_label());
                 break;
             case Row::StaSsid:
-                lv_label_set_text_fmt(row_labels_[i], "%sStation SSID: %s", prefix,
-                                       sta_ssid_[0] == '\0' ? "(empty)" : sta_ssid_);
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::StationSsidRowFmt), prefix,
+                                       sta_ssid_[0] == '\0' ? i18n::tr(i18n::Key::EmptyValue) : sta_ssid_);
                 break;
             case Row::StaPassword:
-                lv_label_set_text_fmt(row_labels_[i], "%sStation Password: %s", prefix,
-                                       sta_password_[0] == '\0' ? "(empty)" : "********");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::StationPasswordRowFmt), prefix,
+                                       sta_password_[0] == '\0' ? i18n::tr(i18n::Key::EmptyValue) : "********");
                 break;
             case Row::ApSsid:
-                lv_label_set_text_fmt(row_labels_[i], "%sAP SSID: %s", prefix,
-                                       ap_ssid_[0] == '\0' ? "(empty)" : ap_ssid_);
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::ApSsidRowFmt), prefix,
+                                       ap_ssid_[0] == '\0' ? i18n::tr(i18n::Key::EmptyValue) : ap_ssid_);
                 break;
             case Row::ApPassword:
-                lv_label_set_text_fmt(row_labels_[i], "%sAP Password: %s", prefix,
-                                       ap_password_[0] == '\0' ? "(open)" : "********");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::ApPasswordRowFmt), prefix,
+                                       ap_password_[0] == '\0' ? i18n::tr(i18n::Key::OpenValue) : "********");
                 break;
             case Row::CaptivePortal:
-                lv_label_set_text_fmt(row_labels_[i], "%sCaptive Portal: %s", prefix,
-                                       captive_portal_enabled_ ? "on" : "off");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::CaptivePortalRowFmt), prefix,
+                                       captive_portal_enabled_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
                 break;
             case Row::SecretWord:
-                lv_label_set_text_fmt(row_labels_[i], "%sSecret Word: %s", prefix,
-                                       secret_word_[0] == '\0' ? "(disabled)" : secret_word_);
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SecretWordRowFmt), prefix,
+                                       secret_word_[0] == '\0' ? i18n::tr(i18n::Key::DisabledValue) : secret_word_);
                 break;
             case Row::Save:
-                lv_label_set_text_fmt(row_labels_[i], "%sSave & Apply", prefix);
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SaveApplyRowFmt), prefix);
                 break;
         }
     }
@@ -248,11 +249,11 @@ void WifiSettingsScreen::enter_edit_text(Row row)
     const char* current_value = "";
     const char* label_text = "";
     switch (row) {
-        case Row::StaSsid:     current_value = sta_ssid_;     label_text = "Editing: Station SSID"; break;
-        case Row::StaPassword: current_value = sta_password_; label_text = "Editing: Station Password"; break;
-        case Row::ApSsid:      current_value = ap_ssid_;       label_text = "Editing: AP SSID"; break;
-        case Row::ApPassword:  current_value = ap_password_;   label_text = "Editing: AP Password"; break;
-        case Row::SecretWord:  current_value = secret_word_;   label_text = "Editing: Secret Word"; break;
+        case Row::StaSsid:     current_value = sta_ssid_;     label_text = i18n::tr(i18n::Key::EditingStationSsid); break;
+        case Row::StaPassword: current_value = sta_password_; label_text = i18n::tr(i18n::Key::EditingStationPassword); break;
+        case Row::ApSsid:      current_value = ap_ssid_;       label_text = i18n::tr(i18n::Key::EditingApSsid); break;
+        case Row::ApPassword:  current_value = ap_password_;   label_text = i18n::tr(i18n::Key::EditingApPassword); break;
+        case Row::SecretWord:  current_value = secret_word_;   label_text = i18n::tr(i18n::Key::EditingSecretWord); break;
         default: break;
     }
     lv_label_set_text(header, label_text);
@@ -302,7 +303,7 @@ void WifiSettingsScreen::save()
     updated.captive_portal_enabled = captive_portal_enabled_;
 
     if (!settings::set_wifi(updated)) {
-        lv_label_set_text(status_label_, "Save failed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::SaveFailed));
         return;
     }
 
@@ -314,13 +315,13 @@ void WifiSettingsScreen::save()
     settings::SecuritySettings sec = settings::all().security;
     std::strncpy(sec.secret_word, secret_word_, sizeof(sec.secret_word) - 1);
     if (!settings::set_security(sec)) {
-        lv_label_set_text(status_label_, "Save failed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::SaveFailed));
         return;
     }
 
     ESP_LOGI(TAG, "WiFi settings saved, applying...");
     if (!wifi::apply_settings()) {
-        lv_label_set_text(status_label_, "Saved, but failed to apply");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::SavedButFailedToApply));
         return;
     }
 
