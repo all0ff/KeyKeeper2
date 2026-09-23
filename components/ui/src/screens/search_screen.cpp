@@ -1,6 +1,7 @@
 #include "ui/screens/search_screen.hpp"
 
 #include "display/fonts.hpp"
+#include "ui/localization.hpp"
 #include "ui/screens/account_view_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
@@ -28,15 +29,15 @@ constexpr lv_coord_t ROW_SPACING = 18;
 
 const char* SearchScreen::title() const
 {
-    return "Search";
+    return i18n::tr(i18n::Key::Search);
 }
 
 const char* SearchScreen::footer_hint() const
 {
     if (mode_ == Mode::Browsing) {
-        return "ROTATE  Select    OK  Open    BACK  Edit query";
+        return i18n::tr(i18n::Key::SearchFooterBrowse);
     }
-    return "OK  Add char    Hold OK  Browse results    BACK  Erase    Hold BACK  Switch set";
+    return i18n::tr(i18n::Key::SearchFooterTyping);
 }
 
 void SearchScreen::initialize(lv_obj_t* content_parent)
@@ -117,7 +118,7 @@ void SearchScreen::update_results()
     }
 
     if (results_.empty()) {
-        lv_label_set_text(status_label_, current_query.empty() ? "Vault is empty" : "No matches");
+        lv_label_set_text(status_label_, current_query.empty() ? i18n::tr(i18n::Key::VaultEmpty) : i18n::tr(i18n::Key::NoMatches));
     } else {
         lv_label_set_text_fmt(status_label_, "%u result%s", static_cast<unsigned>(results_.size()),
                                results_.size() == 1 ? "" : "s");

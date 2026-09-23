@@ -223,6 +223,35 @@ struct Strings {
     const char* empty_value;
     const char* open_value;
     const char* disabled_value;
+    const char* search_footer_browse;
+    const char* search_footer_typing;
+    const char* no_matches;
+    const char* rotate_select_ok_open_back_return;
+    const char* no_categories_yet;
+    const char* no_favorites_yet;
+    const char* system_title;
+    const char* firmware_fmt;
+    const char* vault_db_format_fmt;
+    const char* device_fmt;
+    const char* flash_encryption_fmt;
+    const char* on_capital;
+    const char* off_capital;
+    const char* free_heap_fmt;
+    const char* internal_storage_fmt;
+    const char* internal_storage_unavailable;
+    const char* micro_sd_fmt;
+    const char* micro_sd_usage_unavailable;
+    const char* micro_sd_unreadable;
+    const char* micro_sd_not_detected;
+    const char* unknown_value;
+    const char* password_gen_title;
+    const char* length_row_fmt;
+    const char* uppercase_row_fmt;
+    const char* lowercase_row_fmt;
+    const char* digits_row_fmt;
+    const char* symbols_row_fmt;
+    const char* generate_type_row_fmt;
+    const char* enable_at_least_one_char_type;
 };
 
 constexpr Strings EN = {
@@ -300,7 +329,19 @@ constexpr Strings EN = {
     "Editing: Password Shortcut", "Login+Tab+Password+Enter", "Password Only", "Password+Enter",
     "USB settings saved", "USB",
     "%sPassword Shortcut: %s", "%sDelay Before Typing: %ums", "%sDelay Between Chars: %ums",
-    "%sDelay Between Fields: %ums", "%sPrint Sequence: %s", "%sAuto-switch layout: %s", "(empty)", "(open)", "(disabled)"
+    "%sDelay Between Fields: %ums", "%sPrint Sequence: %s", "%sAuto-switch layout: %s", "(empty)", "(open)", "(disabled)",
+    "ROTATE  Select    OK  Open    BACK  Edit query",
+    "OK  Add char    Hold OK  Browse results    BACK  Erase    Hold BACK  Switch set",
+    "No matches", "ROTATE  Select    OK  Open    BACK  Return",
+    "No categories yet", "No favorites yet",
+    "System", "Firmware: %s", "Vault DB format: v%u", "Device: %s (rev %s)",
+    "Flash Encryption: %s", "On", "Off", "Free heap: %u KB",
+    "Internal storage: %u / %u KB", "Internal storage: unavailable",
+    "microSD: %u / %u MB", "microSD: present, usage unavailable",
+    "microSD: unreadable (see Backup > Format SD Card)", "microSD: not detected", "unknown",
+    "Password Gen", "%sLength: %u", "%sUppercase (A-Z): %s", "%sLowercase (a-z): %s",
+    "%sDigits (0-9): %s", "%sSymbols (!@#...): %s", "%sGenerate & Type",
+    "Enable at least one character type"
 };
 
 constexpr Strings RU = {
@@ -379,7 +420,19 @@ constexpr Strings RU = {
     "Изменение: сочетание для пароля", "Логин+Tab+Пароль+Enter", "Только пароль", "Пароль+Enter",
     "Настройки USB сохранены", "USB",
     "%sСочетание для пароля: %s", "%sЗадержка перед вводом: %uмс", "%sЗадержка между символами: %uмс",
-    "%sЗадержка между полями: %uмс", "%sПоследовательность печати: %s", "%sАвто-раскладка (кириллица): %s", "(пусто)", "(открыта)", "(выключено)"
+    "%sЗадержка между полями: %uмс", "%sПоследовательность печати: %s", "%sАвто-раскладка (кириллица): %s", "(пусто)", "(открыта)", "(выключено)",
+    "ПОВОРОТ  Выбор    OK  Открыть    НАЗАД  Изменить запрос",
+    "OK  Добавить символ    Удержание OK  Результаты    НАЗАД  Стереть    Удержание НАЗАД  Набор",
+    "Совпадений нет", "ПОВОРОТ  Выбор    OK  Открыть    НАЗАД  Возврат",
+    "Категорий пока нет", "Избранного пока нет",
+    "Система", "Прошивка: %s", "Формат Vault DB: v%u", "Устройство: %s (ревизия %s)",
+    "Шифрование Flash: %s", "Вкл.", "Выкл.", "Свободно ОЗУ: %u КБ",
+    "Внутреннее хранилище: %u / %u КБ", "Внутреннее хранилище: недоступно",
+    "microSD: %u / %u МБ", "microSD: карта есть, объём недоступен",
+    "microSD: не читается (см. Backup > Format SD Card)", "microSD: не обнаружена", "неизвестно",
+    "Генератор паролей", "%sДлина: %u", "%sЗаглавные (A-Z): %s", "%sСтрочные (a-z): %s",
+    "%sЦифры (0-9): %s", "%sСимволы (!@#...): %s", "%sСгенерировать и напечатать",
+    "Включите хотя бы один тип символов"
 };
 
 const Strings& strings()
@@ -620,6 +673,35 @@ const char* tr(Key key)
         case Key::EmptyValue: return s.empty_value;
         case Key::OpenValue: return s.open_value;
         case Key::DisabledValue: return s.disabled_value;
+        case Key::SearchFooterBrowse: return s.search_footer_browse;
+        case Key::SearchFooterTyping: return s.search_footer_typing;
+        case Key::NoMatches: return s.no_matches;
+        case Key::RotateSelectOkOpenBackReturn: return s.rotate_select_ok_open_back_return;
+        case Key::NoCategoriesYet: return s.no_categories_yet;
+        case Key::NoFavoritesYet: return s.no_favorites_yet;
+        case Key::SystemTitle: return s.system_title;
+        case Key::FirmwareFmt: return s.firmware_fmt;
+        case Key::VaultDbFormatFmt: return s.vault_db_format_fmt;
+        case Key::DeviceFmt: return s.device_fmt;
+        case Key::FlashEncryptionFmt: return s.flash_encryption_fmt;
+        case Key::OnCapital: return s.on_capital;
+        case Key::OffCapital: return s.off_capital;
+        case Key::FreeHeapFmt: return s.free_heap_fmt;
+        case Key::InternalStorageFmt: return s.internal_storage_fmt;
+        case Key::InternalStorageUnavailable: return s.internal_storage_unavailable;
+        case Key::MicroSdFmt: return s.micro_sd_fmt;
+        case Key::MicroSdUsageUnavailable: return s.micro_sd_usage_unavailable;
+        case Key::MicroSdUnreadable: return s.micro_sd_unreadable;
+        case Key::MicroSdNotDetected: return s.micro_sd_not_detected;
+        case Key::UnknownValue: return s.unknown_value;
+        case Key::PasswordGenTitle: return s.password_gen_title;
+        case Key::LengthRowFmt: return s.length_row_fmt;
+        case Key::UppercaseRowFmt: return s.uppercase_row_fmt;
+        case Key::LowercaseRowFmt: return s.lowercase_row_fmt;
+        case Key::DigitsRowFmt: return s.digits_row_fmt;
+        case Key::SymbolsRowFmt: return s.symbols_row_fmt;
+        case Key::GenerateTypeRowFmt: return s.generate_type_row_fmt;
+        case Key::EnableAtLeastOneCharType: return s.enable_at_least_one_char_type;
     }
 
     return "";

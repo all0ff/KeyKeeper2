@@ -1,6 +1,7 @@
 #include "ui/screens/categories_screen.hpp"
 
 #include "display/fonts.hpp"
+#include "ui/localization.hpp"
 #include "ui/screens/account_view_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
@@ -27,12 +28,12 @@ constexpr size_t SCAN_CAP = 256;
 
 const char* CategoriesScreen::title() const
 {
-    return (mode_ == Mode::EntryList) ? "Category" : "Categories";
+    return (mode_ == Mode::EntryList) ? i18n::tr(i18n::Key::FieldCategory) : i18n::tr(i18n::Key::Categories);
 }
 
 const char* CategoriesScreen::footer_hint() const
 {
-    return "ROTATE  Select    OK  Open    BACK  Return";
+    return i18n::tr(i18n::Key::RotateSelectOkOpenBackReturn);
 }
 
 void CategoriesScreen::initialize(lv_obj_t* content_parent)
@@ -95,7 +96,7 @@ void CategoriesScreen::reload_categories()
     if (total_rows == 0) {
         category_empty_label_ = lv_label_create(content_parent_);
         lv_obj_set_style_text_color(category_empty_label_, pal.secondary_text, 0);
-        lv_label_set_text(category_empty_label_, "No categories yet");
+        lv_label_set_text(category_empty_label_, i18n::tr(i18n::Key::NoCategoriesYet));
         lv_obj_center(category_empty_label_);
     } else {
         for (size_t i = 0; i < total_rows; ++i) {

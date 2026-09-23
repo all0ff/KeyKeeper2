@@ -1,6 +1,7 @@
 #include "ui/screens/favorites_screen.hpp"
 
 #include "display/fonts.hpp"
+#include "ui/localization.hpp"
 #include "ui/screens/account_view_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
@@ -30,12 +31,12 @@ constexpr size_t SCAN_CAP = 256;
 
 const char* FavoritesScreen::title() const
 {
-    return "Favorites";
+    return i18n::tr(i18n::Key::Favorites);
 }
 
 const char* FavoritesScreen::footer_hint() const
 {
-    return "ROTATE  Select    OK  Open    BACK  Return";
+    return i18n::tr(i18n::Key::RotateSelectOkOpenBackReturn);
 }
 
 void FavoritesScreen::initialize(lv_obj_t* content_parent)
@@ -45,7 +46,7 @@ void FavoritesScreen::initialize(lv_obj_t* content_parent)
     const theme::Palette& pal = theme::current();
     empty_label_ = lv_label_create(content_parent);
     lv_obj_set_style_text_color(empty_label_, pal.secondary_text, 0);
-    lv_label_set_text(empty_label_, "No favorites yet");
+    lv_label_set_text(empty_label_, i18n::tr(i18n::Key::NoFavoritesYet));
     lv_obj_center(empty_label_);
     lv_obj_add_flag(empty_label_, LV_OBJ_FLAG_HIDDEN);
 

@@ -1,5 +1,6 @@
 #include "ui/screens/system_info_screen.hpp"
 
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 
 #include "bsp/bsp.hpp"
@@ -25,12 +26,12 @@ constexpr lv_coord_t ROW_SPACING = 16;
 
 const char* SystemInfoScreen::title() const
 {
-    return "System";
+    return i18n::tr(i18n::Key::SystemTitle);
 }
 
 const char* SystemInfoScreen::footer_hint() const
 {
-    return "BACK  Return";
+    return i18n::tr(i18n::Key::BackReturn);
 }
 
 void SystemInfoScreen::initialize(lv_obj_t* content_parent)
@@ -62,14 +63,14 @@ void SystemInfoScreen::refresh()
     char buf[64];
 
     const esp_app_desc_t* app_desc = esp_app_get_description();
-    std::snprintf(buf, sizeof(buf), "Firmware: %s", app_desc != nullptr ? app_desc->version : "unknown");
+    std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::FirmwareFmt), app_desc != nullptr ? app_desc->version : i18n::tr(i18n::Key::UnknownValue));
     add_row(buf);
 
-    std::snprintf(buf, sizeof(buf), "Vault DB format: v%u",
+    std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::VaultDbFormatFmt),
                    static_cast<unsigned>(vault::repository::VAULT_FORMAT_VERSION));
     add_row(buf);
 
-    std::snprintf(buf, sizeof(buf), "Device: %s (rev %s)", bsp::board_name(), bsp::board_revision());
+    std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::DeviceFmt), bsp::board_name(), bsp::board_revision());
     add_row(buf);
 
     // Read-only status -- Flash Encryption itself can't be turned on
@@ -78,21 +79,21 @@ void SystemInfoScreen::refresh()
     // actual eFuse burn happens automatically on the first boot after
     // flashing with that option set. This just reports whether it's
     // currently active on this chip.
-    std::snprintf(buf, sizeof(buf), "Flash Encryption: %s",
-                   esp_efuse_is_flash_encryption_enabled() ? "On" : "Off");
+    std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::FlashEncryptionFmt),
+                   esp_efuse_is_flash_encryption_enabled() ? i18n::tr(i18n::Key::OnCapital) : i18n::tr(i18n::Key::OffCapital));
     add_row(buf);
 
-    std::snprintf(buf, sizeof(buf), "Free heap: %u KB",
+    std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::FreeHeapFmt),
                    static_cast<unsigned>(esp_get_free_heap_size() / 1024));
     add_row(buf);
 
     size_t fs_total = 0;
     size_t fs_used = 0;
     if (storage::fs::get_usage(fs_total, fs_used)) {
-        std::snprintf(buf, sizeof(buf), "Internal storage: %u / %u KB",
+        std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::InternalStorageFmt),
                        static_cast<unsigned>(fs_used / 1024), static_cast<unsigned>(fs_total / 1024));
     } else {
-        std::snprintf(buf, sizeof(buf), "Internal storage: unavailable");
+        std::snprintf(buf, sizeof(buf), "%s", i18n::tr(i18n::Key::InternalStorageUnavailable));
     }
     add_row(buf);
 
@@ -105,9 +106,9 @@ void SystemInfoScreen::refresh()
             // safe well past any microSD size in practical use.
             const unsigned used_mb = static_cast<unsigned>(sd_used / (1024 * 1024));
             const unsigned total_mb = static_cast<unsigned>(sd_total / (1024 * 1024));
-            std::snprintf(buf, sizeof(buf), "microSD: %u / %u MB", used_mb, total_mb);
+            std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::MicroSdFmt), used_mb, total_mb);
         } else {
-            std::snprintf(buf, sizeof(buf), "microSD: present, usage unavailable");
+            std::snprintf(buf, sizeof(buf), "%s", i18n::tr(i18n::Key::MicroSdUsageUnavailable));
         }
     } else {
         // "not inserted" would overclaim precision this board doesn't
@@ -119,9 +120,9 @@ void SystemInfoScreen::refresh()
         // mount_looked_unreadable() is a best-effort distinction, not
         // a guarantee.
         if (storage::sd::mount_looked_unreadable()) {
-            std::snprintf(buf, sizeof(buf), "microSD: unreadable (see Backup > Format SD Card)");
+            std::snprintf(buf, sizeof(buf), "%s", i18n::tr(i18n::Key::MicroSdUnreadable));
         } else {
-            std::snprintf(buf, sizeof(buf), "microSD: not detected");
+            std::snprintf(buf, sizeof(buf), "%s", i18n::tr(i18n::Key::MicroSdNotDetected));
         }
     }
     add_row(buf);

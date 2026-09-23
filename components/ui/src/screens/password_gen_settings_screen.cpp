@@ -1,5 +1,6 @@
 #include "ui/screens/password_gen_settings_screen.hpp"
 
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -24,15 +25,15 @@ constexpr int32_t LENGTH_STEP = 1;
 
 const char* PasswordGenSettingsScreen::title() const
 {
-    return "Password Gen";
+    return i18n::tr(i18n::Key::PasswordGenTitle);
 }
 
 const char* PasswordGenSettingsScreen::footer_hint() const
 {
     if (mode_ == Mode::Adjust) {
-        return "ROTATE  Change    OK/BACK  Confirm";
+        return i18n::tr(i18n::Key::AdjustFooter);
     }
-    return "OK  Open    BACK  Cancel";
+    return i18n::tr(i18n::Key::OkOpenBackCancel);
 }
 
 void PasswordGenSettingsScreen::initialize(lv_obj_t* content_parent)
@@ -87,25 +88,29 @@ void PasswordGenSettingsScreen::render_rows()
 
         switch (static_cast<Row>(i)) {
             case Row::Length:
-                lv_label_set_text_fmt(row_labels_[i], "%sLength: %u", prefix, static_cast<unsigned>(length_));
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::LengthRowFmt), prefix, static_cast<unsigned>(length_));
                 break;
             case Row::Uppercase:
-                lv_label_set_text_fmt(row_labels_[i], "%sUppercase (A-Z): %s", prefix, uppercase_ ? "on" : "off");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::UppercaseRowFmt), prefix,
+                                       uppercase_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
                 break;
             case Row::Lowercase:
-                lv_label_set_text_fmt(row_labels_[i], "%sLowercase (a-z): %s", prefix, lowercase_ ? "on" : "off");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::LowercaseRowFmt), prefix,
+                                       lowercase_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
                 break;
             case Row::Digits:
-                lv_label_set_text_fmt(row_labels_[i], "%sDigits (0-9): %s", prefix, digits_ ? "on" : "off");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::DigitsRowFmt), prefix,
+                                       digits_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
                 break;
             case Row::Symbols:
-                lv_label_set_text_fmt(row_labels_[i], "%sSymbols (!@#...): %s", prefix, symbols_ ? "on" : "off");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SymbolsRowFmt), prefix,
+                                       symbols_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
                 break;
             case Row::GenerateAndType:
-                lv_label_set_text_fmt(row_labels_[i], "%sGenerate & Type", prefix);
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::GenerateTypeRowFmt), prefix);
                 break;
             case Row::Save:
-                lv_label_set_text_fmt(row_labels_[i], "%sSave", prefix);
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SaveRowFmt), prefix);
                 break;
         }
     }
@@ -190,7 +195,7 @@ void PasswordGenSettingsScreen::generate_and_type()
 
     char buf[password_gen::MAX_LENGTH + 1];
     if (!password_gen::generate(cfg, buf, sizeof(buf))) {
-        lv_label_set_text(status_label_, "Enable at least one character type");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::EnableAtLeastOneCharType));
         return;
     }
 
@@ -205,7 +210,7 @@ void PasswordGenSettingsScreen::save()
         // always fail with all four classes off. Refuse to save this
         // combination rather than silently persisting a setting that
         // can never actually generate anything.
-        lv_label_set_text(status_label_, "Enable at least one character type");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::EnableAtLeastOneCharType));
         return;
     }
 
@@ -220,7 +225,7 @@ void PasswordGenSettingsScreen::save()
         ESP_LOGI(TAG, "Password generator settings saved");
         manager().pop();
     } else {
-        lv_label_set_text(status_label_, "Save failed");
+        lv_label_set_text(status_label_, i18n::tr(i18n::Key::SaveFailed));
     }
 }
 
