@@ -495,7 +495,7 @@ void SecuritySettingsScreen::handle_old_pin_result(security::pin::VerifyResult r
         old_pin_.clear();
 
         if (result == security::pin::VerifyResult::LockedOut) {
-            show_pin_step("Locked out, try later");
+            show_pin_step(i18n::tr(i18n::Key::LockedOutTryLater));
         } else if (result == security::pin::VerifyResult::WipeRequired) {
             // NOTE: reaching the wipe threshold here (verifying the OLD
             // PIN while changing it) does NOT trigger an actual wipe --
@@ -507,13 +507,17 @@ void SecuritySettingsScreen::handle_old_pin_result(security::pin::VerifyResult r
             show_pin_step(i18n::tr(i18n::Key::TooManyFailedAttempts));
         } else {
             const uint8_t remaining = security::pin::attempts_remaining();
-            char buf[48];
+            // 96, not 48 -- see lock_screen.cpp's own comment on the
+            // exact same buffer for why (a real, confirmed-on-hardware
+            // truncation bug: the RU translation of the vault-wipe
+            // warning below runs well past 48 UTF-8 bytes).
+            char buf[96];
             if (remaining > 0) {
-                std::snprintf(buf, sizeof(buf), "Wrong current PIN, %u left",
+                std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::WrongCurrentPinLeftFmt),
                               static_cast<unsigned>(remaining));
             } else {
                 const uint8_t until_wipe = security::pin::attempts_until_wipe();
-                std::snprintf(buf, sizeof(buf), "Wrong PIN! %u attempts until vault wipe",
+                std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::WrongPinUntilWipeFmt),
                               static_cast<unsigned>(until_wipe));
             }
             show_pin_step(buf);
@@ -669,18 +673,22 @@ void SecuritySettingsScreen::handle_duress_current_pin_result(security::pin::Ver
         duress_current_pin_.clear();
 
         if (result == security::pin::VerifyResult::LockedOut) {
-            show_duress_pin_step("Locked out, try later");
+            show_duress_pin_step(i18n::tr(i18n::Key::LockedOutTryLater));
         } else if (result == security::pin::VerifyResult::WipeRequired) {
             show_duress_pin_step(i18n::tr(i18n::Key::TooManyFailedAttempts));
         } else {
             const uint8_t remaining = security::pin::attempts_remaining();
-            char buf[48];
+            // 96, not 48 -- see lock_screen.cpp's own comment on the
+            // exact same buffer for why (a real, confirmed-on-hardware
+            // truncation bug: the RU translation of the vault-wipe
+            // warning below runs well past 48 UTF-8 bytes).
+            char buf[96];
             if (remaining > 0) {
-                std::snprintf(buf, sizeof(buf), "Wrong current PIN, %u left",
+                std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::WrongCurrentPinLeftFmt),
                               static_cast<unsigned>(remaining));
             } else {
                 const uint8_t until_wipe = security::pin::attempts_until_wipe();
-                std::snprintf(buf, sizeof(buf), "Wrong PIN! %u attempts until vault wipe",
+                std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::WrongPinUntilWipeFmt),
                               static_cast<unsigned>(until_wipe));
             }
             show_duress_pin_step(buf);

@@ -131,7 +131,16 @@ void LockScreen::handle_result(security::pin::VerifyResult result)
 
         case security::pin::VerifyResult::WrongPin: {
             const uint8_t remaining = security::pin::attempts_remaining();
-            char buf[48];
+            // 48 wasn't enough -- confirmed on real hardware: the RU
+            // translation of the vault-wipe warning below runs 87
+            // UTF-8 bytes (cyrillic is 2 bytes/char) and was silently
+            // truncated mid-word by snprintf, right when it matters
+            // most (the one warning telling the person they're about
+            // to lose everything). 96 covers every current EN/RU
+            // string here with real headroom to spare, not just a
+            // measured-exact fit that could break again the next time
+            // either string changes even slightly.
+            char buf[96];
             if (remaining > 0) {
                 std::snprintf(buf, sizeof(buf), i18n::tr(i18n::Key::WrongPinLeftFmt), static_cast<unsigned>(remaining));
             } else {

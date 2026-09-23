@@ -29,7 +29,16 @@ const char* QuickScreen::title() const
 
 const char* QuickScreen::footer_hint() const
 {
-    return footer_buf_;
+    // No longer a cached/copied buffer -- see footer_buf_'s removal
+    // for why (a real, confirmed-on-hardware bug: the RU translation
+    // of this text is 63 UTF-8 bytes, cyrillic runs 2 bytes/char,
+    // which didn't fit the 48-byte buffer this used to snprintf into
+    // and got silently truncated mid-word). i18n::tr() itself already
+    // returns a pointer to a static string living for the program's
+    // whole lifetime -- nothing to copy, and nothing sized to get out
+    // of sync with a translation's actual length ever again.
+    const bool locked = security::lock::state() == security::lock::State::Locked;
+    return locked ? i18n::tr(i18n::Key::QuickFooterLockedFmt) : i18n::tr(i18n::Key::QuickFooterUnlockedFmt);
 }
 
 void QuickScreen::initialize(lv_obj_t* content_parent)
@@ -59,12 +68,6 @@ void QuickScreen::refresh()
     const bool locked = security::lock::state() == security::lock::State::Locked;
 
     lv_label_set_text(state_label_, locked ? i18n::tr(i18n::Key::LockedStatus) : i18n::tr(i18n::Key::UnlockedStatus));
-
-    if (locked) {
-        std::snprintf(footer_buf_, sizeof(footer_buf_), "%s", i18n::tr(i18n::Key::QuickFooterLockedFmt));
-    } else {
-        std::snprintf(footer_buf_, sizeof(footer_buf_), "%s", i18n::tr(i18n::Key::QuickFooterUnlockedFmt));
-    }
 }
 
 bool QuickScreen::on_input(InputAction action)

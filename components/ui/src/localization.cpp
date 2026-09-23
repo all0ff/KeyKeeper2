@@ -260,6 +260,7 @@ struct Strings {
     const char* unlocked_status;
     const char* wifi_not_connected;
     const char* password_shortcut_empty;
+    const char* wrong_current_pin_left_fmt;
 };
 
 constexpr Strings EN = {
@@ -352,7 +353,7 @@ constexpr Strings EN = {
     "Enable at least one character type",
     "Firmware %s", "Standalone password / TOTP manager",
     "BACK  Unlock   OK  Print URL", "OK  Print URL",
-    "Locked", "Unlocked", "WiFi not connected", "Password Shortcut empty"
+    "Locked", "Unlocked", "WiFi not connected", "Password Shortcut empty", "Wrong current PIN, %u left"
 };
 
 constexpr Strings RU = {
@@ -446,7 +447,7 @@ constexpr Strings RU = {
     "Включите хотя бы один тип символов",
     "Прошивка %s", "Автономный менеджер паролей / TOTP",
     "НАЗАД  Разблокировать   OK  Печать URL", "OK  Печать URL",
-    "Заблокировано", "Разблокировано", "WiFi не подключен", "Пароль для сочетания не задан"
+    "Заблокировано", "Разблокировано", "WiFi не подключен", "Пароль для сочетания не задан", "Неверный текущий PIN, осталось %u"
 };
 
 const Strings& strings()
@@ -724,6 +725,7 @@ const char* tr(Key key)
         case Key::UnlockedStatus: return s.unlocked_status;
         case Key::WifiNotConnected: return s.wifi_not_connected;
         case Key::PasswordShortcutEmpty: return s.password_shortcut_empty;
+        case Key::WrongCurrentPinLeftFmt: return s.wrong_current_pin_left_fmt;
     }
 
     return "";

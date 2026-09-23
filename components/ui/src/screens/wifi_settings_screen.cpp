@@ -67,6 +67,13 @@ void WifiSettingsScreen::build_rows(lv_obj_t* parent)
     for (size_t i = 0; i < ROW_COUNT; ++i) {
         lv_obj_t* label = lv_label_create(parent);
         lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0); // SSID/secret word can be Cyrillic
+        // Same fix as usb_settings_screen.cpp's own row labels and
+        // ui_manager.cpp's footer_label_ (see that file's comment for
+        // the full reasoning) -- a fixed width is required for
+        // LV_LABEL_LONG_SCROLL to have anything to detect an overflow
+        // against. A row that fits just sits still, same as before.
+        lv_obj_set_width(label, LV_PCT(96));
+        lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL);
         // SecretWord and Save (i >= 6) get pushed down one extra
         // ROW_SPACING to make room for status_label_'s own dedicated
         // slot right after CaptivePortal -- see status_label_'s own
@@ -82,6 +89,12 @@ void WifiSettingsScreen::build_rows(lv_obj_t* parent)
     status_label_ = lv_label_create(parent);
     lv_obj_set_style_text_color(status_label_, pal.secondary_text, 0);
     lv_label_set_text(status_label_, "");
+    // Same width+scroll treatment as the rows above -- the AP-mode
+    // status line (IP address plus client count) is exactly the text
+    // confirmed on real hardware to not fit and, before this, to just
+    // run off the edge instead of scrolling into view.
+    lv_obj_set_width(status_label_, LV_PCT(96));
+    lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL);
     // Inline in the scrolling row sequence now (its own dedicated slot
     // between CaptivePortal and SecretWord), NOT pinned to the bottom
     // of the screen -- a fixed-bottom position used to sit UNDER

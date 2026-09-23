@@ -260,6 +260,7 @@ enum class Key : uint8_t {
     UnlockedStatus,
     WifiNotConnected,
     PasswordShortcutEmpty,
+    WrongCurrentPinLeftFmt,
 };
 
 void set_language(settings::Language language);

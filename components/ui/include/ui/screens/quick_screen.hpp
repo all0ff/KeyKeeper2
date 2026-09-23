@@ -53,7 +53,10 @@ private:
     lv_obj_t* state_label_ = nullptr;
     lv_obj_t* status_label_ = nullptr;
 
-    char footer_buf_[48]{};
+    // No footer_buf_ any more -- see footer_hint()'s own comment in
+    // quick_screen.cpp for why copying into a fixed buffer was itself
+    // the bug (a translation longer than the buffer got silently
+    // truncated), not just something that needed a bigger size.
 };
 
 } // namespace ui::screens
