@@ -71,6 +71,17 @@ public:
         size_t max_length = 64; ///< BYTE budget -- see the class comment. Clamped to MAX_BUFFER - 1 regardless.
         const char* initial_value = "";
         bool mask = false; ///< Confirmed characters render as '*' (one per CHARACTER, not per byte -- e.g. password fields).
+        /// The two Cyrillic classes (see the class comment's 6 classes)
+        /// are the last two in the cycle and simply skipped by
+        /// BackLong when this is false -- true (the default) keeps
+        /// every existing field's behavior exactly as it was. The
+        /// project owner's own call for WiFi passwords specifically:
+        /// Cyrillic there is correct in principle (this widget can
+        /// type it) but wanted in maybe 2% of real passwords, so
+        /// cycling past 2 extra classes on every single field of this
+        /// kind just to reach digits/symbols is friction with no
+        /// payoff for the common case.
+        bool allow_cyrillic = true;
     };
 
     void init(lv_obj_t* parent, const Config& cfg);
@@ -117,6 +128,7 @@ private:
 
     bool mask_ = false;
     bool finished_ = false;
+    bool allow_cyrillic_ = true;
 
     size_t class_index_ = 0;
     size_t index_in_class_ = 0;

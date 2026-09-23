@@ -41,7 +41,7 @@ const char* MainMenu::title() const
 
 const char* MainMenu::footer_hint() const
 {
-    return "ROTATE  Select    OK  Open    BACK  Return";
+    return i18n::tr(i18n::Key::RotateSelectOkOpenBackReturn);
 }
 
 void MainMenu::initialize(lv_obj_t* content_parent)

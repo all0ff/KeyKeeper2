@@ -293,6 +293,11 @@ void WifiSettingsScreen::enter_edit_text(Row row)
     widgets::TextEntry::Config cfg{};
     cfg.max_length = (row == Row::StaPassword || row == Row::ApPassword) ? 64 : 32;
     cfg.mask = (row == Row::StaPassword || row == Row::ApPassword);
+    // Password fields specifically, not SSID or Secret Word -- see
+    // Config::allow_cyrillic's own comment for the reasoning. Reuses
+    // the same row check as cfg.mask just above since it's exactly
+    // the same two rows.
+    cfg.allow_cyrillic = !cfg.mask;
     cfg.initial_value = current_value;
 
     text_entry_.init(content_parent_, cfg);
@@ -361,7 +366,14 @@ void WifiSettingsScreen::save()
     // effect immediately rather than only on next boot.
     web::restart();
 
-    refresh_status();
+    // Same pattern every sibling settings screen already follows on a
+    // successful save (GeneralSettingsScreen, SecuritySettingsScreen,
+    // etc. all manager().pop() here) -- this screen was the one
+    // inconsistent holdout, confirmed on real hardware as a real,
+    // noticeable difference in behavior, not just a style nitpick.
+    // refresh_status() no longer needed right after -- there's no one
+    // left to see status_label_ once this screen is gone.
+    manager().pop();
 }
 
 bool WifiSettingsScreen::on_input(InputAction action)

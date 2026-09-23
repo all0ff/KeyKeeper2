@@ -122,6 +122,7 @@ size_t utf8_char_count(const char* buf, size_t byte_len)
 void TextEntry::init(lv_obj_t* parent, const Config& cfg)
 {
     mask_ = cfg.mask;
+    allow_cyrillic_ = cfg.allow_cyrillic;
     set_max_length(cfg.max_length);
 
     const theme::Palette& pal = theme::current();
@@ -187,7 +188,13 @@ void TextEntry::reset(const char* initial_value)
 
 void TextEntry::advance_to_next_class()
 {
-    class_index_ = (class_index_ + 1) % CLASS_COUNT;
+    // The two Cyrillic classes are CLASSES[4] and CLASSES[5] -- the
+    // last two of the 6 (see the class comment's own list) -- so
+    // skipping them when allow_cyrillic_ is false is just a smaller
+    // modulus, not a different cycle order. See Config::allow_cyrillic
+    // for the reasoning.
+    const size_t effective_count = allow_cyrillic_ ? CLASS_COUNT : 4;
+    class_index_ = (class_index_ + 1) % effective_count;
     index_in_class_ = 0;
 }
 
