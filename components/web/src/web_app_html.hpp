@@ -558,7 +558,7 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
 
     <div class="help-section">
       <h3>Резервная копия, экспорт и импорт</h3>
-      <p>Две разные вещи, обе на microSD-карте, обе в разделе Backup на устройстве:</p>
+      <p>Две разные вещи, обе на microSD-карте, обе в разделе Резервная копия на устройстве:</p>
       <ul>
         <li><strong>Создать/восстановить резервную копию</strong> &mdash; полная, точная копия внутреннего файла хранилища
           устройства. Читается только другим устройством KeyKeeper2, не сторонними приложениями.</li>
@@ -613,6 +613,27 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
 </div>
 
 <script>
+// Set by web_russian_localization.hpp's own script (a separate,
+// dictionary-based DOM translator -- see that file's own comment) --
+// used here to translate a handful of dynamically-assigned button/
+// status strings DIRECTLY at the moment they're set, rather than
+// relying on that script's MutationObserver to catch the change
+// after the fact. Confirmed on real hardware as the correct fix for
+// several strings that stayed English despite already being correct,
+// present dictionary entries (Set/Replace/Delete and others): plain
+// .textContent assignment on an EXISTING element is a real DOM
+// mutation and the observer's own childList config does pick it up
+// in most cases, but exactly which of these specific call sites ran
+// before the async, fetch-based language check had first resolved
+// (a real timing gap right after unlock, not something worth trying
+// to close from the observer side) varied in a way that wasn't worth
+// chasing further. Always defined (returns the input unchanged) even
+// before that script decides the language, so no caller needs its
+// own existence check.
+function t(s) {
+  return (window.krTranslate && window.krTranslate(s)) || s;
+}
+
 let entries = [];
 let currentEntryId = null;
 let editingId = null;
@@ -653,7 +674,7 @@ async function login() {
   const pin = document.getElementById('pin').value;
   const msg = document.getElementById('login-msg');
   msg.style.color = '#000';
-  msg.textContent = 'Checking...';
+  msg.textContent = t('Checking...');
   try {
     const { ok, body } = await api('api/v1/auth/login', {
       method: 'POST',
@@ -665,7 +686,7 @@ async function login() {
       showApp();
     } else {
       msg.style.color = '#c00';
-      msg.textContent = body.message || 'Error';
+      msg.textContent = t(body.message || 'Error');
     }
   } catch (e) {
     msg.style.color = '#c00';
@@ -714,7 +735,7 @@ async function loadList() {
 
   const { ok, body } = await api('api/v1/entries');
   if (!ok) {
-    msg.textContent = body.message || 'Failed to load';
+    msg.textContent = t(body.message || 'Failed to load');
     return;
   }
 
@@ -741,7 +762,7 @@ async function runSearch() {
   msg.textContent = 'Searching...';
   const { ok, body } = await api('api/v1/search?q=' + encodeURIComponent(q));
   if (!ok) {
-    msg.textContent = body.message || 'Search failed';
+    msg.textContent = t(body.message || 'Search failed');
     return;
   }
 
@@ -815,7 +836,7 @@ async function openEntry(id) {
   document.getElementById('seed-phrase-edit').style.display = 'none';
   renderSeedPhrase();
 
-  document.getElementById('delete-btn').textContent = 'Delete';
+  document.getElementById('delete-btn').textContent = t('Delete');
   showView('detail-view');
 }
 
@@ -830,10 +851,10 @@ function renderRecoveryCodes() {
     const empty = document.createElement('div');
     empty.className = 'empty';
     empty.style.padding = '10px 0';
-    empty.textContent = 'Not set.';
+    empty.textContent = t('Not set.');
     list.appendChild(empty);
     copyBtn.style.display = 'none';
-    setBtn.textContent = 'Set';
+    setBtn.textContent = t('Set');
   } else {
     currentRecoveryCodes.forEach(rc => {
       const row = document.createElement('div');
@@ -843,14 +864,14 @@ function renderRecoveryCodes() {
       code.textContent = rc.code;
       const btn = document.createElement('button');
       btn.className = 'small secondary';
-      btn.textContent = rc.used ? 'Mark unused' : 'Mark used';
+      btn.textContent = rc.used ? t('Mark unused') : t('Mark used');
       btn.onclick = () => toggleRecoveryCode(rc.code, !rc.used);
       row.appendChild(code);
       row.appendChild(btn);
       list.appendChild(row);
     });
     copyBtn.style.display = 'inline-block';
-    setBtn.textContent = 'Replace';
+    setBtn.textContent = t('Replace');
   }
   actions.style.display = 'flex';
 }
@@ -901,7 +922,7 @@ async function saveRecoveryCodes() {
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codes }) }
   );
   if (!ok) {
-    msg.textContent = body.message || 'Failed to save recovery codes';
+    msg.textContent = t(body.message || 'Failed to save recovery codes');
     return;
   }
 
@@ -920,7 +941,7 @@ async function toggleRecoveryCode(code, used) {
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, used }) }
   );
   if (!ok) {
-    msg.textContent = body.message || 'Failed to update code';
+    msg.textContent = t(body.message || 'Failed to update code');
     return;
   }
   currentRecoveryCodes = body.data.recovery_codes;
@@ -954,18 +975,18 @@ function renderSeedPhrase() {
     const empty = document.createElement('div');
     empty.className = 'empty';
     empty.style.padding = '6px 0';
-    empty.textContent = 'Not set.';
+    empty.textContent = t('Not set.');
     view.appendChild(empty);
     revealBtn.style.display = 'none';
     copyBtn.style.display = 'none';
     clearBtn.style.display = 'none';
-    editBtn.textContent = 'Set';
+    editBtn.textContent = t('Set');
   } else {
     revealBtn.style.display = 'inline-block';
     revealBtn.textContent = seedRevealed ? 'Hide' : 'Reveal';
     copyBtn.style.display = 'inline-block';
     clearBtn.style.display = 'inline-block';
-    editBtn.textContent = 'Replace';
+    editBtn.textContent = t('Replace');
 
     const list = document.createElement('div');
     list.style.fontFamily = 'ui-monospace, Consolas, monospace';
@@ -1035,7 +1056,7 @@ async function saveSeedPhrase() {
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ words }) }
   );
   if (!ok) {
-    msg.textContent = body.message || 'Failed to save seed phrase';
+    msg.textContent = t(body.message || 'Failed to save seed phrase');
     return;
   }
 
@@ -1071,7 +1092,7 @@ async function clearSeedPhrase() {
     { method: 'DELETE' }
   );
   if (!ok) {
-    msg.textContent = body.message || 'Failed to clear seed phrase';
+    msg.textContent = t(body.message || 'Failed to clear seed phrase');
     return;
   }
 
@@ -1168,7 +1189,7 @@ async function saveEntry() {
 
   if (!ok) {
     msg.style.color = '#c00';
-    msg.textContent = body.message || 'Save failed';
+    msg.textContent = t(body.message || 'Save failed');
     return;
   }
 
@@ -1252,7 +1273,7 @@ async function saveSettings(section) {
 
   if (!ok) {
     msg.style.color = '#c00';
-    msg.textContent = body.message || 'Save failed';
+    msg.textContent = t(body.message || 'Save failed');
     return;
   }
 
@@ -1278,7 +1299,7 @@ async function loadBackups() {
   const { ok, body } = await api('api/v1/backups');
   if (!ok) {
     list.innerHTML = '';
-    msg.textContent = body.message || 'Failed to load backups';
+    msg.textContent = t(body.message || 'Failed to load backups');
     return;
   }
 
@@ -1309,7 +1330,7 @@ async function loadBackups() {
 
     const deleteBtn = document.createElement('button');
     deleteBtn.className = 'small danger';
-    deleteBtn.textContent = 'Delete';
+    deleteBtn.textContent = t('Delete');
     deleteBtn.onclick = () => deleteBackup(b.filename);
 
     row.appendChild(name);
@@ -1325,7 +1346,7 @@ async function createBackup() {
   msg.textContent = 'Creating...';
   const { ok, body } = await api('api/v1/backups', { method: 'POST' });
   if (!ok) {
-    msg.textContent = body.message || 'Failed to create backup';
+    msg.textContent = t(body.message || 'Failed to create backup');
     return;
   }
   msg.textContent = 'Created: ' + body.data.filename;
@@ -1350,7 +1371,7 @@ async function restoreBackup(filename) {
     { method: 'POST' }
   );
   if (!ok) {
-    msg.textContent = body.message || 'Restore failed';
+    msg.textContent = t(body.message || 'Restore failed');
     return;
   }
   msg.textContent = 'Restoring. The device is restarting -- reconnect in a few seconds and log in again.';
@@ -1363,7 +1384,7 @@ async function deleteBackup(filename) {
     { method: 'DELETE' }
   );
   if (!ok) {
-    msg.textContent = body.message || 'Failed to delete backup';
+    msg.textContent = t(body.message || 'Failed to delete backup');
     return;
   }
   msg.textContent = '';

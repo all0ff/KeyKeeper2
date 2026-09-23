@@ -182,7 +182,23 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Yes": "Да",
     "Restoring -- device will restart...": "Восстановление -- устройство перезагрузится...",
     "A full, exact copy of the device's own internal vault file, on the microSD card. Only ever readable by another KeyKeeper2 device, not other password managers or spreadsheet apps -- for that, use Export Vault (CSV) on the device itself instead, though that CSV export leaves out recovery codes and seed phrases (only login/password/url/notes/TOTP secret/category/favorite) -- a Backup here is the only copy that includes everything.":
-      "Полная, точная копия внутреннего файла хранилища устройства, на microSD-карте. Читается только другим устройством KeyKeeper2, не другими менеджерами паролей или табличными редакторами -- для этого используйте Export Vault (CSV) на самом устройстве, хотя такой CSV-экспорт не включает коды восстановления и seed-фразы (только login/password/url/notes/TOTP secret/category/favorite) -- Backup здесь -- единственная копия, включающая всё."
+      "Полная, точная копия внутреннего файла хранилища устройства, на microSD-карте. Читается только другим устройством KeyKeeper2, не другими менеджерами паролей или табличными редакторами -- для этого используйте Export Vault (CSV) на самом устройстве, хотя такой CSV-экспорт не включает коды восстановления и seed-фразы (только login/password/url/notes/TOTP secret/category/favorite) -- Backup здесь -- единственная копия, включающая всё.",
+    "Failed to load": "Не удалось загрузить",
+    "Search failed": "Ошибка поиска",
+    "Failed to save recovery codes": "Не удалось сохранить коды восстановления",
+    "Failed to update code": "Не удалось обновить код",
+    "Failed to save seed phrase": "Не удалось сохранить seed-фразу",
+    "Failed to clear seed phrase": "Не удалось очистить seed-фразу",
+    "Failed to load backups": "Не удалось загрузить список резервных копий",
+    "Failed to create backup": "Не удалось создать резервную копию",
+    "Failed to delete backup": "Не удалось удалить резервную копию",
+    "Failed to load entry": "Не удалось загрузить запись",
+    "Delete failed": "Ошибка удаления",
+    "Failed to load settings": "Не удалось загрузить настройки",
+    "These come FROM the service the account belongs to (its own 2FA or account-recovery settings page) -- paste or import the ones it gave you. This device has no way to create codes that service would actually accept.":
+      "Эти коды выдаёт сам сервис, которому принадлежит запись (его собственная страница настроек 2FA или восстановления доступа) -- вставьте или импортируйте именно те, что он выдал. Устройство не может само создать коды, которые сервис реально примет.",
+    "Anyone who has this phrase has full, irreversible control of the wallet it belongs to -- treat it with at least the same care as the wallet itself. This device does not encrypt its storage (see Help).":
+      "У кого есть эта фраза, у того полный и необратимый контроль над кошельком, которому она принадлежит -- обращайтесь с ней не менее бережно, чем с самим кошельком. Устройство не шифрует своё хранилище (см. Помощь)."
   };
 
   // For code that shows a message via alert() (a native browser
