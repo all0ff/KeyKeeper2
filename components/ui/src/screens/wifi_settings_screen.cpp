@@ -67,7 +67,14 @@ void WifiSettingsScreen::build_rows(lv_obj_t* parent)
     for (size_t i = 0; i < ROW_COUNT; ++i) {
         lv_obj_t* label = lv_label_create(parent);
         lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0); // SSID/secret word can be Cyrillic
-        lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4, ROW_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i));
+        // SecretWord and Save (i >= 6) get pushed down one extra
+        // ROW_SPACING to make room for status_label_'s own dedicated
+        // slot right after CaptivePortal -- see status_label_'s own
+        // comment just below for why it moved here instead of staying
+        // pinned to the bottom of the screen.
+        const lv_coord_t extra_offset = (i >= static_cast<size_t>(Row::SecretWord)) ? ROW_SPACING : 0;
+        lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4,
+                     ROW_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i) + extra_offset);
         row_labels_[i] = label;
     }
 
@@ -75,7 +82,18 @@ void WifiSettingsScreen::build_rows(lv_obj_t* parent)
     status_label_ = lv_label_create(parent);
     lv_obj_set_style_text_color(status_label_, pal.secondary_text, 0);
     lv_label_set_text(status_label_, "");
-    lv_obj_align(status_label_, LV_ALIGN_BOTTOM_MID, 0, -2);
+    // Inline in the scrolling row sequence now (its own dedicated slot
+    // between CaptivePortal and SecretWord), NOT pinned to the bottom
+    // of the screen -- a fixed-bottom position used to sit UNDER
+    // whichever row the scroll-to-view below happened to bring into
+    // that same physical spot (confirmed on real hardware: this
+    // status text, which can run long -- AP mode shows the IP address
+    // and client count -- visibly overlapped the Captive Portal row).
+    // Scrolling together with the rest of the content means it can
+    // never land on top of a row again, regardless of which one is
+    // selected.
+    lv_obj_align(status_label_, LV_ALIGN_TOP_LEFT, 4,
+                 ROW_Y_START + static_cast<lv_coord_t>(ROW_SPACING * static_cast<size_t>(Row::SecretWord)));
 
     render_rows();
     refresh_status();

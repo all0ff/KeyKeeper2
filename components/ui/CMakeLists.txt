@@ -25,7 +25,6 @@ idf_component_register(
         "src/screens/usb_settings_screen.cpp"
         "src/screens/system_info_screen.cpp"
         "src/screens/wifi_settings_screen.cpp"
-        "src/screens/font_test_screen.cpp"
         "src/widgets/keyboard.cpp"
         "src/widgets/text_entry.cpp"
         "src/async_pin_check.cpp"

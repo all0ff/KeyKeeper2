@@ -3,7 +3,6 @@
 #include "ui/screens/about_screen.hpp"
 #include "ui/screens/accounts_screen.hpp"
 #include "ui/screens/backup_screen.hpp"
-#include "ui/screens/font_test_screen.hpp"
 #include "ui/screens/settings_screen.hpp"
 #include "ui/localization.hpp"
 #include "ui/theme.hpp"
@@ -28,7 +27,6 @@ constexpr i18n::Key ITEM_KEYS[] = {
     i18n::Key::Backup,
     i18n::Key::Lock,
     i18n::Key::About,
-    i18n::Key::FontTest,
 };
 
 constexpr lv_coord_t FIRST_ITEM_Y = 8;
@@ -220,11 +218,6 @@ void MainMenu::activate()
         case Item::About:
             manager().push(std::make_unique<AboutScreen>());
             ESP_LOGI(TAG, "About selected");
-            break;
-
-        case Item::FontTest:
-            manager().push(std::make_unique<FontTestScreen>());
-            ESP_LOGI(TAG, "Font Test selected");
             break;
 
         case Item::Count:

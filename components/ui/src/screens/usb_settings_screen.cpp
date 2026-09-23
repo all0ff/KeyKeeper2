@@ -71,6 +71,16 @@ void UsbSettingsScreen::build_rows(lv_obj_t* parent)
     for (size_t i = 0; i < ROW_COUNT; ++i) {
         lv_obj_t* label = lv_label_create(parent);
         lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0); // default_password can be Cyrillic
+        // Same fix as ui_manager.cpp's own footer_label_ (see that
+        // file's comment for the full reasoning) -- Print Sequence's
+        // row specifically, with the "> " selection prefix plus a
+        // value like "Логин+Tab+Пароль+Enter", confirmed on real
+        // hardware to sometimes not fully fit and instead shift the
+        // whole screen sideways. A fixed width is required for
+        // LV_LABEL_LONG_SCROLL to have anything to detect an overflow
+        // against; a row that fits just sits still, same as before.
+        lv_obj_set_width(label, LV_PCT(96));
+        lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL);
         lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4, ROW_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i));
         row_labels_[i] = label;
     }

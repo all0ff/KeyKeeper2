@@ -47,7 +47,6 @@ private:
         Backup,
         Lock,
         About,
-        FontTest,
         Count,
     };
 
