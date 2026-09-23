@@ -760,7 +760,7 @@ function escapeHtml(s) {
 async function openEntry(id) {
   const { ok, body } = await api('api/v1/entry?id=' + encodeURIComponent(id));
   if (!ok) {
-    alert(body.message || 'Failed to load entry');
+    alert(window.krTranslate ? window.krTranslate(body.message || 'Failed to load entry') : (body.message || 'Failed to load entry'));
     return;
   }
 
@@ -1091,7 +1091,7 @@ async function confirmDelete() {
 
   const { ok, body } = await api('api/v1/entry?id=' + encodeURIComponent(currentEntryId), { method: 'DELETE' });
   if (!ok) {
-    alert(body.message || 'Delete failed');
+    alert(window.krTranslate ? window.krTranslate(body.message || 'Delete failed') : (body.message || 'Delete failed'));
     return;
   }
   showView('list-view');
@@ -1181,7 +1181,7 @@ async function saveEntry() {
 async function openSettings() {
   const { ok, body } = await api('api/v1/settings');
   if (!ok) {
-    alert(body.message || 'Failed to load settings');
+    alert(window.krTranslate ? window.krTranslate(body.message || 'Failed to load settings') : (body.message || 'Failed to load settings'));
     return;
   }
 

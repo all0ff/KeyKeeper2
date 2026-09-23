@@ -169,7 +169,35 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Invalid value": "Недопустимое значение",
     "Connection failed": "Ошибка подключения",
     "Permission denied": "Доступ запрещён",
-    "Unauthorized": "Не авторизован"
+    "Unauthorized": "Не авторизован",
+    "Not set.": "Не задано.",
+    "Checking...": "Проверка...",
+    "Mark used": "Отметить использованным",
+    "Mark unused": "Снять отметку",
+    "Replace": "Заменить",
+    "Show": "Показать",
+    "Hide": "Скрыть",
+    "Yes": "Да",
+    "Restoring -- device will restart...": "Восстановление -- устройство перезагрузится...",
+    "A full, exact copy of the device's own internal vault file, on the microSD card. Only ever readable by another KeyKeeper2 device, not other password managers or spreadsheet apps -- for that, use Export Vault (CSV) on the device itself instead, though that CSV export leaves out recovery codes and seed phrases (only login/password/url/notes/TOTP secret/category/favorite) -- a Backup here is the only copy that includes everything.":
+      "Полная, точная копия внутреннего файла хранилища устройства, на microSD-карте. Читается только другим устройством KeyKeeper2, не другими менеджерами паролей или табличными редакторами -- для этого используйте Export Vault (CSV) на самом устройстве, хотя такой CSV-экспорт не включает коды восстановления и seed-фразы (только login/password/url/notes/TOTP secret/category/favorite) -- Backup здесь -- единственная копия, включающая всё."
+  };
+
+  // For code that shows a message via alert() (a native browser
+  // dialog, not a DOM node) -- translate() below only ever walks the
+  // PAGE's own DOM, so it can't reach text inside a native alert()
+  // popup no matter what's in RU above. A confirmed real case: the
+  // three alert(body.message || '...') call sites in the main app
+  // script stayed in English even once "Not authenticated" (a common
+  // body.message when a session lapses) was already a correct RU
+  // entry above -- the dictionary was right, alert() just doesn't go
+  // through translate() at all. Exposed globally so the main app
+  // script can wrap exactly those call sites; returns the original
+  // string unchanged (never throws, never returns undefined) if RU
+  // has no entry for it or this script hasn't set language to
+  // Russian, so callers never need to check that themselves first.
+  window.krTranslate = function (s) {
+    return RU[s] || s;
   };
 
   const ATTRS = ["placeholder", "title", "aria-label"];
@@ -248,6 +276,20 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
         document.documentElement.lang = "ru";
         translate(document.body);
         startObserver();
+        // Help's own EN/RU toggle (setHelpLang(), a separate,
+        // pre-existing mechanism from this dictionary translator --
+        // see this script's own file comment) defaults to English
+        // regardless of this setting, since it's just a manual button
+        // click with no memory of its own. Syncing it here once,
+        // right when the rest of the page goes Russian, means opening
+        // Help for the first time already shows the matching content
+        // instead of defaulting back to English independently of
+        // everything else already translated on the page -- the
+        // person can still click EN inside Help afterward if they
+        // specifically want that section in English.
+        if (typeof setHelpLang === "function") {
+          setHelpLang("ru");
+        }
         return true;
       }
       // Settings were read successfully and the language is not Russian.
