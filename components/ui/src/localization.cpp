@@ -243,7 +243,6 @@ constexpr Strings EN = {
     "This erases EVERYTHING. Press OK again to confirm.",
     "Security", "ROTATE  Change    OK/BACK  Confirm",
     "ROTATE Digit OK Next Hold OK Done BACK Erase/Cancel",
-    "OK  Open    BACK  Cancel",
     "Enter current PIN", "Confirm new PIN", "Enter duress PIN", "Confirm duress PIN",
     "Too many failed attempts"
 };
@@ -310,7 +309,6 @@ constexpr Strings RU = {
     "Это сотрёт ВСЁ содержимое. Нажмите OK ещё раз для подтверждения.",
     "Безопасность", "ПОВОРОТ  Изменить    OK/НАЗАД  Подтвердить",
     "ПОВОРОТ Цифра OK Далее Удержание OK Готово НАЗАД Стереть/Отмена",
-    "OK  Открыть    НАЗАД  Отмена",
     "Введите текущий PIN", "Подтвердите новый PIN", "Введите PIN под принуждением", "Подтвердите PIN под принуждением",
     "Слишком много неудачных попыток"
 };
@@ -355,6 +353,7 @@ const char* tr(Key key)
         case Key::BackReturn: return s.back_return;
         case Key::RotateChange: return s.rotate_change;
         case Key::OkBackConfirm: return s.ok_back_confirm;
+        case Key::OkOpenBackCancel: return s.ok_open_back_cancel;
         case Key::English: return s.english;
         case Key::Russian: return s.russian;
         case Key::Off: return s.off;
