@@ -252,6 +252,14 @@ enum class Key : uint8_t {
     SymbolsRowFmt,
     GenerateTypeRowFmt,
     EnableAtLeastOneCharType,
+    FirmwareVersionFmt,
+    TaglineDesc,
+    QuickFooterLockedFmt,
+    QuickFooterUnlockedFmt,
+    LockedStatus,
+    UnlockedStatus,
+    WifiNotConnected,
+    PasswordShortcutEmpty,
 };
 
 void set_language(settings::Language language);

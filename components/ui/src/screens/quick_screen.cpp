@@ -1,6 +1,7 @@
 #include "ui/screens/quick_screen.hpp"
 
 #include "ui/screens/lock_screen.hpp"
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 #include "ui/screens/main_menu.hpp"
@@ -57,12 +58,12 @@ void QuickScreen::refresh()
 {
     const bool locked = security::lock::state() == security::lock::State::Locked;
 
-    lv_label_set_text(state_label_, locked ? "Locked" : "Unlocked");
+    lv_label_set_text(state_label_, locked ? i18n::tr(i18n::Key::LockedStatus) : i18n::tr(i18n::Key::UnlockedStatus));
 
     if (locked) {
-        std::snprintf(footer_buf_, sizeof(footer_buf_), "BACK  Unlock   OK  Print URL");
+        std::snprintf(footer_buf_, sizeof(footer_buf_), "%s", i18n::tr(i18n::Key::QuickFooterLockedFmt));
     } else {
-        std::snprintf(footer_buf_, sizeof(footer_buf_), "OK  Print URL");
+        std::snprintf(footer_buf_, sizeof(footer_buf_), "%s", i18n::tr(i18n::Key::QuickFooterUnlockedFmt));
     }
 }
 
@@ -93,7 +94,7 @@ bool QuickScreen::on_input(InputAction action)
 
             if (password == nullptr || password[0] == '\0') {
                 ESP_LOGI(TAG, "Password Shortcut is empty");
-                lv_label_set_text(status_label_, "Password Shortcut empty");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::PasswordShortcutEmpty));
                 return true;
             }
 
@@ -114,7 +115,7 @@ bool QuickScreen::on_input(InputAction action)
             const char* ip = wifi::ip_address();
             if (ip[0] == '\0') {
                 ESP_LOGI(TAG, "Print URL: WiFi not connected");
-                lv_label_set_text(status_label_, "WiFi not connected");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::WifiNotConnected));
                 return true;
             }
 

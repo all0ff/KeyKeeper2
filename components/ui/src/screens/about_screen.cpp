@@ -1,5 +1,6 @@
 #include "ui/screens/about_screen.hpp"
 
+#include "ui/localization.hpp"
 #include "ui/theme.hpp"
 
 #include "esp_app_desc.h"
@@ -10,12 +11,12 @@ namespace ui::screens {
 
 const char* AboutScreen::title() const
 {
-    return "About";
+    return i18n::tr(i18n::Key::About);
 }
 
 const char* AboutScreen::footer_hint() const
 {
-    return "BACK  Return";
+    return i18n::tr(i18n::Key::BackReturn);
 }
 
 void AboutScreen::initialize(lv_obj_t* content_parent)
@@ -29,13 +30,13 @@ void AboutScreen::initialize(lv_obj_t* content_parent)
 
     lv_obj_t* tagline_label = lv_label_create(content_parent);
     lv_obj_set_style_text_color(tagline_label, pal.secondary_text, 0);
-    lv_label_set_text(tagline_label, "Standalone password / TOTP manager");
+    lv_label_set_text(tagline_label, i18n::tr(i18n::Key::TaglineDesc));
     lv_obj_align(tagline_label, LV_ALIGN_TOP_MID, 0, 26);
 
     char version_buf[48];
     const esp_app_desc_t* app_desc = esp_app_get_description();
-    std::snprintf(version_buf, sizeof(version_buf), "Firmware %s",
-                  app_desc != nullptr ? app_desc->version : "unknown");
+    std::snprintf(version_buf, sizeof(version_buf), i18n::tr(i18n::Key::FirmwareVersionFmt),
+                  app_desc != nullptr ? app_desc->version : i18n::tr(i18n::Key::UnknownValue));
 
     lv_obj_t* version_label = lv_label_create(content_parent);
     lv_obj_set_style_text_color(version_label, pal.secondary_text, 0);

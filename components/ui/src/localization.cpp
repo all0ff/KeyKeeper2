@@ -252,6 +252,14 @@ struct Strings {
     const char* symbols_row_fmt;
     const char* generate_type_row_fmt;
     const char* enable_at_least_one_char_type;
+    const char* firmware_version_fmt;
+    const char* tagline_desc;
+    const char* quick_footer_locked_fmt;
+    const char* quick_footer_unlocked_fmt;
+    const char* locked_status;
+    const char* unlocked_status;
+    const char* wifi_not_connected;
+    const char* password_shortcut_empty;
 };
 
 constexpr Strings EN = {
@@ -341,7 +349,10 @@ constexpr Strings EN = {
     "microSD: unreadable (see Backup > Format SD Card)", "microSD: not detected", "unknown",
     "Password Gen", "%sLength: %u", "%sUppercase (A-Z): %s", "%sLowercase (a-z): %s",
     "%sDigits (0-9): %s", "%sSymbols (!@#...): %s", "%sGenerate & Type",
-    "Enable at least one character type"
+    "Enable at least one character type",
+    "Firmware %s", "Standalone password / TOTP manager",
+    "BACK  Unlock   OK  Print URL", "OK  Print URL",
+    "Locked", "Unlocked", "WiFi not connected", "Password Shortcut empty"
 };
 
 constexpr Strings RU = {
@@ -432,7 +443,10 @@ constexpr Strings RU = {
     "microSD: не читается (см. Backup > Format SD Card)", "microSD: не обнаружена", "неизвестно",
     "Генератор паролей", "%sДлина: %u", "%sЗаглавные (A-Z): %s", "%sСтрочные (a-z): %s",
     "%sЦифры (0-9): %s", "%sСимволы (!@#...): %s", "%sСгенерировать и напечатать",
-    "Включите хотя бы один тип символов"
+    "Включите хотя бы один тип символов",
+    "Прошивка %s", "Автономный менеджер паролей / TOTP",
+    "НАЗАД  Разблокировать   OK  Печать URL", "OK  Печать URL",
+    "Заблокировано", "Разблокировано", "WiFi не подключен", "Пароль для сочетания не задан"
 };
 
 const Strings& strings()
@@ -702,6 +716,14 @@ const char* tr(Key key)
         case Key::SymbolsRowFmt: return s.symbols_row_fmt;
         case Key::GenerateTypeRowFmt: return s.generate_type_row_fmt;
         case Key::EnableAtLeastOneCharType: return s.enable_at_least_one_char_type;
+        case Key::FirmwareVersionFmt: return s.firmware_version_fmt;
+        case Key::TaglineDesc: return s.tagline_desc;
+        case Key::QuickFooterLockedFmt: return s.quick_footer_locked_fmt;
+        case Key::QuickFooterUnlockedFmt: return s.quick_footer_unlocked_fmt;
+        case Key::LockedStatus: return s.locked_status;
+        case Key::UnlockedStatus: return s.unlocked_status;
+        case Key::WifiNotConnected: return s.wifi_not_connected;
+        case Key::PasswordShortcutEmpty: return s.password_shortcut_empty;
     }
 
     return "";
