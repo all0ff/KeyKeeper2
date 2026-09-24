@@ -261,6 +261,7 @@ enum class Key : uint8_t {
     WifiNotConnected,
     PasswordShortcutEmpty,
     WrongCurrentPinLeftFmt,
+    RotateScrollOkPrintBackReturn,
 };
 
 void set_language(settings::Language language);

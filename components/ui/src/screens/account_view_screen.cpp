@@ -52,7 +52,7 @@ const char* AccountViewScreen::title() const
 const char* AccountViewScreen::footer_hint() const
 {
     if (mode_ == Mode::RecoveryCodesList) {
-        return i18n::tr(i18n::Key::RotateScrollBackReturn);
+        return i18n::tr(i18n::Key::RotateScrollOkPrintBackReturn);
     }
     if (mode_ == Mode::SeedPhraseView) {
         return i18n::tr(i18n::Key::RotateScrollOkRevealHideBackReturn);
@@ -324,7 +324,26 @@ void AccountViewScreen::render_actions()
     }
 
     if (action_count_ > 0) {
-        lv_obj_scroll_to_view(action_labels_[selected_action_], LV_ANIM_ON);
+        if (selected_action_ == 0) {
+            // scroll_to_view() below only guarantees the TARGET label
+            // itself becomes visible -- the minimum scroll needed for
+            // that, not necessarily all the way back to the top of the
+            // container. Confirmed as a real bug on real hardware:
+            // rotating back up to the very first action after having
+            // scrolled down to a later one left the info fields above
+            // it (Login/Password/URL/...) still mostly or entirely
+            // scrolled out of view, with no way to see them again
+            // short of leaving and re-opening the entry. Explicitly
+            // scrolling the whole container to its own top here, only
+            // for this one specific position, guarantees those fields
+            // are visible again exactly when the person has navigated
+            // back to the top of the action list, which is the only
+            // point where "back to the top" and "first action
+            // selected" necessarily coincide.
+            lv_obj_scroll_to_y(content_parent_, 0, LV_ANIM_ON);
+        } else {
+            lv_obj_scroll_to_view(action_labels_[selected_action_], LV_ANIM_ON);
+        }
     }
 }
 
@@ -666,13 +685,42 @@ bool AccountViewScreen::on_input(InputAction action)
                 move_recovery_code_selection(+1);
                 return true;
 
+            case InputAction::OkShort: {
+                // Previously swallowed entirely (this list used to be
+                // read-only by design) -- but the footer hint one
+                // level up, on the account's own action list ("OK
+                // Run"), sets an expectation that selecting something
+                // and pressing OK does something with THAT specific
+                // selection, and the only way to print a recovery
+                // code at all used to be the bulk "Print Recovery
+                // Codes" action (every unused code at once) -- not
+                // useful when a service is only asking for one
+                // specific backup code right now. Confirmed as a real
+                // gap, not just a missing nicety: typing every unused
+                // code into a field that only wants one is actively
+                // wrong, not just inconvenient.
+                if (entry_.recovery_codes.empty()) {
+                    return true;
+                }
+                const security::permission::Result result =
+                    security::permission::check(security::permission::Operation::PrintPassword);
+                if (result != security::permission::Result::Allowed) {
+                    ESP_LOGI(TAG, "Print single recovery code denied (%d)", static_cast<int>(result));
+                    lv_label_set_text(status_label_, i18n::tr(i18n::Key::NotAllowed));
+                    return true;
+                }
+                usb::type_string(entry_.recovery_codes[selected_recovery_code_].code);
+                lv_label_set_text(status_label_, usb::last_status());
+                return true;
+            }
+
             case InputAction::BackShort:
                 mode_ = Mode::Main;
                 reload();
                 return true;
 
             default:
-                return true; // swallow OK/etc -- nothing to activate in a read-only list
+                return true; // swallow anything else -- nothing more to activate here
         }
     }
 

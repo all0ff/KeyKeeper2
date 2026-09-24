@@ -86,7 +86,22 @@ void VaultListScreen::reload()
                  static_cast<unsigned>(total), static_cast<unsigned>(MAX_ROWS));
     }
 
-    selected_ = 0;
+    // Clamped, not unconditionally reset to 0 -- on_show() (and so
+    // this) runs every time the screen becomes active again,
+    // INCLUDING coming back from having viewed a specific entry, not
+    // just on a fresh navigation into the list. Confirmed as a real,
+    // reported annoyance: with a longer list, viewing one entry near
+    // the bottom and going back used to always land back at the very
+    // top, losing your place every single time. Clamping instead
+    // means: unchanged position on an ordinary "view an entry, go
+    // back", and a graceful fall to the new last entry specifically
+    // if the previously-selected one was the one just deleted -- not
+    // a jump to the top in that case either, which would be a worse
+    // surprise (a totally different entry now sitting under the
+    // cursor) than just landing one row up from where you were.
+    if (selected_ >= to_load) {
+        selected_ = (to_load > 0) ? to_load - 1 : 0;
+    }
 
     const theme::Palette& pal = theme::current();
     for (size_t i = 0; i < entries_.size(); ++i) {
