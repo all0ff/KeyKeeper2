@@ -22,6 +22,7 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Cancel": "Отмена",
     "← Cancel": "← Отмена",
     "Set / Replace": "Задать / заменить",
+    "Set": "Задать",
     "Copy unused": "Копировать неиспользованные",
     "Reveal": "Показать",
     "Copy": "Копировать",
@@ -181,6 +182,8 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Hide": "Скрыть",
     "Yes": "Да",
     "Restoring -- device will restart...": "Восстановление -- устройство перезагрузится...",
+    "Restoring. The device is restarting -- reconnect in a few seconds and log in again.":
+      "Восстановление. Устройство перезагружается -- переподключитесь через несколько секунд и войдите снова.",
     "A full, exact copy of the device's own internal vault file, on the microSD card. Only ever readable by another KeyKeeper2 device, not other password managers or spreadsheet apps -- for that, use Export Vault (CSV) on the device itself instead, though that CSV export leaves out recovery codes and seed phrases (only login/password/url/notes/TOTP secret/category/favorite) -- a Backup here is the only copy that includes everything.":
       "Полная, точная копия внутреннего файла хранилища устройства, на microSD-карте. Читается только другим устройством KeyKeeper2, не другими менеджерами паролей или табличными редакторами -- для этого используйте Export Vault (CSV) на самом устройстве, хотя такой CSV-экспорт не включает коды восстановления и seed-фразы (только login/password/url/notes/TOTP secret/category/favorite) -- Backup здесь -- единственная копия, включающая всё.",
     "Failed to load": "Не удалось загрузить",
@@ -222,12 +225,42 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
   let observer = null;
   let retryTimer = null;
 
+  function normalizeWhitespace(s) {
+    // HTML source line-wrapping and indentation (newlines, runs of
+    // spaces) are NOT collapsed in node.nodeValue -- that collapsing
+    // is CSS's doing, for the visual render only; the DOM text node
+    // itself keeps the raw source whitespace verbatim. Confirmed as
+    // the real cause of a real bug: every dictionary key here for a
+    // paragraph spanning more than one source line was written as
+    // plain, single-spaced text (how the text reads, not how the
+    // source happens to be wrapped) and so could never exact-match
+    // node.nodeValue's own literal "word\n        word" runs no
+    // matter how many times the key itself was checked byte-for-byte
+    // correct against the reconstructed rendered text -- the
+    // reconstruction was the bug, not the key. Single-line strings
+    // (most of this dictionary) were never affected, which is why
+    // this went unnoticed through several rounds of fixing individual
+    // entries instead of the lookup itself.
+    return s.replace(/\s+/g, " ").trim();
+  }
+
   function translateTextNode(node) {
     const text = node.nodeValue;
     if (!text || !text.trim()) return;
     const trimmed = text.trim();
     if (RU[trimmed]) {
       node.nodeValue = text.replace(trimmed, RU[trimmed]);
+      return;
+    }
+
+    // Whitespace-normalized fallback for exactly the multi-source-line
+    // case above -- replaces the WHOLE node value (not a substring
+    // splice like the exact-match branch just above), since once
+    // translated the original's internal line-wrapping no longer
+    // means anything.
+    const normalized = normalizeWhitespace(text);
+    if (normalized !== trimmed && RU[normalized]) {
+      node.nodeValue = RU[normalized];
       return;
     }
 

@@ -1365,7 +1365,7 @@ async function restoreBackup(filename) {
   backupRestoreConfirmPending = null;
 
   const msg = document.getElementById('backup-msg');
-  msg.textContent = 'Restoring -- device will restart...';
+  msg.textContent = t('Restoring -- device will restart...');
   const { ok, body } = await api(
     'api/v1/backups/restore?filename=' + encodeURIComponent(filename),
     { method: 'POST' }
@@ -1374,7 +1374,7 @@ async function restoreBackup(filename) {
     msg.textContent = t(body.message || 'Restore failed');
     return;
   }
-  msg.textContent = 'Restoring. The device is restarting -- reconnect in a few seconds and log in again.';
+  msg.textContent = t('Restoring. The device is restarting -- reconnect in a few seconds and log in again.');
 }
 
 async function deleteBackup(filename) {
