@@ -30,6 +30,14 @@ bool require_unlocked(httpd_req_t* req)
         respond_error(req, "401 Unauthorized", "Not authenticated");
         return false;
     }
+    // See security::lock::notify_activity()'s own comment -- a real,
+    // confirmed-on-hardware bug: without this, using the device
+    // purely through the Web UI still auto-locked on the physical
+    // input timer's own schedule, and the very next request after a
+    // web-based unlock would immediately auto-lock again since
+    // nothing about that unlock had touched input's own activity
+    // timestamp.
+    security::lock::notify_activity();
     return true;
 }
 

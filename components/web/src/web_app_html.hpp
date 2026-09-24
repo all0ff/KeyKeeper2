@@ -192,8 +192,8 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         <button class="small danger" id="seed-clear-btn" onclick="clearSeedPhrase()" style="display:none">Clear</button>
       </div>
       <div class="note" style="margin-top:8px">Anyone who has this phrase has full, irreversible control of the
-        wallet it belongs to -- treat it with at least the same care as the wallet itself. This device does not
-        encrypt its storage (see Help).</div>
+        wallet it belongs to -- treat it with at least the same care as the wallet itself. This device encrypts
+        its own storage, but a Backup or CSV export of it is not (see Help).</div>
       <div id="seed-msg" style="font-size:0.85rem; margin-top:4px"></div>
     </div>
 
@@ -448,9 +448,10 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
           for being made to unlock the device under pressure.</li>
         <li>Auto-Lock (Settings &rarr; Security) locks the device after a period of inactivity you choose.</li>
         <li>Factory Reset erases everything: vault, PIN, all settings, WiFi credentials.</li>
-        <li>The vault file on the device (and in a Backup or CSV export) is <strong>not encrypted</strong> &mdash;
-          the PIN protects on-device access, not the data at rest. Treat a backup or export file with the same
-          care as the passwords it contains.</li>
+        <li>The vault file on the device itself is encrypted (AES-256-GCM, keyed from the PIN) -- but a Backup or
+          CSV export of it is <strong>not</strong>, by design (a Backup needs to work from any KeyKeeper2 device's
+          own PIN, and CSV is meant to move between different password managers). Treat a backup or export file
+          with the same care as the passwords it contains.</li>
       </ul>
     </div>
 
@@ -584,9 +585,10 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
           стирает хранилище — на случай если вас заставляют разблокировать устройство.</li>
         <li>Автоблокировка (Настройки &rarr; Безопасность) блокирует устройство после выбранного периода бездействия.</li>
         <li>Сброс до заводских стирает всё: хранилище, PIN, все настройки, данные WiFi.</li>
-        <li>Файл хранилища на устройстве (и в резервной копии или CSV-экспорте) <strong>не зашифрован</strong>
-          &mdash; PIN защищает доступ на самом устройстве, но не данные как таковые. Обращайтесь с файлом резервной
-          копии или экспорта так же бережно, как с паролями внутри него.</li>
+        <li>Файл хранилища на самом устройстве зашифрован (AES-256-GCM, ключ выводится из PIN) — а резервная копия
+          или CSV-экспорт <strong>нет</strong>, осознанно (резервная копия должна работать с PIN любого устройства
+          KeyKeeper2, а CSV предназначен для переноса между разными менеджерами паролей). Обращайтесь с файлом
+          резервной копии или экспорта так же бережно, как с паролями внутри него.</li>
       </ul>
     </div>
 
@@ -690,7 +692,7 @@ async function login() {
     }
   } catch (e) {
     msg.style.color = '#c00';
-    msg.textContent = 'Request failed: ' + e;
+    msg.textContent = t('Request failed: ') + e;
   }
 }
 
@@ -729,7 +731,7 @@ function renderEntryList(list_data, empty_message) {
 
 async function loadList() {
   const msg = document.getElementById('msg');
-  msg.textContent = 'Loading...';
+  msg.textContent = t('Loading...');
   const searchBox = document.getElementById('search-box');
   if (searchBox) searchBox.value = '';
 
@@ -759,7 +761,7 @@ async function runSearch() {
     return;
   }
 
-  msg.textContent = 'Searching...';
+  msg.textContent = t('Searching...');
   const { ok, body } = await api('api/v1/search?q=' + encodeURIComponent(q));
   if (!ok) {
     msg.textContent = t(body.message || 'Search failed');
@@ -805,11 +807,11 @@ async function openEntry(id) {
     if (masked) {
       const btn = document.createElement('button');
       btn.className = 'small secondary';
-      btn.textContent = 'Show';
+      btn.textContent = t('Show');
       btn.onclick = () => {
         const shown = span.textContent !== '\u2022'.repeat(8);
         span.textContent = shown ? '\u2022'.repeat(8) : value;
-        btn.textContent = shown ? 'Show' : 'Hide';
+        btn.textContent = shown ? t('Show') : t('Hide');
       };
       v.appendChild(btn);
     }
@@ -896,7 +898,7 @@ function handleRecoveryCodesFile(event) {
     document.getElementById('recovery-codes-input').value = reader.result;
   };
   reader.onerror = () => {
-    document.getElementById('recovery-msg').textContent = 'Could not read that file.';
+    document.getElementById('recovery-msg').textContent = t('Could not read that file.');
   };
   reader.readAsText(file);
   event.target.value = ''; // allow re-selecting the same file later
@@ -912,11 +914,11 @@ async function saveRecoveryCodes() {
   const msg = document.getElementById('recovery-msg');
 
   if (codes.length === 0) {
-    msg.textContent = 'Paste or import at least one code first.';
+    msg.textContent = t('Paste or import at least one code first.');
     return;
   }
 
-  msg.textContent = 'Saving...';
+  msg.textContent = t('Saving...');
   const { ok, body } = await api(
     'api/v1/entry/recovery_codes?id=' + encodeURIComponent(currentEntryId),
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codes }) }
@@ -953,9 +955,9 @@ async function copyRecoveryCodes() {
   const msg = document.getElementById('recovery-msg');
   try {
     await navigator.clipboard.writeText(unused);
-    msg.textContent = 'Copied to clipboard.';
+    msg.textContent = t('Copied to clipboard.');
   } catch (e) {
-    msg.textContent = 'Could not access clipboard -- select and copy manually.';
+    msg.textContent = t('Could not access clipboard -- select and copy manually.');
   }
 }
 
@@ -983,7 +985,7 @@ function renderSeedPhrase() {
     editBtn.textContent = t('Set');
   } else {
     revealBtn.style.display = 'inline-block';
-    revealBtn.textContent = seedRevealed ? 'Hide' : 'Reveal';
+    revealBtn.textContent = seedRevealed ? t('Hide') : t('Reveal');
     copyBtn.style.display = 'inline-block';
     clearBtn.style.display = 'inline-block';
     editBtn.textContent = t('Replace');
@@ -1028,7 +1030,7 @@ function handleSeedPhraseFile(event) {
     document.getElementById('seed-phrase-input').value = reader.result;
   };
   reader.onerror = () => {
-    document.getElementById('seed-msg').textContent = 'Could not read that file.';
+    document.getElementById('seed-msg').textContent = t('Could not read that file.');
   };
   reader.readAsText(file);
   event.target.value = '';
@@ -1046,11 +1048,11 @@ async function saveSeedPhrase() {
   // is the one that actually decides -- see
   // web_vault_routes.cpp's handle_set_seed_phrase().
   if (!VALID_SEED_LENGTHS.includes(words.length)) {
-    msg.textContent = 'Must be 12, 15, 18, 21 or 24 words -- got ' + words.length + '.';
+    msg.textContent = t('Must be 12, 15, 18, 21 or 24 words -- got ') + words.length + '.';
     return;
   }
 
-  msg.textContent = 'Saving...';
+  msg.textContent = t('Saving...');
   const { ok, body } = await api(
     'api/v1/entry/seed_phrase?id=' + encodeURIComponent(currentEntryId),
     { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ words }) }
@@ -1072,9 +1074,9 @@ async function copySeedPhrase() {
   const msg = document.getElementById('seed-msg');
   try {
     await navigator.clipboard.writeText(currentSeedPhrase.join(' '));
-    msg.textContent = 'Copied to clipboard.';
+    msg.textContent = t('Copied to clipboard.');
   } catch (e) {
-    msg.textContent = 'Could not access clipboard -- select and copy manually.';
+    msg.textContent = t('Could not access clipboard -- select and copy manually.');
   }
 }
 
@@ -1106,7 +1108,7 @@ async function confirmDelete() {
   const btn = document.getElementById('delete-btn');
   if (!deleteConfirmPending) {
     deleteConfirmPending = true;
-    btn.textContent = 'Tap again to confirm';
+    btn.textContent = t('Tap again to confirm');
     return;
   }
 
@@ -1176,7 +1178,7 @@ async function saveEntry() {
   }
 
   msg.style.color = '#000';
-  msg.textContent = 'Saving...';
+  msg.textContent = t('Saving...');
 
   const path = editingId ? ('api/v1/entry?id=' + encodeURIComponent(editingId)) : 'api/v1/entry';
   const method = editingId ? 'PUT' : 'POST';
@@ -1263,7 +1265,7 @@ async function saveSettings(section) {
   }
 
   msg.style.color = '#000';
-  msg.textContent = 'Saving...';
+  msg.textContent = t('Saving...');
 
   const { ok, body } = await api('api/v1/settings/' + section, {
     method: 'PUT',
@@ -1278,7 +1280,7 @@ async function saveSettings(section) {
   }
 
   msg.style.color = '#080';
-  msg.textContent = 'Saved.';
+  msg.textContent = t('Saved.');
 }
 
 // ---------- Backup ----------
@@ -1294,7 +1296,7 @@ function openBackup() {
 async function loadBackups() {
   const list = document.getElementById('backup-list');
   const msg = document.getElementById('backup-msg');
-  list.innerHTML = 'Loading...';
+  list.innerHTML = t('Loading...');
 
   const { ok, body } = await api('api/v1/backups');
   if (!ok) {
@@ -1343,13 +1345,13 @@ async function loadBackups() {
 
 async function createBackup() {
   const msg = document.getElementById('backup-msg');
-  msg.textContent = 'Creating...';
+  msg.textContent = t('Creating...');
   const { ok, body } = await api('api/v1/backups', { method: 'POST' });
   if (!ok) {
     msg.textContent = t(body.message || 'Failed to create backup');
     return;
   }
-  msg.textContent = 'Created: ' + body.data.filename;
+  msg.textContent = t('Created: ') + body.data.filename;
   loadBackups();
 }
 

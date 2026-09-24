@@ -87,6 +87,27 @@ bool unlock_after_pin_set();
  */
 void lock();
 
+/**
+ * @brief Record activity from a source OTHER than the physical
+ *        rotary knob/buttons -- specifically, an authenticated Web UI
+ *        request. auto_lock_task()'s own idle calculation used to
+ *        read ONLY input::last_activity_ms(), meaning using the
+ *        device purely through the Web UI (no physical button
+ *        touched at all) still auto-locked on schedule regardless of
+ *        how actively the web session was being used -- confirmed on
+ *        real hardware as a real bug, not just an inconvenience: the
+ *        very next poll after a web-based unlock would immediately
+ *        re-lock again (input's own timestamp was still old, nothing
+ *        about the successful web unlock had touched it), which is
+ *        why unlocking via the web looked like it briefly worked and
+ *        then instantly locked again on the next action. Called from
+ *        each require_unlocked() in the web:: routes, right after
+ *        confirming the request is already authenticated -- not on
+ *        the login attempt itself, only on requests that prove an
+ *        existing session is actively being used.
+ */
+void notify_activity();
+
 int register_callback(Callback cb, void* ctx);
 void unregister_callback(int handle);
 

@@ -23,6 +23,17 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "← Cancel": "← Отмена",
     "Set / Replace": "Задать / заменить",
     "Set": "Задать",
+    "Searching...": "Поиск...",
+    "Could not read that file.": "Не удалось прочитать файл.",
+    "Paste or import at least one code first.": "Сначала вставьте или импортируйте хотя бы один код.",
+    "Copied to clipboard.": "Скопировано в буфер обмена.",
+    "Could not access clipboard -- select and copy manually.": "Нет доступа к буферу обмена -- выделите и скопируйте вручную.",
+    "Creating...": "Создание...",
+    "Request failed: ": "Ошибка запроса: ",
+    "Must be 12, 15, 18, 21 or 24 words -- got ": "Должно быть 12, 15, 18, 21 или 24 слова -- получено ",
+    "Created: ": "Создано: ",
+    "Paste the codes this service gave you, one per line": "Вставьте коды, которые выдал сервис, по одному на строку",
+    "12, 15, 18, 21 or 24 words, space or newline separated": "12, 15, 18, 21 или 24 слова, через пробел или с новой строки",
     "Copy unused": "Копировать неиспользованные",
     "Reveal": "Показать",
     "Copy": "Копировать",
@@ -200,8 +211,8 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "Failed to load settings": "Не удалось загрузить настройки",
     "These come FROM the service the account belongs to (its own 2FA or account-recovery settings page) -- paste or import the ones it gave you. This device has no way to create codes that service would actually accept.":
       "Эти коды выдаёт сам сервис, которому принадлежит запись (его собственная страница настроек 2FA или восстановления доступа) -- вставьте или импортируйте именно те, что он выдал. Устройство не может само создать коды, которые сервис реально примет.",
-    "Anyone who has this phrase has full, irreversible control of the wallet it belongs to -- treat it with at least the same care as the wallet itself. This device does not encrypt its storage (see Help).":
-      "У кого есть эта фраза, у того полный и необратимый контроль над кошельком, которому она принадлежит -- обращайтесь с ней не менее бережно, чем с самим кошельком. Устройство не шифрует своё хранилище (см. Помощь)."
+    "Anyone who has this phrase has full, irreversible control of the wallet it belongs to -- treat it with at least the same care as the wallet itself. This device encrypts its own storage, but a Backup or CSV export of it is not (see Help).":
+      "У кого есть эта фраза, у того полный и необратимый контроль над кошельком, которому она принадлежит -- обращайтесь с ней не менее бережно, чем с самим кошельком. Устройство шифрует собственное хранилище, но резервная копия или CSV-экспорт из него -- нет (см. Помощь)."
   };
 
   // For code that shows a message via alert() (a native browser

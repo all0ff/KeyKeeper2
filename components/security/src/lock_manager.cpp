@@ -12,6 +12,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include <algorithm>
+
 namespace security::lock {
 
 namespace {
@@ -25,6 +27,11 @@ constexpr size_t MAX_CALLBACKS = 8;
 
 bool initialized = false;
 State current_state = State::Locked;
+// See notify_activity()'s own comment -- tracked separately from
+// input::last_activity_ms() (security:: has no business writing to
+// input::'s own state) and combined with it in auto_lock_task()'s own
+// idle calculation below.
+uint32_t last_notified_activity_ms = 0;
 
 uint32_t last_activity_seen_ms = 0;
 
@@ -86,7 +93,11 @@ void auto_lock_task(void* /*arg*/)
             continue;
         }
 
-        const uint32_t activity = input::last_activity_ms();
+        // Combined with last_notified_activity_ms (see
+        // notify_activity()'s own comment) -- either source counts as
+        // "the system is actively being used" for auto-lock purposes,
+        // not just physical input.
+        const uint32_t activity = std::max(input::last_activity_ms(), last_notified_activity_ms);
         const uint32_t idle_for = now_ms() - activity;
 
         if (idle_for >= sec.auto_lock_timeout_s * 1000u) {
@@ -100,6 +111,15 @@ void transition_to_unlocked()
 {
     current_state = State::Unlocked;
     session::begin_session(session::Origin::Local);
+    // Establishes a fresh baseline right at the moment of unlock --
+    // without this, a web-based unlock (which doesn't touch
+    // input::last_activity_ms() at all) could in principle still read
+    // as instantly idle on auto_lock_task()'s very next poll if
+    // nothing else happened to call notify_activity() first (a
+    // request to any require_unlocked() route already does, per that
+    // function's own comment, but this closes the gap unconditionally
+    // rather than depending on one arriving in time).
+    notify_activity();
 
     if (event_bus::is_initialized()) {
         event_bus::publish(event_bus::Category::System,
@@ -229,6 +249,11 @@ void lock()
 
     ESP_LOGI(TAG, "Locked");
     fire_callbacks(State::Locked);
+}
+
+void notify_activity()
+{
+    last_notified_activity_ms = now_ms();
 }
 
 int register_callback(Callback cb, void* ctx)
