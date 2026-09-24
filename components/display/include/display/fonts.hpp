@@ -46,14 +46,27 @@
 // needing to stay loaded at all, and keeps digit box glyphs visually
 // consistent with the rest of the UI.
 //
-// IMPORTANT -- this only makes Cyrillic text RENDER. Actually TYPING
-// Cyrillic into an account field is a separate, much larger gap:
-// widgets::TextEntry's character wheel (ALPHABET in text_entry.cpp)
-// is ASCII-only, and its whole buffer/cursor model assumes one byte
-// equals one character, which doesn't hold for UTF-8-encoded
-// Cyrillic (2 bytes per character). Not addressed here -- flagged as
-// a separate, substantial follow-up.
+// keykeeper_cyrillic_24 is widgets::TextEntry's own value_label_ font
+// (see text_entry.cpp) -- every screen that types a value character
+// by character (WiFi SSID/password/secret word, USB password
+// shortcut, account fields, ...) uses this widget, and the project
+// owner's own call: on a 320x172 screen with only a short header
+// label above it, there was plenty of room to go noticeably larger
+// than keykeeper_cyrillic_18 once a size that large actually existed
+// -- generated the same way as the other two (see the file header
+// comment inside keykeeper_cyrillic_24.c itself for the exact
+// lv_font_conv invocation, identical ttf source, bpp and Unicode
+// ranges to keykeeper_cyrillic_18, only --size differs), not by
+// scaling either existing one up at render time (these are pre-
+// rendered bitmap fonts; LVGL's own zoom transform would visibly
+// blur/pixelate them instead of looking like a real larger font).
+//
+// TextEntry's own character wheel (ALPHABET in text_entry.cpp) does
+// support typing Cyrillic now (6 character classes -- see that file's
+// own header comment), a later addition after this comment block was
+// first written.
 // =============================================================================
 
 extern const lv_font_t keykeeper_cyrillic_16;
 extern const lv_font_t keykeeper_cyrillic_18;
+extern const lv_font_t keykeeper_cyrillic_24;

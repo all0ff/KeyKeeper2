@@ -4,6 +4,7 @@ idf_component_register(
         "src/lvgl_port.cpp"
         "src/fonts/keykeeper_cyrillic_16.c"
         "src/fonts/keykeeper_cyrillic_18.c"
+        "src/fonts/keykeeper_cyrillic_24.c"
 
     INCLUDE_DIRS
         "include"

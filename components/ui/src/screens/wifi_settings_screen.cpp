@@ -292,12 +292,18 @@ void WifiSettingsScreen::enter_edit_text(Row row)
 
     widgets::TextEntry::Config cfg{};
     cfg.max_length = (row == Row::StaPassword || row == Row::ApPassword) ? 64 : 32;
-    cfg.mask = (row == Row::StaPassword || row == Row::ApPassword);
+    // NOT masked, even for the password rows -- this whole screen is
+    // already behind the device's own PIN, and the project owner's
+    // own call: being unable to actually READ the current value while
+    // editing it (only seeing mask dots) defeats the point of
+    // pre-filling it at all -- there's no way to tell what you're
+    // changing FROM. Vault entries' own passwords stay masked
+    // elsewhere; this is specifically about local WiFi credentials on
+    // an already-unlocked device.
+    cfg.mask = false;
     // Password fields specifically, not SSID or Secret Word -- see
-    // Config::allow_cyrillic's own comment for the reasoning. Reuses
-    // the same row check as cfg.mask just above since it's exactly
-    // the same two rows.
-    cfg.allow_cyrillic = !cfg.mask;
+    // Config::allow_cyrillic's own comment for the reasoning.
+    cfg.allow_cyrillic = !(row == Row::StaPassword || row == Row::ApPassword);
     cfg.initial_value = current_value;
 
     text_entry_.init(content_parent_, cfg);

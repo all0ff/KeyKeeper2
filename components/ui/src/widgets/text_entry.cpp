@@ -128,10 +128,9 @@ void TextEntry::init(lv_obj_t* parent, const Config& cfg)
     const theme::Palette& pal = theme::current();
     value_label_ = lv_label_create(parent);
     lv_obj_set_style_text_color(value_label_, pal.primary_text, 0);
-    // keykeeper_cyrillic_18 (see display/fonts.hpp's own comment --
-    // already proven working elsewhere: widgets::PinEntry's own digit
-    // boxes use this exact same font), applied EXPLICITLY to this one
-    // label, NOT changing the app-wide default (keykeeper_cyrillic_16,
+    // keykeeper_cyrillic_24 (see display/fonts.hpp's own comment for
+    // where this specific size came from), applied EXPLICITLY to this
+    // one label, NOT changing the app-wide default (keykeeper_cyrillic_16,
     // set once via lv_theme_default_init() in lvgl_port.cpp -- every
     // settings row list still inherits that unchanged). The project
     // owner's own call: whatever's being TYPED right now -- a
@@ -139,8 +138,11 @@ void TextEntry::init(lv_obj_t* parent, const Config& cfg)
     // specifically, confirmed on real hardware to otherwise sit too
     // small on a screen with plenty of spare room for it, while the
     // list of existing values elsewhere stays exactly as sized as
-    // before.
-    lv_obj_set_style_text_font(value_label_, &keykeeper_cyrillic_18, 0);
+    // before. Was keykeeper_cyrillic_18 (still used elsewhere, e.g.
+    // widgets::PinEntry's own digit boxes) until a real 24px font
+    // actually existed to switch to -- see fonts.hpp for how it was
+    // generated.
+    lv_obj_set_style_text_font(value_label_, &keykeeper_cyrillic_24, 0);
 
     reset(cfg.initial_value);
 }
