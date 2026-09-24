@@ -798,7 +798,7 @@ async function openEntry(id) {
     const wrap = document.createElement('div');
     const l = document.createElement('div');
     l.className = 'field-label';
-    l.textContent = label;
+    l.textContent = t(label);
     const v = document.createElement('div');
     v.className = 'field-value';
     const span = document.createElement('span');
