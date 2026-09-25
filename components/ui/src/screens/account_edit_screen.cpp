@@ -243,6 +243,15 @@ void AccountEditScreen::enter_edit_mode()
     const theme::Palette& pal = theme::current();
     edit_header_label_ = lv_label_create(content_parent_);
     lv_obj_set_style_text_color(edit_header_label_, pal.secondary_text, 0);
+    // Same bump as the value being typed below it (see
+    // widgets::TextEntry's own comment), plus the same width+scroll
+    // safety net as ui_manager.cpp's own footer_label_ (see that
+    // file's comment for the full reasoning) -- at this size, a
+    // longer field name plus the "Editing: " prefix can genuinely run
+    // past 320px, especially in Russian.
+    lv_obj_set_style_text_font(edit_header_label_, &keykeeper_cyrillic_24, 0);
+    lv_obj_set_width(edit_header_label_, LV_PCT(96));
+    lv_label_set_long_mode(edit_header_label_, LV_LABEL_LONG_SCROLL);
     lv_label_set_text_fmt(edit_header_label_, i18n::tr(i18n::Key::EditingFmt), field_label(field));
     lv_obj_align(edit_header_label_, LV_ALIGN_TOP_LEFT, 4, 4);
 

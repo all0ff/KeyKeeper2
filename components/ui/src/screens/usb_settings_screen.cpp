@@ -249,12 +249,24 @@ void UsbSettingsScreen::enter_edit_password()
     const theme::Palette& pal = theme::current();
     lv_obj_t* header = lv_label_create(content_parent_);
     lv_obj_set_style_text_color(header, pal.secondary_text, 0);
+    // See wifi_settings_screen.cpp's own header for the same
+    // bump -- consistent across every "editing a value" screen, not
+    // just the ones asked about first. Width+scroll same reasoning
+    // too -- "Editing: Password Shortcut" is long enough to risk it
+    // at this size.
+    lv_obj_set_style_text_font(header, &keykeeper_cyrillic_24, 0);
+    lv_obj_set_width(header, LV_PCT(96));
+    lv_label_set_long_mode(header, LV_LABEL_LONG_SCROLL);
     lv_label_set_text(header, i18n::tr(i18n::Key::EditingPasswordShortcut));
     lv_obj_align(header, LV_ALIGN_TOP_LEFT, 4, 4);
 
     widgets::TextEntry::Config cfg{};
     cfg.max_length = sizeof(password_shortcut_) - 1;
-    cfg.mask = true;
+    // NOT masked -- same reasoning as wifi_settings_screen.cpp's own
+    // password/secret-word fields (see that file's own comment):
+    // already behind the device's PIN, and being unable to read what
+    // you're changing FROM defeats pre-filling it at all.
+    cfg.mask = false;
     cfg.initial_value = password_shortcut_;
 
     text_entry_.init(content_parent_, cfg);

@@ -276,6 +276,15 @@ void WifiSettingsScreen::enter_edit_text(Row row)
     const theme::Palette& pal = theme::current();
     lv_obj_t* header = lv_label_create(content_parent_);
     lv_obj_set_style_text_color(header, pal.secondary_text, 0);
+    // Same bump as the value being typed below it (see
+    // widgets::TextEntry's own comment) -- the field NAME deserves
+    // the same size increase, not just the value. Width+scroll same
+    // as account_edit_screen.cpp's own edit_header_label_ (see that
+    // file's comment) -- "Editing: Station Password" and its RU
+    // equivalent both genuinely risk running past 320px at this size.
+    lv_obj_set_style_text_font(header, &keykeeper_cyrillic_24, 0);
+    lv_obj_set_width(header, LV_PCT(96));
+    lv_label_set_long_mode(header, LV_LABEL_LONG_SCROLL);
 
     const char* current_value = "";
     const char* label_text = "";

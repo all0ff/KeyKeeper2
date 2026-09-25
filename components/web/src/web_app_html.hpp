@@ -452,6 +452,13 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
           CSV export of it is <strong>not</strong>, by design (a Backup needs to work from any KeyKeeper2 device's
           own PIN, and CSV is meant to move between different password managers). Treat a backup or export file
           with the same care as the passwords it contains.</li>
+        <li>An alternative <strong>Dial</strong> PIN entry style (Settings &rarr; Security &rarr; PIN Entry) mimics
+          a real combination lock: rotate one direction to spin a digit, then reverse direction to confirm it and
+          move to the next one -- each digit alternates which direction confirms it, the same way a physical dial
+          does. Only changes how <em>unlocking</em> works; setting or changing the PIN itself always uses the
+          ordinary rotate-then-OkShort style, regardless of this setting. <strong>Dial Last Digit</strong> (same
+          settings screen) controls whether the very last digit also confirms by reversing, or still needs an
+          explicit OkShort for a more deliberate final confirmation.</li>
       </ul>
     </div>
 
@@ -589,6 +596,14 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
           или CSV-экспорт <strong>нет</strong>, осознанно (резервная копия должна работать с PIN любого устройства
           KeyKeeper2, а CSV предназначен для переноса между разными менеджерами паролей). Обращайтесь с файлом
           резервной копии или экспорта так же бережно, как с паролями внутри него.</li>
+        <li>Альтернативный режим набора PIN <strong>"Лимбовый"</strong> (Настройки &rarr; Безопасность &rarr; Набор
+          PIN) имитирует настоящий кодовый замок: вращаете в одну сторону, чтобы прокрутить цифру, затем
+          разворачиваете в другую сторону, чтобы подтвердить её и перейти к следующей — для каждой цифры
+          направление подтверждения чередуется, точно как у настоящего механического замка. Меняет только способ
+          <em>разблокировки</em> — установка или смена самого PIN всегда идёт обычным способом (вращение, затем
+          OkShort), независимо от этой настройки. <strong>Последняя цифра</strong> (там же, в настройках)
+          определяет, подтверждается ли последняя цифра тоже разворотом, или по-прежнему требует явного OkShort —
+          для более осознанного финального подтверждения.</li>
       </ul>
     </div>
 
