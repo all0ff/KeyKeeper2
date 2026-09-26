@@ -255,6 +255,10 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
       <input id="set-cyrillic-auto-switch" type="checkbox">
       Auto-switch keyboard layout for Cyrillic (best-effort, Alt+Shift)
     </label>
+    <label class="checkbox" style="margin-top:12px">
+      <input id="set-enter-after-login-password" type="checkbox">
+      Send Enter after typing Login or Password
+    </label>
     <div id="set-usb-msg"></div>
     <button onclick="saveSettings('usb')" style="margin-top:8px">Save USB</button>
 
@@ -418,6 +422,10 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         send Alt+Shift to try switching for you before and after each run of Cyrillic characters &mdash; best-effort,
         since the device can't know what's configured on the computer it's plugged into. With it off, switch the
         layout yourself on the computer before printing.</p>
+      <p>Settings &rarr; USB &rarr; <strong>Enter after Login/Password</strong> (off by default) sends a real Enter
+        keypress right after printing the Login or Password field specifically, from the account view's own "Print
+        Login"/"Print Password" actions or the Quick Password shortcut &mdash; useful for a field you want to submit
+        right away. Doesn't apply to the URL or the TOTP code.</p>
     </div>
 
     <div class="help-section">
@@ -567,6 +575,10 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         Alt+Shift, пытаясь переключить раскладку самостоятельно до и после каждого кириллического участка &mdash;
         это работает не гарантированно, так как устройство не может знать, что настроено на принимающем компьютере.
         Если выключено — переключайте раскладку сами перед печатью.</p>
+      <p>Настройки &rarr; USB &rarr; <strong>Enter после Логин/Пароль</strong> (по умолчанию выключено) отправляет
+        настоящее нажатие Enter сразу после печати именно поля Логин или Пароль — через действия "Напечатать
+        логин"/"Напечатать пароль" в просмотре записи, или через быстрый пароль. Полезно для поля, которое сразу
+        нужно отправить. На URL и код TOTP не действует.</p>
     </div>
 
     <div class="help-section">
@@ -1241,6 +1253,7 @@ async function openSettings() {
 
   document.getElementById('set-default-password').value = d.usb.default_password;
   document.getElementById('set-cyrillic-auto-switch').checked = !!d.usb.cyrillic_auto_switch_layout;
+  document.getElementById('set-enter-after-login-password').checked = !!d.usb.enter_after_login_password;
 
   document.getElementById('set-auto-lock-enabled').checked = !!d.security.auto_lock_enabled;
   document.getElementById('set-auto-lock-timeout').value = d.security.auto_lock_timeout_s;
@@ -1272,7 +1285,8 @@ async function saveSettings(section) {
   } else if (section === 'usb') {
     payload = {
       default_password: document.getElementById('set-default-password').value,
-      cyrillic_auto_switch_layout: document.getElementById('set-cyrillic-auto-switch').checked
+      cyrillic_auto_switch_layout: document.getElementById('set-cyrillic-auto-switch').checked,
+      enter_after_login_password: document.getElementById('set-enter-after-login-password').checked
     };
   } else if (section === 'security') {
     payload = {

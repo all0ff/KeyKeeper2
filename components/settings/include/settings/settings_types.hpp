@@ -141,6 +141,17 @@ struct UsbSettings
     // to correctly interpret both parts -- not something this device
     // tries to compensate for in manual mode).
     bool cyrillic_auto_switch_layout = false;
+
+    // Appends a real Enter keypress (types '\n', which keycode_map.cpp
+    // already correctly maps to keycode::ENTER -- see that file) right
+    // after typing the Login or Password field specifically, via
+    // either the account view's own "Print Login"/"Print Password"
+    // actions or QuickScreen's default_password shortcut. Deliberately
+    // does NOT apply to URL or the TOTP code -- those are typically
+    // pasted into a field you're not meant to "submit" by pressing
+    // Enter right after. Defaults to false: unchanged behavior unless
+    // explicitly turned on.
+    bool enter_after_login_password = false;
 };
 
 struct SecuritySettings

@@ -86,6 +86,7 @@ constexpr char RUSSIAN_LOCALIZATION_SCRIPT[] = R"JS(<script>
     "USB": "USB",
     "Quick Password (no PIN required)": "Быстрый пароль (PIN не требуется)",
     "Auto-switch keyboard layout for Cyrillic (best-effort, Alt+Shift)": "Автопереключение раскладки для кириллицы (по возможности, Alt+Shift)",
+    "Send Enter after typing Login or Password": "Отправлять Enter после ввода Логина или Пароля",
     "Save USB": "Сохранить USB",
     "Security": "Безопасность",
     "Auto Lock enabled": "Автоблокировка включена",

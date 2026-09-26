@@ -262,6 +262,7 @@ struct Strings {
     const char* password_shortcut_empty;
     const char* wrong_current_pin_left_fmt;
     const char* rotate_scroll_ok_print_back_return;
+    const char* enter_after_login_password_row_fmt;
 };
 
 constexpr Strings EN = {
@@ -354,7 +355,7 @@ constexpr Strings EN = {
     "Enable at least one character type",
     "Firmware %s", "Standalone password / TOTP manager",
     "BACK  Unlock   OK  Print URL", "OK  Print URL",
-    "Locked", "Unlocked", "WiFi not connected", "Password Shortcut empty", "Wrong current PIN, %u left", "ROTATE Scroll OK Print BACK Return"
+    "Locked", "Unlocked", "WiFi not connected", "Password Shortcut empty", "Wrong current PIN, %u left", "ROTATE Scroll OK Print BACK Return", "%sEnter after Login/Password: %s"
 };
 
 constexpr Strings RU = {
@@ -448,7 +449,7 @@ constexpr Strings RU = {
     "Включите хотя бы один тип символов",
     "Прошивка %s", "Автономный менеджер паролей / TOTP",
     "НАЗАД  Разблокировать   OK  Печать URL", "OK  Печать URL",
-    "Заблокировано", "Разблокировано", "WiFi не подключен", "Пароль для сочетания не задан", "Неверный текущий PIN, осталось %u", "ПОВОРОТ Прокрутка OK Напечатать НАЗАД Возврат"
+    "Заблокировано", "Разблокировано", "WiFi не подключен", "Пароль для сочетания не задан", "Неверный текущий PIN, осталось %u", "ПОВОРОТ Прокрутка OK Напечатать НАЗАД Возврат", "%sEnter после Логин/Пароль: %s"
 };
 
 const Strings& strings()
@@ -728,6 +729,7 @@ const char* tr(Key key)
         case Key::PasswordShortcutEmpty: return s.password_shortcut_empty;
         case Key::WrongCurrentPinLeftFmt: return s.wrong_current_pin_left_fmt;
         case Key::RotateScrollOkPrintBackReturn: return s.rotate_scroll_ok_print_back_return;
+        case Key::EnterAfterLoginPasswordRowFmt: return s.enter_after_login_password_row_fmt;
     }
 
     return "";

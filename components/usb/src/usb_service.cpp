@@ -3,6 +3,7 @@
 
 #include "security/permission_manager.hpp"
 #include "rtc_time/rtc_time.hpp"
+#include "settings/settings.hpp"
 #include "totp/totp.hpp"
 
 #include "esp_log.h"
@@ -124,9 +125,18 @@ void print_field(const vault::VaultEntry& entry, Field field)
             break;
         case Field::Login:
             text = entry.login;
+            // See settings::UsbSettings::enter_after_login_password's
+            // own comment -- deliberately Login/Password only, not
+            // URL or OTP.
+            if (settings::all().usb.enter_after_login_password) {
+                text += '\n';
+            }
             break;
         case Field::Password:
             text = entry.password;
+            if (settings::all().usb.enter_after_login_password) {
+                text += '\n';
+            }
             break;
         case Field::Otp: {
             char code[8];
