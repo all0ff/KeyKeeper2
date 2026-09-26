@@ -469,6 +469,11 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         &mdash; and, if a Secret Word is set (also under WiFi settings), only at <code>/&lt;secret word&gt;/</code>
         rather than the bare address, as a lightweight extra layer against someone stumbling onto it by guessing the
         IP.</p>
+      <p><strong>Captive Portal</strong> (same settings screen, Access Point mode only) makes a phone or laptop
+        that just joined the device's network pop this page up automatically &mdash; the same "tap to sign in"
+        prompt public WiFi networks show &mdash; instead of needing to type the device's IP address by hand. Works
+        by answering every DNS lookup with the device's own address and redirecting any plain HTTP request here;
+        never runs in Station mode, and once you're actually on this page it has no further effect.</p>
     </div>
 
     <div class="help-section">
@@ -614,6 +619,12 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         режимах, по IP-адресу устройства &mdash; а если задано Секретное слово (там же, в настройках WiFi), то только по
         адресу <code>/&lt;secret word&gt;/</code>, а не по голому адресу — как лёгкий дополнительный барьер против
         случайного попадания на страницу перебором IP.</p>
+      <p><strong>Captive Portal</strong> (тот же экран настроек, только в режиме Точки доступа) делает так, что
+        телефон или ноутбук, только что подключившийся к сети устройства, сам показывает эту страницу — то же самое
+        "нажмите, чтобы войти", что показывают публичные WiFi-сети — вместо того чтобы вручную вводить IP-адрес
+        устройства. Работает за счёт того, что отвечает на любой DNS-запрос собственным адресом устройства и
+        перенаправляет любой обычный HTTP-запрос сюда же; никогда не работает в режиме Station, а как только вы уже
+        открыли эту страницу — больше никак не влияет.</p>
     </div>
 
     <div class="help-section">
