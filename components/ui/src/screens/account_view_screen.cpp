@@ -539,8 +539,26 @@ void AccountViewScreen::enter_recovery_codes_list()
 void AccountViewScreen::build_recovery_codes_list()
 {
     lv_obj_clean(content_parent_);
-
+    // lv_obj_clean() just destroyed status_label_ along with every
+    // other child of content_parent_ (it was created back in Main
+    // mode's reload(), also a child of content_parent_) -- WITHOUT
+    // this, status_label_ stayed a dangling pointer into freed LVGL
+    // memory for the rest of this mode. Confirmed as the actual cause
+    // of a real, serious bug: printing the selected code (which
+    // writes its result through status_label_) wrote through that
+    // dangling pointer, corrupting heap state -- inconsistent
+    // symptoms (sometimes seemed to work, sometimes left navigation
+    // broken, sometimes crashed the device outright) are exactly what
+    // use-after-free looks like, not a coincidence. Recreated fresh
+    // here, the same way reload() creates the Main-mode one, so it's
+    // valid for as long as this mode's own content_parent_ children
+    // are.
+    status_label_ = lv_label_create(content_parent_);
     const theme::Palette& pal = theme::current();
+    lv_obj_set_style_text_color(status_label_, pal.secondary_text, 0);
+    lv_label_set_text(status_label_, "");
+    lv_obj_align(status_label_, LV_ALIGN_BOTTOM_MID, 0, -2);
+
     constexpr lv_coord_t ROW_Y_START = 4;
     constexpr lv_coord_t ROW_SPACING = 20;
 
@@ -609,8 +627,20 @@ void AccountViewScreen::enter_seed_phrase_view()
 void AccountViewScreen::build_seed_phrase_view()
 {
     lv_obj_clean(content_parent_);
-
+    // Same latent issue as build_recovery_codes_list() (see that
+    // function's own comment for the full explanation) -- this mode's
+    // own on_input handling doesn't currently write to status_label_
+    // at all, so it was a dangling pointer that just never happened
+    // to get dereferenced yet, not an active crash today. Fixed here
+    // too so the next addition that DOES touch status_label_ in this
+    // mode (matching the recovery-codes one) doesn't silently
+    // reintroduce the exact same bug.
+    status_label_ = lv_label_create(content_parent_);
     const theme::Palette& pal = theme::current();
+    lv_obj_set_style_text_color(status_label_, pal.secondary_text, 0);
+    lv_label_set_text(status_label_, "");
+    lv_obj_align(status_label_, LV_ALIGN_BOTTOM_MID, 0, -2);
+
     constexpr lv_coord_t ROW_Y_START = 4;
     constexpr lv_coord_t ROW_SPACING = 20;
 

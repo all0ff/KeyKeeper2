@@ -245,6 +245,10 @@ void UsbSettingsScreen::enter_edit_password()
 {
     mode_ = Mode::EditText;
     lv_obj_clean(content_parent_);
+    // See wifi_settings_screen.cpp's own enter_edit_text() for the
+    // full reasoning -- same latent-not-active-today dangling pointer,
+    // nulled out defensively for the same reason.
+    status_label_ = nullptr;
 
     const theme::Palette& pal = theme::current();
     lv_obj_t* header = lv_label_create(content_parent_);

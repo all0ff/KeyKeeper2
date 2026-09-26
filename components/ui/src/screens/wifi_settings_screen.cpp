@@ -272,6 +272,17 @@ void WifiSettingsScreen::enter_edit_text(Row row)
     mode_ = Mode::EditText;
 
     lv_obj_clean(content_parent_);
+    // status_label_ was a child of content_parent_ (created in
+    // build_rows()) and just got destroyed by the line above --
+    // nothing in THIS mode currently writes to it (confirmed: no
+    // timer, no event_bus subscription here that could fire while
+    // typing), so it's a latent dangling pointer today, not an active
+    // bug -- but see account_view_screen.cpp's build_recovery_codes_list()
+    // for exactly what happens the day some future addition DOES
+    // write to it without checking first. Nulled out defensively,
+    // matching the pattern security_settings_screen.cpp's own similar
+    // spots already use.
+    status_label_ = nullptr;
 
     const theme::Palette& pal = theme::current();
     lv_obj_t* header = lv_label_create(content_parent_);
