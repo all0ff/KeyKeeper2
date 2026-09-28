@@ -418,6 +418,12 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         send Alt+Shift to try switching for you before and after each run of Cyrillic characters &mdash; best-effort,
         since the device can't know what's configured on the computer it's plugged into. With it off, switch the
         layout yourself on the computer before printing.</p>
+      <p>Settings &rarr; USB &rarr; <strong>Print Sequence</strong> controls what the account view's own
+        <strong>Print Password</strong> action actually types: <strong>Login+Tab+Password+Enter</strong> types the
+        login, a Tab (to move to the next field), the password, then Enter (to submit) &mdash; all in one action;
+        <strong>Password Only</strong> types just the password, nothing else; <strong>Password+Enter</strong> types
+        the password followed by Enter. This is specifically about the Print Password action &mdash; Print Login on
+        its own always just types the login by itself, with no Tab or Enter added regardless of this setting.</p>
     </div>
 
     <div class="help-section">
@@ -567,6 +573,12 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         Alt+Shift, пытаясь переключить раскладку самостоятельно до и после каждого кириллического участка &mdash;
         это работает не гарантированно, так как устройство не может знать, что настроено на принимающем компьютере.
         Если выключено — переключайте раскладку сами перед печатью.</p>
+      <p>Настройки &rarr; USB &rarr; <strong>Последовательность печати</strong> определяет, что реально печатает
+        действие <strong>"Напечатать пароль"</strong> в просмотре записи: <strong>Логин+Tab+Пароль+Enter</strong>
+        печатает логин, Tab (переход к следующему полю), пароль, затем Enter (отправка) — всё одним действием;
+        <strong>Только пароль</strong> печатает только пароль, больше ничего; <strong>Пароль+Enter</strong>
+        печатает пароль, затем Enter. Это касается именно действия "Напечатать пароль" — "Напечатать логин" сам по
+        себе всегда печатает только логин, без Tab и Enter, независимо от этой настройки.</p>
     </div>
 
     <div class="help-section">
