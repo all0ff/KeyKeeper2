@@ -125,17 +125,26 @@ void print_field(const vault::VaultEntry& entry, Field field)
             break;
         case Field::Login:
             text = entry.login;
-            // See settings::UsbSettings::enter_after_login_password's
-            // own comment -- deliberately Login/Password only, not
-            // URL or OTP.
-            if (settings::all().usb.enter_after_login_password) {
-                text += '\n';
-            }
             break;
         case Field::Password:
-            text = entry.password;
-            if (settings::all().usb.enter_after_login_password) {
-                text += '\n';
+            // "Print Password" is the one action people actually use
+            // day to day, so it's this case -- not the unused
+            // Field::LoginAndPassword below -- that follows the
+            // configured typing order for real. Settings -> USB ->
+            // Print Sequence names each option after exactly what it
+            // types; this is that description made to actually do
+            // what it says, not the row that ships the setting but
+            // leaves it disconnected from typing.
+            switch (settings::all().usb.typing_order) {
+                case settings::TypingOrder::LoginTabPasswordEnter:
+                    text = entry.login + "\t" + entry.password + "\n";
+                    break;
+                case settings::TypingOrder::PasswordOnly:
+                    text = entry.password;
+                    break;
+                case settings::TypingOrder::PasswordEnter:
+                    text = entry.password + "\n";
+                    break;
             }
             break;
         case Field::Otp: {

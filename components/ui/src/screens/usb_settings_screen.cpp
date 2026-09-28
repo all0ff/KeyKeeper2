@@ -55,7 +55,6 @@ void UsbSettingsScreen::initialize(lv_obj_t* content_parent)
     delay_between_fields_ms_ = u.delay_between_fields_ms;
     typing_order_ = u.typing_order;
     cyrillic_auto_switch_layout_ = u.cyrillic_auto_switch_layout;
-    enter_after_login_password_ = u.enter_after_login_password;
 
     build_rows(content_parent_);
 }
@@ -141,10 +140,6 @@ void UsbSettingsScreen::render_rows()
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::AutoSwitchLayoutRowFmt), prefix,
                                        cyrillic_auto_switch_layout_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
                 break;
-            case Row::EnterAfterLoginPassword:
-                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::EnterAfterLoginPasswordRowFmt), prefix,
-                                       enter_after_login_password_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
-                break;
             case Row::Save:
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SaveRowFmt), prefix);
                 break;
@@ -220,10 +215,6 @@ void UsbSettingsScreen::adjust_value(int32_t delta)
 
         case Row::CyrillicAutoSwitch:
             cyrillic_auto_switch_layout_ = !cyrillic_auto_switch_layout_;
-            break;
-
-        case Row::EnterAfterLoginPassword:
-            enter_after_login_password_ = !enter_after_login_password_;
             break;
 
         default:
@@ -308,7 +299,6 @@ void UsbSettingsScreen::save()
     updated.delay_between_chars_ms = delay_between_chars_ms_;
     updated.delay_between_fields_ms = delay_between_fields_ms_;
     updated.cyrillic_auto_switch_layout = cyrillic_auto_switch_layout_;
-    updated.enter_after_login_password = enter_after_login_password_;
 
     if (settings::set_usb(updated)) {
         ESP_LOGI(TAG, "USB settings saved");

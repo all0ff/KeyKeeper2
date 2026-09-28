@@ -57,10 +57,9 @@ private:
         DelayBetweenFields,
         PrintSequence,
         CyrillicAutoSwitch,
-        EnterAfterLoginPassword,
         Save,
     };
-    static constexpr size_t ROW_COUNT = 8;
+    static constexpr size_t ROW_COUNT = 7;
 
     enum class Mode : uint8_t
     {
@@ -94,7 +93,6 @@ private:
     uint16_t delay_between_fields_ms_ = 0;
     settings::TypingOrder typing_order_ = settings::TypingOrder::LoginTabPasswordEnter;
     bool cyrillic_auto_switch_layout_ = false;
-    bool enter_after_login_password_ = false;
 
     widgets::TextEntry text_entry_;
 };

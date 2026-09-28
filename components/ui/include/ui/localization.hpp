@@ -262,7 +262,6 @@ enum class Key : uint8_t {
     PasswordShortcutEmpty,
     WrongCurrentPinLeftFmt,
     RotateScrollOkPrintBackReturn,
-    EnterAfterLoginPasswordRowFmt,
 };
 
 void set_language(settings::Language language);

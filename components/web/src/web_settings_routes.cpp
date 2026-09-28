@@ -113,7 +113,6 @@ cJSON* usb_to_json(const settings::UsbSettings& u)
     cJSON_AddNumberToObject(obj, "delay_between_chars_ms", u.delay_between_chars_ms);
     cJSON_AddNumberToObject(obj, "delay_between_fields_ms", u.delay_between_fields_ms);
     cJSON_AddBoolToObject(obj, "cyrillic_auto_switch_layout", u.cyrillic_auto_switch_layout);
-    cJSON_AddBoolToObject(obj, "enter_after_login_password", u.enter_after_login_password);
     return obj;
 }
 
@@ -260,10 +259,6 @@ esp_err_t handle_put_usb(httpd_req_t* req)
     const cJSON* auto_switch_item = cJSON_GetObjectItemCaseSensitive(root, "cyrillic_auto_switch_layout");
     if (auto_switch_item != nullptr && cJSON_IsBool(auto_switch_item)) {
         updated.cyrillic_auto_switch_layout = cJSON_IsTrue(auto_switch_item);
-    }
-    const cJSON* enter_after_item = cJSON_GetObjectItemCaseSensitive(root, "enter_after_login_password");
-    if (enter_after_item != nullptr && cJSON_IsBool(enter_after_item)) {
-        updated.enter_after_login_password = cJSON_IsTrue(enter_after_item);
     }
     cJSON_Delete(root);
 
