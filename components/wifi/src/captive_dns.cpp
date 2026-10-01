@@ -2,9 +2,11 @@
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "lwip/sockets.h"
 
+#include <atomic>
 #include <cstring>
 
 namespace wifi::captive_dns {
@@ -16,11 +18,34 @@ constexpr uint16_t DNS_PORT = 53;
 constexpr size_t MAX_PACKET = 512; // generous for a single-question query; anything bigger is dropped
 constexpr size_t DNS_HEADER_LEN = 12;
 constexpr uint32_t ANSWER_TTL_SECONDS = 60; // short on purpose -- this isn't real DNS data worth caching
+// How long stop() will wait for dns_task() to actually confirm it has
+// exited before giving up and returning anyway (see stop()'s own
+// comment for why giving up here, rather than blocking forever, is
+// the right call). Generous relative to how quickly the task is
+// expected to wake from its now-closed socket and exit -- a handful
+// of milliseconds in practice.
+constexpr uint32_t TASK_EXIT_TIMEOUT_MS = 500;
 
 TaskHandle_t task_handle = nullptr;
 int sock_fd = -1;
 uint8_t ap_ip[4] = {0, 0, 0, 0};
-volatile bool should_run = false;
+// std::atomic<bool>, not a plain volatile bool (audit finding Q-03,
+// same underlying concern as Q-01 in async_pin_check.cpp -- see that
+// file's own comment for the full reasoning): should_run is written
+// by start()/stop() on the caller's task and read by dns_task() on
+// its own task, which can genuinely be a different core on this
+// dual-core chip. volatile alone guarantees neither atomicity nor a
+// cross-core memory barrier.
+std::atomic<bool> should_run{false};
+// Given by dns_task() immediately before it exits (see its own
+// comment just above vTaskDelete() below); taken by stop() to confirm
+// the PREVIOUS task has genuinely finished before returning. Without
+// this, stop() returning as soon as it asked the task to exit (the
+// earlier code here) let a fast-following start() create a brand new
+// socket and task while the old one might still be mid-exit --
+// briefly two dns_task instances racing on the same UDP port.
+// Created lazily, once, on first use -- see start()'s own comment.
+SemaphoreHandle_t task_exited_sem = nullptr;
 
 /**
  * @brief Find the byte length of the QUESTION section starting at
@@ -135,6 +160,13 @@ void dns_task(void* /*arg*/)
 
     ESP_LOGI(TAG, "Captive DNS task exiting");
     task_handle = nullptr;
+    // Given LAST, right before the task actually ends -- see
+    // task_exited_sem's own comment above for why stop() waits on
+    // this specifically (confirms this task is truly done, not just
+    // that it's been asked to stop).
+    if (task_exited_sem != nullptr) {
+        xSemaphoreGive(task_exited_sem);
+    }
     vTaskDelete(nullptr);
 }
 
@@ -159,6 +191,25 @@ bool start(esp_netif_t* ap_netif)
     // esp_ip4_addr_t stores the address in network byte order already
     // -- these four bytes are the dotted-decimal octets in order.
     std::memcpy(ap_ip, &ip_info.ip.addr, 4);
+
+    // Created once, the first time start() is ever called -- not at
+    // file-scope static-init time, since the FreeRTOS scheduler isn't
+    // guaranteed running yet then. Safe to call unconditionally here:
+    // by the time application code is calling start() at all, it is.
+    if (task_exited_sem == nullptr) {
+        task_exited_sem = xSemaphoreCreateBinary();
+        if (task_exited_sem == nullptr) {
+            ESP_LOGE(TAG, "start(): failed to create task-exit semaphore");
+            return false;
+        }
+    }
+    // Drain any stale give() left over from a previous dns_task's own
+    // exit (there shouldn't be one -- stop() below already consumes
+    // it -- but starting from a definitely-empty semaphore is what
+    // makes stop()'s own wait trustworthy rather than possibly
+    // returning instantly on a leftover signal from a DIFFERENT,
+    // already-finished task).
+    xSemaphoreTake(task_exited_sem, 0);
 
     sock_fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sock_fd < 0) {
@@ -204,6 +255,27 @@ void stop()
         close(sock_fd);
         sock_fd = -1;
     }
+
+    // Waits for dns_task()'s own confirmation that it has actually
+    // exited (see task_exited_sem's own comment up top) -- this is
+    // the actual fix for the race: without it, this function used to
+    // return as soon as the socket closed, while the task itself
+    // might still be mid-wakeup/mid-exit, and a fast-following
+    // start() could create a brand new socket+task while that old one
+    // was still alive, briefly two dns_task instances racing on the
+    // same port. A bounded wait, not an unbounded one -- if dns_task()
+    // somehow never confirms (task_exited_sem was never created
+    // because start() was never actually called, or something has
+    // gone wrong with the task itself), this still returns rather
+    // than hanging the CALLER forever; logged either way so a stuck
+    // task is visible rather than silently assumed fine.
+    if (task_exited_sem != nullptr) {
+        if (xSemaphoreTake(task_exited_sem, pdMS_TO_TICKS(TASK_EXIT_TIMEOUT_MS)) != pdTRUE) {
+            ESP_LOGW(TAG, "stop(): dns_task did not confirm exit within %ums -- proceeding anyway",
+                     static_cast<unsigned>(TASK_EXIT_TIMEOUT_MS));
+        }
+    }
+
     ESP_LOGI(TAG, "Captive DNS stopping");
 }
 
