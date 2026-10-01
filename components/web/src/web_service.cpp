@@ -113,6 +113,53 @@ esp_err_t handle_auth_status(httpd_req_t* req)
 
 esp_err_t handle_login(httpd_req_t* req)
 {
+    // =========================================================================
+    // KNOWN LIMITATION (audit finding Q-02, accepted as documented rather than
+    // fixed -- see the reasoning below before changing this):
+    //
+    // security::lock::unlock() below runs PBKDF2 (~10s by design -- that
+    // cost is what makes offline PIN brute-forcing expensive) SYNCHRONOUSLY
+    // on this handler, which runs on esp_http_server's own single httpd
+    // task. ESP-IDF's httpd processes exactly one request handler at a
+    // time by design (confirmed via espressif/esp-idf#10594: "In ESP-IDF
+    // today, only a single request handler can run at a time") -- so for
+    // as long as THIS call is running, every other web request (including
+    // a legitimate owner's own login, or any other API call) is queued
+    // behind it, unserved.
+    //
+    // This genuinely lets a remote, unauthenticated sender keep the web
+    // interface unavailable by repeatedly POSTing here. It is NOT an
+    // amplification attack, though: httpd's one-task-at-a-time processing
+    // already means a second attempt's handler cannot even BEGIN running
+    // until the first one's ~10s PBKDF2 call returns, so attempts are
+    // already naturally paced roughly one per ~10s no matter how fast an
+    // attacker fires requests -- keeping the device down for N minutes
+    // costs the attacker very close to N minutes of sustained traffic, not
+    // one cheap request. security::pin::verify()'s own existing lockout
+    // (6 wrong PINs -> 30s locked out, checked BEFORE this PBKDF2 call, see
+    // pin_manager.cpp) further bounds it to roughly six ~10s blocks per
+    // 30-second cycle while someone is actively guessing.
+    //
+    // The architecturally correct fix is ESP-IDF's own documented pattern
+    // for exactly this situation -- httpd_req_async_handler_begin() to get
+    // a request copy, hand PBKDF2 off to a worker task, let this handler
+    // return immediately (freeing the httpd task for other requests), and
+    // call httpd_req_async_handler_complete() once the worker's result is
+    // ready (see examples/protocols/http_server/async_handlers in ESP-IDF
+    // itself). NOT adopted here: espressif/esp-idf#15587 is a confirmed,
+    // reported crash inside httpd_req_async_handler_complete() itself
+    // (frees a shallow-copied pointer that was never actually allocated).
+    // This project's build doesn't pin an exact ESP-IDF version anywhere
+    // (checked sdkconfig.defaults and every idf_component.yml -- none name
+    // one), so whether that specific bug is even present isn't something
+    // that can be confirmed by reading the repository, and it cannot be
+    // tested here without real hardware. Shipping that fix unverified
+    // risks replacing "slow" with "crashes on every login attempt" --
+    // strictly worse. Project owner's own call: leave this documented
+    // rather than risk that trade blind. Revisit if ESP-IDF's own fix for
+    // #15587 lands and this project's pinned version is confirmed to
+    // include it.
+    // =========================================================================
     char buf[128];
     const size_t recv_size = std::min(static_cast<size_t>(req->content_len), sizeof(buf) - 1);
 
