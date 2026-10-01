@@ -9,9 +9,9 @@
     "--query-driver=**",
     "--compile-commands-dir=c:\\Users\\Ustas\\Documents\\CriptoKey\\Progect\\KeyKeeper2/build/default"
   ],
-  "idf.portWin": "COM8",
   "idf.monitorPort": "COM8",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
-  ]
+  ],
+  "idf.port": "COM8"
 }

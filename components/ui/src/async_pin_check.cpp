@@ -9,6 +9,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include <atomic>
 #include <cstring>
 
 namespace ui {
@@ -28,12 +29,34 @@ struct AsyncPinCheck::SharedState
     char old_pin[9]{}; // only used for SetPin
     bool has_old_pin = false;
 
-    // Single-writer-then-single-reader, no mutex: the worker task
-    // writes result then done (in that order); the poll timer only
-    // ever reads once done is observed true. abandoned is the
-    // opposite direction (poll side -> worker side), same pattern.
-    volatile bool done = false;
-    volatile bool abandoned = false;
+    // Single-writer-then-single-reader, cross-task (worker task on one
+    // core, LVGL poll timer running on whichever core ui_manager's
+    // main loop is pinned to -- ESP32-S3 is dual-core, so these can
+    // genuinely be two different cores): the worker writes result
+    // then done (in that order); the poll timer only ever reads once
+    // done is observed true. abandoned is the opposite direction
+    // (poll side -> worker side), same pattern.
+    //
+    // std::atomic<bool>, not a plain volatile bool (the earlier code
+    // here) -- volatile guarantees neither atomicity nor a memory
+    // barrier in C++; it only blocks the COMPILER from reordering or
+    // caching the access in registers, which says nothing about what
+    // the OTHER CORE's cache sees or when. A write becoming visible
+    // "quickly enough in practice" on this chip's particular cache
+    // coherency behavior is not the same thing as the C++ standard
+    // actually guaranteeing it.
+    //
+    // Left at std::atomic<bool>'s own default operations (operator=
+    // and the implicit bool conversion used everywhere below,
+    // unchanged from the plain-bool version) rather than hand-picking
+    // memory_order_release/acquire at each call site -- those default
+    // to memory_order_seq_cst, the strongest ordering, which is
+    // exactly as correct as a hand-tuned acquire/release pairing here
+    // and categorically simpler to get right. A flag polled once
+    // every 100ms has no meaningful performance reason to trade that
+    // safety margin away.
+    std::atomic<bool> done{false};
+    std::atomic<bool> abandoned{false};
     security::pin::VerifyResult result = security::pin::VerifyResult::WrongPin;
 
     ResultCallback callback = nullptr;
