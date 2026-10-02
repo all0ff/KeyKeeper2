@@ -10,6 +10,7 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 #include "freertos/task.h"
 
 #include <algorithm>
@@ -47,6 +48,18 @@ CallbackSlot callbacks[MAX_CALLBACKS]{};
 TaskHandle_t task_handle = nullptr;
 int settings_sub_handle = -1;
 
+// current_state and callbacks[] above (audit finding Q-07) used to
+// have no synchronization at all -- written from lock()/unlock()/
+// unlock_after_pin_set(), callable from the UI task AND from the web
+// httpd task (web_service.cpp's handle_login() calls unlock()
+// directly), and separately read every poll by auto_lock_task() on
+// its own task, with register_callback()/unregister_callback() able
+// to run concurrently with fire_callbacks() iterating the same array
+// from any of the above. Created lazily in init() (not at file-scope
+// static-init time, before the scheduler is guaranteed running) --
+// see init()'s own comment.
+SemaphoreHandle_t state_mutex = nullptr;
+
 uint32_t now_ms()
 {
     return static_cast<uint32_t>(esp_timer_get_time() / 1000);
@@ -54,7 +67,22 @@ uint32_t now_ms()
 
 void fire_callbacks(State new_state)
 {
-    for (const CallbackSlot& slot : callbacks) {
+    // Snapshot under the lock, invoke outside it -- a callback is
+    // free to call back into this module's own public API
+    // (state()/register_callback()/even another lock()/unlock()), and
+    // invoking cb(...) while still holding state_mutex would risk a
+    // reentrant deadlock the same way an earlier, equivalent fix in
+    // components/power/src/power_manager.cpp's own fire_callbacks()
+    // closed -- see that function's comment for the fuller version of
+    // this reasoning.
+    CallbackSlot snapshot[MAX_CALLBACKS];
+    xSemaphoreTake(state_mutex, portMAX_DELAY);
+    for (size_t i = 0; i < MAX_CALLBACKS; ++i) {
+        snapshot[i] = callbacks[i];
+    }
+    xSemaphoreGive(state_mutex);
+
+    for (const CallbackSlot& slot : snapshot) {
         if (slot.used && slot.cb != nullptr) {
             slot.cb(new_state, slot.ctx);
         }
@@ -84,7 +112,10 @@ void auto_lock_task(void* /*arg*/)
     while (true) {
         vTaskDelay(period);
 
-        if (current_state != State::Unlocked) {
+        xSemaphoreTake(state_mutex, portMAX_DELAY);
+        const State snapshot = current_state;
+        xSemaphoreGive(state_mutex);
+        if (snapshot != State::Unlocked) {
             continue;
         }
 
@@ -109,7 +140,9 @@ void auto_lock_task(void* /*arg*/)
 
 void transition_to_unlocked()
 {
+    xSemaphoreTake(state_mutex, portMAX_DELAY);
     current_state = State::Unlocked;
+    xSemaphoreGive(state_mutex);
     session::begin_session(session::Origin::Local);
     // Establishes a fresh baseline right at the moment of unlock --
     // without this, a web-based unlock (which doesn't touch
@@ -144,7 +177,24 @@ bool init()
         return false;
     }
 
+    // Created before anything that could possibly read/write
+    // current_state or callbacks[] concurrently -- in particular
+    // before xTaskCreate() below, since auto_lock_task() takes this
+    // lock on its very first poll.
+    state_mutex = xSemaphoreCreateMutex();
+    if (state_mutex == nullptr) {
+        ESP_LOGE(TAG, "Failed to create state mutex");
+        return false;
+    }
+
+    // Technically no concurrent access is possible yet at this exact
+    // point (initialized is still false, and every public entry point
+    // below checks that first) -- taking the lock anyway, for the
+    // same reason every other write in this file does, rather than
+    // leaving one single exception for a reader to wonder about.
+    xSemaphoreTake(state_mutex, portMAX_DELAY);
     current_state = State::Locked; // REQUIREMENTS 9.2: locked at startup
+    xSemaphoreGive(state_mutex);
     last_activity_seen_ms = now_ms();
 
     if (event_bus::is_initialized()) {
@@ -172,7 +222,10 @@ bool is_initialized()
 
 State state()
 {
-    return current_state;
+    xSemaphoreTake(state_mutex, portMAX_DELAY);
+    const State snapshot = current_state;
+    xSemaphoreGive(state_mutex);
+    return snapshot;
 }
 
 pin::VerifyResult unlock(const char* pin_guess)
@@ -231,11 +284,18 @@ bool unlock_after_pin_set()
 
 void lock()
 {
-    if (!initialized || current_state == State::Locked) {
+    if (!initialized) {
         return;
     }
 
+    xSemaphoreTake(state_mutex, portMAX_DELAY);
+    if (current_state == State::Locked) {
+        xSemaphoreGive(state_mutex);
+        return;
+    }
     current_state = State::Locked;
+    xSemaphoreGive(state_mutex);
+
     session::end_session();
     // The device being Locked must never leave a usable vault
     // encryption key sitting in memory -- see vault_key.hpp's own
@@ -262,15 +322,21 @@ int register_callback(Callback cb, void* ctx)
         return -1;
     }
 
+    xSemaphoreTake(state_mutex, portMAX_DELAY);
+    int result = -1;
     for (size_t i = 0; i < MAX_CALLBACKS; ++i) {
         if (!callbacks[i].used) {
             callbacks[i] = {cb, ctx, true};
-            return static_cast<int>(i);
+            result = static_cast<int>(i);
+            break;
         }
     }
+    xSemaphoreGive(state_mutex);
 
-    ESP_LOGW(TAG, "Callback registry full (max %u)", static_cast<unsigned>(MAX_CALLBACKS));
-    return -1;
+    if (result < 0) {
+        ESP_LOGW(TAG, "Callback registry full (max %u)", static_cast<unsigned>(MAX_CALLBACKS));
+    }
+    return result;
 }
 
 void unregister_callback(int handle)
@@ -278,7 +344,9 @@ void unregister_callback(int handle)
     if (handle < 0 || static_cast<size_t>(handle) >= MAX_CALLBACKS) {
         return;
     }
+    xSemaphoreTake(state_mutex, portMAX_DELAY);
     callbacks[handle].used = false;
+    xSemaphoreGive(state_mutex);
 }
 
 } // namespace security::lock
