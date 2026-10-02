@@ -25,7 +25,20 @@ constexpr uint32_t TYPE_TASK_STACK = 4096;
 constexpr uint8_t  TYPE_TASK_PRIO  = 3;
 
 TypeEngine engine;
-const char* status_msg = "";
+// std::atomic<const char*>, not a plain const char* (audit finding
+// Q-08): set_status() is called from several places that DON'T go
+// through the typing_in_progress-serialized type_task() at all --
+// print_field()'s own early returns (permission denied, not
+// connected, empty field) run directly on whatever task called
+// print_field() in the first place, which can race a type_task()
+// that's mid-flight finishing up and setting its own final status at
+// the same moment. The underlying TypeEngine `engine` above doesn't
+// need the same treatment: typing_in_progress already guarantees at
+// most one type_task() -- the only thing that ever calls engine's own
+// methods -- runs at a time, so engine's internal state was already
+// effectively serialized by that earlier fix. status_msg specifically
+// wasn't covered by it.
+std::atomic<const char*> status_msg{""};
 // Guards against a real, confirmed-on-hardware bug: pressing "Print
 // Password" repeatedly, about once a second, used to spawn a NEW
 // type_task() each time -- but one full run (the typed text, plus any
