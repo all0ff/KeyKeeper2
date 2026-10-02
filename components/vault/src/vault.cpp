@@ -1,5 +1,6 @@
 #include "vault/vault.hpp"
 
+#include "vault/vault_order.hpp"
 #include "vault/vault_repository.hpp"
 
 #include "event_bus/event_bus.hpp"
@@ -93,6 +94,12 @@ bool init()
         ESP_LOGE(TAG, "Failed to subscribe to System events");
         return false;
     }
+
+    // Shared display-order state for every surface that lists vault
+    // entries (device UI, Web UI) -- see vault_order.hpp's own
+    // comment. Initialized here, as part of Vault's own init(),
+    // rather than leaving each consumer to initialize it separately.
+    order::init();
 
     initialized = true;
     ESP_LOGI(TAG, "Vault initialized (database remains unloaded while locked)");

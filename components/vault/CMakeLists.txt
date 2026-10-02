@@ -6,6 +6,7 @@ idf_component_register(
         "src/vault_wipe.cpp"
         "src/vault_backup.cpp"
         "src/vault_csv.cpp"
+        "src/vault_order.cpp"
         "src/bip39_wordlist.cpp"
 
     INCLUDE_DIRS
@@ -18,5 +19,6 @@ idf_component_register(
         esp_timer
         esp_hw_support
         mbedtls
+        nvs_flash
         log
 )
