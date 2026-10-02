@@ -9,6 +9,7 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_wifi.h"
+#include "freertos/FreeRTOS.h"
 
 #include <cstdio>
 #include <cstring>
@@ -26,6 +27,31 @@ constexpr char TAG[] = "wifi";
 constexpr uint8_t MAX_STA_RETRIES = 5;
 
 bool initialized = false;
+
+// current_state/last_error_buf/sta_retry_count/ap_client_count_value
+// below (audit finding Q-04) are written from handle_wifi_event()/
+// handle_ip_event() -- ESP-IDF event-loop callbacks, which run on the
+// system event task -- and read from the public getters
+// (state()/ap_client_count()/last_error()/ip_address()), called from
+// whichever task the UI/web layer happens to be on. Genuinely
+// different tasks, no synchronization before this.
+//
+// A spinlock (portMUX_TYPE), not per-field std::atomic: these four
+// fields are updated TOGETHER as one logical transition in most of
+// the call sites below (e.g. "entering Connecting" always resets
+// sta_retry_count in the same breath) -- independent atomics on each
+// field would make every individual read/write safe on its own while
+// still letting a reader observe a torn COMBINATION (the new state
+// with the old retry count, say). The whole block needs one critical
+// section, not four separate ones. portMUX_TYPE specifically (over a
+// FreeRTOS mutex/semaphore) because it's safe to initialize right
+// here, at static-init time, before the scheduler is running --
+// xSemaphoreCreateMutex() is not -- and every critical section below
+// is short enough (plain field reads/writes, no blocking calls
+// inside) that a spinlock is the correct tool, not just a convenient
+// one.
+portMUX_TYPE state_lock = portMUX_INITIALIZER_UNLOCKED;
+
 ConnectionState current_state = ConnectionState::Idle;
 char last_error_buf[64] = "";
 uint8_t sta_retry_count = 0;
@@ -36,10 +62,21 @@ esp_netif_t* ap_netif = nullptr;
 esp_event_handler_instance_t wifi_event_instance = nullptr;
 esp_event_handler_instance_t ip_event_instance = nullptr;
 
-void set_last_error(const char* message)
+// Caller already holds state_lock -- a plain helper, not itself
+// locking, to avoid the non-recursive-spinlock deadlock a nested
+// portENTER_CRITICAL() would cause from inside handle_wifi_event()'s
+// own critical section.
+void set_last_error_locked(const char* message)
 {
     std::strncpy(last_error_buf, message, sizeof(last_error_buf) - 1);
     last_error_buf[sizeof(last_error_buf) - 1] = '\0';
+}
+
+void set_last_error(const char* message)
+{
+    portENTER_CRITICAL(&state_lock);
+    set_last_error_locked(message);
+    portEXIT_CRITICAL(&state_lock);
 }
 
 void publish(WifiEventId id, uint32_t payload_u32 = 0)
@@ -77,12 +114,15 @@ void handle_wifi_event(void* arg, esp_event_base_t event_base, int32_t event_id,
     (void)event_base;
 
     switch (event_id) {
-        case WIFI_EVENT_STA_START:
+        case WIFI_EVENT_STA_START: {
+            portENTER_CRITICAL(&state_lock);
             sta_retry_count = 0;
             current_state = ConnectionState::Connecting;
+            portEXIT_CRITICAL(&state_lock);
             publish(WifiEventId::Connecting);
             esp_wifi_connect();
             break;
+        }
 
         case WIFI_EVENT_STA_DISCONNECTED: {
             const auto* info = static_cast<wifi_event_sta_disconnected_t*>(event_data);
@@ -90,32 +130,47 @@ void handle_wifi_event(void* arg, esp_event_base_t event_base, int32_t event_id,
 
             publish(WifiEventId::Disconnected);
 
-            if (sta_retry_count < MAX_STA_RETRIES) {
+            portENTER_CRITICAL(&state_lock);
+            const bool will_retry = sta_retry_count < MAX_STA_RETRIES;
+            if (will_retry) {
                 ++sta_retry_count;
                 current_state = ConnectionState::Connecting;
-                ESP_LOGW(TAG, "STA disconnected (reason %u), retry %u/%u", static_cast<unsigned>(reason),
-                         static_cast<unsigned>(sta_retry_count), static_cast<unsigned>(MAX_STA_RETRIES));
-                esp_wifi_connect();
             } else {
                 current_state = ConnectionState::Failed;
-                set_last_error(describe_disconnect_reason(reason));
+                set_last_error_locked(describe_disconnect_reason(reason));
+            }
+            const uint8_t retry_count_now = sta_retry_count;
+            portEXIT_CRITICAL(&state_lock);
+
+            if (will_retry) {
+                ESP_LOGW(TAG, "STA disconnected (reason %u), retry %u/%u", static_cast<unsigned>(reason),
+                         static_cast<unsigned>(retry_count_now), static_cast<unsigned>(MAX_STA_RETRIES));
+                esp_wifi_connect();
+            } else {
                 ESP_LOGE(TAG, "STA connection failed: %s", last_error_buf);
                 publish(WifiEventId::ConnectionFailed);
             }
             break;
         }
 
-        case WIFI_EVENT_AP_STACONNECTED:
-            ++ap_client_count_value;
-            publish(WifiEventId::ApClientJoined, ap_client_count_value);
+        case WIFI_EVENT_AP_STACONNECTED: {
+            portENTER_CRITICAL(&state_lock);
+            const uint8_t count = ++ap_client_count_value;
+            portEXIT_CRITICAL(&state_lock);
+            publish(WifiEventId::ApClientJoined, count);
             break;
+        }
 
-        case WIFI_EVENT_AP_STADISCONNECTED:
+        case WIFI_EVENT_AP_STADISCONNECTED: {
+            portENTER_CRITICAL(&state_lock);
             if (ap_client_count_value > 0) {
                 --ap_client_count_value;
             }
-            publish(WifiEventId::ApClientLeft, ap_client_count_value);
+            const uint8_t count = ap_client_count_value;
+            portEXIT_CRITICAL(&state_lock);
+            publish(WifiEventId::ApClientLeft, count);
             break;
+        }
 
         default:
             break;
@@ -129,9 +184,11 @@ void handle_ip_event(void* arg, esp_event_base_t event_base, int32_t event_id, v
     (void)event_data;
 
     if (event_id == IP_EVENT_STA_GOT_IP) {
+        portENTER_CRITICAL(&state_lock);
         sta_retry_count = 0;
         current_state = ConnectionState::Connected;
         last_error_buf[0] = '\0';
+        portEXIT_CRITICAL(&state_lock);
         publish(WifiEventId::Connected);
 
         // Only real clock source on this board -- see rtc_time.hpp's
@@ -200,8 +257,10 @@ bool start_access_point(const settings::WifiSettings& cfg)
         return false;
     }
 
+    portENTER_CRITICAL(&state_lock);
     ap_client_count_value = 0;
     current_state = ConnectionState::ApRunning;
+    portEXIT_CRITICAL(&state_lock);
     publish(WifiEventId::ApStarted);
 
     if (!cfg.captive_portal_enabled) {
@@ -270,7 +329,9 @@ bool init()
     }
 
     initialized = true;
+    portENTER_CRITICAL(&state_lock);
     current_state = ConnectionState::Idle;
+    portEXIT_CRITICAL(&state_lock);
     ESP_LOGI(TAG, "WiFiService initialized (radio not started yet -- call apply_settings())");
     publish(WifiEventId::Started);
     return true;
@@ -295,22 +356,30 @@ bool apply_settings()
     // it, not just be pointless.
     captive_dns::stop();
     esp_wifi_stop();
+    portENTER_CRITICAL(&state_lock);
     sta_retry_count = 0;
     ap_client_count_value = 0;
     last_error_buf[0] = '\0';
+    portEXIT_CRITICAL(&state_lock);
 
     const settings::WifiSettings& cfg = settings::all().wifi;
 
     switch (cfg.mode) {
-        case settings::WifiMode::Disabled:
+        case settings::WifiMode::Disabled: {
             esp_wifi_set_mode(WIFI_MODE_NULL);
+            portENTER_CRITICAL(&state_lock);
             current_state = ConnectionState::Idle;
+            portEXIT_CRITICAL(&state_lock);
             publish(WifiEventId::Stopped);
             return true;
+        }
 
-        case settings::WifiMode::Station:
+        case settings::WifiMode::Station: {
+            portENTER_CRITICAL(&state_lock);
             current_state = ConnectionState::Connecting;
+            portEXIT_CRITICAL(&state_lock);
             return start_station(cfg);
+        }
 
         case settings::WifiMode::AccessPoint:
             return start_access_point(cfg);
@@ -327,13 +396,18 @@ void stop()
     captive_dns::stop();
     esp_wifi_stop();
     esp_wifi_set_mode(WIFI_MODE_NULL);
+    portENTER_CRITICAL(&state_lock);
     current_state = ConnectionState::Idle;
+    portEXIT_CRITICAL(&state_lock);
     publish(WifiEventId::Stopped);
 }
 
 ConnectionState state()
 {
-    return current_state;
+    portENTER_CRITICAL(&state_lock);
+    const ConnectionState snapshot = current_state;
+    portEXIT_CRITICAL(&state_lock);
+    return snapshot;
 }
 
 const char* ip_address()
@@ -341,11 +415,23 @@ const char* ip_address()
     static char buf[16];
     buf[0] = '\0';
 
-    if (current_state != ConnectionState::Connected && current_state != ConnectionState::ApRunning) {
+    // One snapshot of current_state for both decisions below (which
+    // netif, and whether to bother at all) -- re-reading the shared
+    // field separately for each would risk acting on two different
+    // moments in time if a transition happens to land exactly between
+    // them. The netif pointers themselves aren't behind this lock
+    // (sta_netif/ap_netif are set once in init(), long before any
+    // concurrent access is possible, and never reassigned after), so
+    // only the state read itself needs the critical section.
+    portENTER_CRITICAL(&state_lock);
+    const ConnectionState snapshot = current_state;
+    portEXIT_CRITICAL(&state_lock);
+
+    if (snapshot != ConnectionState::Connected && snapshot != ConnectionState::ApRunning) {
         return buf;
     }
 
-    esp_netif_t* netif = (current_state == ConnectionState::ApRunning) ? ap_netif : sta_netif;
+    esp_netif_t* netif = (snapshot == ConnectionState::ApRunning) ? ap_netif : sta_netif;
     if (netif == nullptr) {
         return buf;
     }
@@ -361,12 +447,34 @@ const char* ip_address()
 
 uint8_t ap_client_count()
 {
-    return (current_state == ConnectionState::ApRunning) ? ap_client_count_value : 0;
+    portENTER_CRITICAL(&state_lock);
+    const uint8_t count = (current_state == ConnectionState::ApRunning) ? ap_client_count_value : 0;
+    portEXIT_CRITICAL(&state_lock);
+    return count;
 }
 
 const char* last_error()
 {
-    return last_error_buf;
+    // KNOWN RESIDUAL LIMITATION: this still returns a raw pointer
+    // into the shared last_error_buf, not a copy -- the critical
+    // section here only protects the pointer READ itself from racing
+    // a concurrent WRITE to current_state/the other fields; it does
+    // NOT protect whatever the caller does with the returned pointer
+    // afterward, since last_error_buf's own bytes could still be
+    // overwritten by a later event while the caller is mid-read.
+    // Fully closing that would mean changing this into an output-
+    // buffer-style API (last_error(char* out, size_t out_size), copy
+    // under the lock) -- not done here since it has exactly one
+    // caller today (wifi_settings_screen.cpp, which copies the
+    // content out immediately via lv_label_set_text_fmt() -- a brief,
+    // low-risk window in practice, not a long-held reference), and
+    // changing the public signature for that one call site felt like
+    // a bigger, separate change from "add the missing synchronization"
+    // -- worth doing explicitly if this component grows more callers.
+    portENTER_CRITICAL(&state_lock);
+    const char* result = last_error_buf;
+    portEXIT_CRITICAL(&state_lock);
+    return result;
 }
 
 } // namespace wifi

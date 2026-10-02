@@ -12,6 +12,8 @@
 #include "freertos/queue.h"
 #include "freertos/task.h"
 
+#include <atomic>
+
 namespace input {
 
 namespace {
@@ -34,7 +36,20 @@ TaskHandle_t task_handle = nullptr;
 
 // Updated on every event, independent of whether/when a consumer
 // drains event_queue. See input::last_activity_ms().
-volatile uint32_t activity_ms = 0;
+//
+// std::atomic<uint32_t>, not a plain volatile uint32_t (audit finding
+// Q-13, same underlying concern as Q-01/Q-03 elsewhere in this
+// project -- see async_pin_check.cpp's own comment for the full
+// reasoning): written from the input task, read from
+// last_activity_ms() by callers on other tasks (power management's
+// idle check, security::lock's own auto-lock timer via
+// std::max(input::last_activity_ms(), ...), both genuinely different
+// tasks than the one writing this). volatile alone guarantees neither
+// atomicity nor a cross-core memory barrier on this dual-core chip --
+// benign in practice on Xtensa for a single aligned 32-bit word, but
+// not something the C++ standard actually promises, which is the
+// difference between "has worked so far" and "is actually correct."
+std::atomic<uint32_t> activity_ms{0};
 
 // A button press that woke the display is consumed completely: the
 // wake-up action must not also activate the corresponding UI function.
