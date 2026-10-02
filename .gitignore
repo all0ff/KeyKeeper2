@@ -19,6 +19,13 @@ LovyanGFX/
 security/keys/*
 !security/keys/.gitkeep
 
+# Draw.io's own lock/autosave files (e.g. ".$gpio_map.drawio.bkp") --
+# found two of these already committed in
+# docs/hardware/schematics/drawio/ (B-09 audit finding); removed from
+# tracking alongside this entry, but worth keeping so a future editing
+# session doesn't recommit new ones by accident.
+*.bkp
+
 #*   **Использовать символы подстановки:** `file?.txt` (будет соответствовать `file1.txt`, `file2.txt` и т.д.).
 #*   **Отменить действие шаблона:** поставьте восклицательный знак перед шаблоном, например `!important.txt`.
 
