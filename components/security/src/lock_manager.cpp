@@ -34,8 +34,6 @@ State current_state = State::Locked;
 // idle calculation below.
 uint32_t last_notified_activity_ms = 0;
 
-uint32_t last_activity_seen_ms = 0;
-
 struct CallbackSlot
 {
     Callback cb = nullptr;
@@ -46,7 +44,6 @@ struct CallbackSlot
 CallbackSlot callbacks[MAX_CALLBACKS]{};
 
 TaskHandle_t task_handle = nullptr;
-int settings_sub_handle = -1;
 
 // current_state and callbacks[] above (audit finding Q-07) used to
 // have no synchronization at all -- written from lock()/unlock()/
@@ -87,22 +84,6 @@ void fire_callbacks(State new_state)
             slot.cb(new_state, slot.ctx);
         }
     }
-}
-
-void on_settings_changed(const event_bus::Event& event, void* /*ctx*/)
-{
-    if (event.category != event_bus::Category::System) {
-        return;
-    }
-    if (event.id != static_cast<uint32_t>(event_bus::SystemEventId::SettingsChanged)) {
-        return;
-    }
-    // We only care if the changed section was Security, but re-reading
-    // settings::all() unconditionally on any SettingsChanged is cheap
-    // and simpler than decoding the Section payload here -- the values
-    // we read (auto_lock_enabled/timeout) just happen to be unchanged
-    // if a different section fired.
-    ESP_LOGI(TAG, "Settings changed, auto-lock config will be re-read next poll");
 }
 
 void auto_lock_task(void* /*arg*/)
@@ -205,18 +186,24 @@ bool init()
     xSemaphoreTake(state_mutex, portMAX_DELAY);
     current_state = State::Locked; // REQUIREMENTS 9.2: locked at startup
     xSemaphoreGive(state_mutex);
-    last_activity_seen_ms = now_ms();
-
-    if (event_bus::is_initialized()) {
-        settings_sub_handle =
-            event_bus::subscribe(event_bus::Category::System, on_settings_changed, nullptr);
-    }
 
     const BaseType_t task_created = xTaskCreate(
         auto_lock_task, "sec_lock", TASK_STACK_SIZE, nullptr, TASK_PRIORITY, &task_handle);
 
     if (task_created != pdPASS) {
         ESP_LOGE(TAG, "Failed to create auto-lock task");
+        // Flagged in review: this used to return false here without
+        // undoing state_mutex above, leaving it allocated with
+        // nothing to ever free it, and -- back when a SettingsChanged
+        // subscription still lived here too -- without unsubscribing
+        // it either. A caller that retried init() after this would
+        // leak a mutex each attempt, and every public function's own
+        // state_mutex-null guard (see state()'s own comment) wouldn't
+        // save it: state_mutex would be a stale, already-deleted
+        // handle, not null, after a retry's own fresh
+        // xSemaphoreCreateMutex() call overwrote this leaked one.
+        vSemaphoreDelete(state_mutex);
+        state_mutex = nullptr;
         return false;
     }
 
@@ -232,6 +219,22 @@ bool is_initialized()
 
 State state()
 {
+    // Without this check, a call before init() has created
+    // state_mutex would pass a null handle to xSemaphoreTake() --
+    // undefined behavior on FreeRTOS, in practice an assert/crash,
+    // not a graceful failure. Flagged in review: state() used to read
+    // current_state directly with no mutex at all (the very thing
+    // Q-07 fixed), which was accidentally safe against this exact
+    // case; the mutex fix introduced this new, narrower failure mode
+    // in exchange for closing the real race Q-07 was about.
+    // initialized only ever becomes true AFTER state_mutex is
+    // successfully created (see init()'s own ordering) and is reset
+    // before state_mutex is torn down on a failed init (see init()'s
+    // own cleanup path) -- so this one check alone is sufficient,
+    // matching every other public function in this file.
+    if (!initialized) {
+        return State::Locked; // REQUIREMENTS 9.2: locked is the safe default
+    }
     xSemaphoreTake(state_mutex, portMAX_DELAY);
     const State snapshot = current_state;
     xSemaphoreGive(state_mutex);
@@ -337,7 +340,9 @@ void notify_activity()
 
 int register_callback(Callback cb, void* ctx)
 {
-    if (cb == nullptr) {
+    // See state()'s own comment on why this check exists -- same
+    // reasoning, same state_mutex-is-still-null failure mode.
+    if (cb == nullptr || !initialized) {
         return -1;
     }
 
@@ -360,7 +365,8 @@ int register_callback(Callback cb, void* ctx)
 
 void unregister_callback(int handle)
 {
-    if (handle < 0 || static_cast<size_t>(handle) >= MAX_CALLBACKS) {
+    // See state()'s own comment on why this check exists.
+    if (!initialized || handle < 0 || static_cast<size_t>(handle) >= MAX_CALLBACKS) {
         return;
     }
     xSemaphoreTake(state_mutex, portMAX_DELAY);
