@@ -90,13 +90,10 @@ Application
 GUI Layer
         │
         ▼
-Service Layer
-        │
-        ▼
-Security Layer
-        │
-        ▼
-Storage Layer
+Component Layer (security:: / vault:: / storage:: / usb:: / wifi::
+                  / web:: / settings:: -- see Component Architecture
+                  below; each is the service boundary on its own,
+                  there is no separate wrapper layer above them)
         │
         ▼
 Hardware Abstraction Layer (BSP)
@@ -104,6 +101,19 @@ Hardware Abstraction Layer (BSP)
         ▼
 ESP-IDF
 ```
+
+Earlier revisions of this document showed "Service Layer" and
+"Security Layer" as two separate layers here, with Security
+positioned *below* a Service Layer that wrapped it in classes like
+`SecurityService`/`VaultService`. That wrapper layer was never
+actually built -- every component (`security::`, `vault::`,
+`storage::`, `usb::`, `wifi::`, `web::`, `settings::`) exposes its own
+public API as free functions directly, and GUI calls those
+directly (confirmed via `components/ui`'s own `CMakeLists.txt`
+`REQUIRES`, which lists these components, not any `*_service`
+wrapper). This is the actual, current architecture, not a
+simplification pending future work -- see the **Service Layer**
+section further below for the full reasoning.
 
 Каждый уровень взаимодействует только с соседним уровнем.
 
@@ -242,7 +252,7 @@ Vault не отвечает за безопасность.
 - подготовку архитектуры к AES-256;
 - подготовку к Secure Element.
 
-Все остальные компоненты используют Security только через SecurityService.
+Все остальные компоненты используют Security только через security::.
 
 ---
 
@@ -297,7 +307,7 @@ Vault не отвечает за безопасность.
 
 Использует NVS.
 
-Настройки доступны только через SettingsService.
+Настройки доступны только через settings::.
 
 ---
 
@@ -319,33 +329,56 @@ System не содержит бизнес-логики приложения.
 
 # Service Layer
 
-Все сервисы располагаются между GUI и инфраструктурой.
+**Note on terminology:** earlier revisions of this document described
+a separate "Service Layer" of wrapper classes (`StorageService`,
+`VaultService`, `SecurityService`, ...) sitting between GUI and each
+component's own implementation. That layer was never actually built.
+What exists instead, and what this section now describes, is simpler:
+each component's own public namespace (declared in its `include/`
+headers) *is* the service boundary -- there is no separate wrapper
+class above it. `components/ui`'s own `CMakeLists.txt` confirms this
+directly: its `REQUIRES` lists `security`, `vault`, `storage`, `usb`,
+`wifi`, `web`, `settings` by name, and GUI code calls their free
+functions (`vault::repository::load(...)`,
+`security::permission::check(...)`, and so on) straight from screen
+code, with no intermediate object to construct or own.
 
-Основные сервисы:
+Each component's public API is its own service:
 
 ```text
-StorageService
+storage::
 
-VaultService
+vault::
 
-SecurityService
+security::
 
-USBService
+usb::
 
-WiFiService
+wifi::
 
-WebService
+web::
 
-SettingsService
-
-ThemeService
-
-LanguageService
+settings::
 ```
 
-Сервисы взаимодействуют между собой через EventBus или публичные интерфейсы.
+Theming and localization (what earlier revisions called
+`ThemeService`/`LanguageService`) are not separate components --
+`ui::theme` and `ui::i18n` are part of the `ui` component itself,
+since both exist purely to serve GUI rendering and have no reason to
+be reachable from, say, `web::` or `usb::`.
 
-Прямые зависимости между GUI и инфраструктурой запрещены.
+Components communicate with each other either through EventBus
+(`event_bus::publish()`/`subscribe()` -- for loosely-coupled
+notifications, e.g. `security::lock` publishing `DeviceLocked` without
+needing to know who's listening) or by calling another component's
+public API directly where a direct dependency already makes sense
+(e.g. `usb::print_field()` calling `security::permission::check()`
+before typing a password -- see the Security Architecture section
+below). There is no rule against a component depending on another
+component's public header; the thing actually enforced is narrower
+and more useful: a component may only reach another component through
+that component's own declared public API (its `include/` headers),
+never by reaching past it into internals that aren't exported there.
 
 ---
 
@@ -358,7 +391,7 @@ GUI
 
 ↓
 
-SecurityService
+security::
 
 ↓
 
@@ -369,7 +402,7 @@ Permission Check
 Vault / USB / Web
 ```
 
-Любая операция, связанная с конфиденциальными данными, проходит проверку через SecurityService.
+Любая операция, связанная с конфиденциальными данными, проходит проверку через security::.
 
 К защищённым операциям относятся:
 
@@ -412,24 +445,30 @@ Vault / USB / Web
 Внутри каждого компонента рекомендуется использовать одинаковую структуру.
 
 ```text
-Public API
+Public API (free functions in the component's own namespace,
+            declared in its include/ headers)
 
 ↓
 
-Service
-
-↓
-
-Manager
-
-↓
-
-Provider
+Manager (one per sub-area of responsibility -- e.g. security::'s own
+         pin_manager.cpp / lock_manager.cpp / session_manager.cpp /
+         permission_manager.cpp, each exposing its own nested
+         namespace: security::pin::, security::lock::, and so on)
 
 ↓
 
 ESP-IDF
 ```
+
+**Note on "Service" here:** this used to show a separate `Service`
+layer between `Public API` and `Manager`. Dropped -- see the *Service
+Layer* section above for the full reasoning; within one component,
+the "Public API" row above already *is* that component's own service
+boundary, not a distinct layer sitting above a `Manager` layer.
+`security::lock::unlock()`, for instance, is simultaneously the public
+API call a caller makes *and* a thin function inside
+`lock_manager.cpp` doing the actual work -- there's no separate
+wrapper for it to pass through first.
 
 Каждый слой имеет единственную область ответственности.
 
@@ -548,27 +587,41 @@ Settings
 
 # GUI Architecture
 
-GUI полностью отделён от бизнес-логики.
-
 ```text
 LVGL
 
 ↓
 
-ScreenManager
+ui::UiManager (screen stack, navigation, the recursive LVGL mutex
+               every lv_* call goes through)
 
 ↓
 
-Presenters
+Screen classes (LockScreen, AccountViewScreen, ... -- one per
+                screen; each calls the component namespaces below
+                directly from its own on_input()/render() -- there is
+                no separate Presenter object in between)
 
 ↓
 
-Services
+security:: / vault:: / settings:: / usb:: / wifi:: / web:: / ...
 
 ↓
 
-EventBus
+EventBus (for the loosely-coupled notifications -- see the Service
+          Layer section above)
 ```
+
+**Note:** this used to show a separate `Presenters` layer between
+`ScreenManager` and `Services` ("GUI полностью отделён от
+бизнес-логики"). Dropped for the same reason as the Service Layer
+above -- every concrete screen class calls the relevant component's
+own public API directly from its own code, with no separate presenter
+object wrapping that call. The 21 screens under `components/ui/src/
+screens/` are both the presentation AND the thing that invokes
+business logic, just like `security::lock::unlock()` is both the
+public API and the implementation one layer down (see Internal
+Layers above).
 
 GUI отвечает только за:
 
@@ -583,7 +636,7 @@ GUI отвечает только за:
 Подсистема хранения разделена на два уровня.
 
 ```text
-VaultService
+vault::
 
 ↓
 
@@ -607,20 +660,20 @@ StorageProvider инкапсулирует работу с файловой си
 Внутренняя структура:
 
 ```text
-SecurityService
+security::
 
-├── PinManager
+├── security::pin
 
-├── LockManager
+├── security::lock
 
-├── SessionManager
+├── security::session
 
-└── PermissionManager
+└── security::permission
 ```
 
 ---
 
-### SecurityService
+### security::
 
 Центральная точка доступа ко всей подсистеме безопасности.
 
@@ -633,7 +686,7 @@ SecurityService
 
 ---
 
-### PinManager
+### security::pin
 
 Отвечает за:
 
@@ -644,7 +697,7 @@ SecurityService
 
 ---
 
-### LockManager
+### security::lock
 
 Отвечает за:
 
@@ -655,7 +708,7 @@ SecurityService
 
 ---
 
-### SessionManager
+### security::session
 
 Управляет пользовательской сессией.
 
@@ -667,7 +720,7 @@ SecurityService
 
 ---
 
-### PermissionManager
+### security::permission
 
 Определяет возможность выполнения защищённых операций.
 
@@ -686,7 +739,7 @@ SecurityService
 Подсистема USB построена поверх TinyUSB.
 
 ```text
-USBService
+usb::
 
 ↓
 
@@ -703,7 +756,7 @@ USB HID
 
 Все запросы помещаются в очередь.
 
-Перед выполнением защищённых действий USBService обращается к SecurityService.
+Перед выполнением защищённых действий usb:: обращается к security::.
 
 ---
 
@@ -712,7 +765,7 @@ USB HID
 Wi-Fi полностью изолирован от GUI.
 
 ```text
-WiFiService
+wifi::
 
 ↓
 
@@ -733,7 +786,7 @@ WebServer
 
 # Web Architecture
 
-Локальный Web UI использует сервисный слой.
+Локальный Web UI вызывает нужные компоненты напрямую, как и GUI.
 
 ```text
 Browser
@@ -744,18 +797,18 @@ REST API
 
 ↓
 
-WebService
+web::
 
 ↓
 
-VaultService
+vault::
 
 ↓
 
 Storage
 ```
 
-Перед выполнением защищённых операций производится проверка через SecurityService.
+Перед выполнением защищённых операций производится проверка через security::.
 
 ---
 
@@ -764,7 +817,7 @@ Storage
 Все настройки приложения централизованы.
 
 ```text
-SettingsService
+settings::
 
 ↓
 
@@ -773,7 +826,7 @@ NVS
 
 Прямой доступ к NVS из других компонентов запрещён.
 
-Настройки изменяются только через SettingsService.
+Настройки изменяются только через settings::.
 
 ---
 
@@ -848,37 +901,37 @@ GUI не работает напрямую с файловой системой.
 
 ## Rule 4
 
-Все операции хранения выполняются через StorageService.
+Все операции хранения выполняются через storage::.
 
 ---
 
 ## Rule 5
 
-Все операции с учетными записями выполняются через VaultService.
+Все операции с учетными записями выполняются через vault::.
 
 ---
 
 ## Rule 6
 
-Все операции, связанные с безопасностью, выполняются через SecurityService.
+Все операции, связанные с безопасностью, выполняются через security::.
 
 ---
 
 ## Rule 7
 
-USB не имеет доступа к данным Vault без проверки SecurityService.
+USB не имеет доступа к данным Vault без проверки security::.
 
 ---
 
 ## Rule 8
 
-Web UI не имеет доступа к защищённым данным без проверки SecurityService.
+Web UI не имеет доступа к защищённым данным без проверки security::.
 
 ---
 
 ## Rule 9
 
-Все изменения настроек выполняются через SettingsService.
+Все изменения настроек выполняются через settings::.
 
 ---
 
