@@ -156,15 +156,28 @@ int Manager::register_callback(Callback cb, void* ctx)
         return -1;
     }
 
+    // Protects callbacks_[] against fire_callbacks() (possibly a
+    // different task, during a sleep/wake transition) reading it
+    // mid-write -- not an audit-numbered finding on its own, found
+    // alongside Q-05/Q-06 and closed the same way, reusing
+    // transition_mutex_ rather than adding a second lock for what's
+    // really the same "Manager's own internal state" this mutex
+    // already protects.
+    xSemaphoreTake(transition_mutex_, portMAX_DELAY);
+    int result = -1;
     for (size_t i = 0; i < MAX_CALLBACKS; ++i) {
         if (!callbacks_[i].used) {
             callbacks_[i] = {cb, ctx, true};
-            return static_cast<int>(i);
+            result = static_cast<int>(i);
+            break;
         }
     }
+    xSemaphoreGive(transition_mutex_);
 
-    ESP_LOGW(TAG, "Callback registry full (max %u)", static_cast<unsigned>(MAX_CALLBACKS));
-    return -1;
+    if (result < 0) {
+        ESP_LOGW(TAG, "Callback registry full (max %u)", static_cast<unsigned>(MAX_CALLBACKS));
+    }
+    return result;
 }
 
 void Manager::unregister_callback(int handle)
@@ -172,12 +185,38 @@ void Manager::unregister_callback(int handle)
     if (handle < 0 || static_cast<size_t>(handle) >= MAX_CALLBACKS) {
         return;
     }
+    xSemaphoreTake(transition_mutex_, portMAX_DELAY);
     callbacks_[handle].used = false;
+    xSemaphoreGive(transition_mutex_);
+}
+
+State Manager::state() const
+{
+    xSemaphoreTake(transition_mutex_, portMAX_DELAY);
+    const State snapshot = state_;
+    xSemaphoreGive(transition_mutex_);
+    return snapshot;
 }
 
 void Manager::fire_callbacks(State new_state)
 {
-    for (const CallbackSlot& slot : callbacks_) {
+    // Snapshot the active slots under the lock, then invoke them
+    // OUTSIDE it -- same reentrancy reasoning as
+    // transition_to_light_sleep()'s own comment above: a callback is
+    // free to call register_callback()/unregister_callback() (or
+    // request_sleep(), re-entering this whole call chain), and doing
+    // that while THIS function still held transition_mutex_ for the
+    // actual cb(...) invocation would risk the identical deadlock
+    // Q-06 already fixed one call site of, just moved here instead of
+    // eliminated.
+    CallbackSlot snapshot[MAX_CALLBACKS];
+    xSemaphoreTake(transition_mutex_, portMAX_DELAY);
+    for (size_t i = 0; i < MAX_CALLBACKS; ++i) {
+        snapshot[i] = callbacks_[i];
+    }
+    xSemaphoreGive(transition_mutex_);
+
+    for (const CallbackSlot& slot : snapshot) {
         if (slot.used && slot.cb != nullptr) {
             slot.cb(new_state, slot.ctx);
         }
@@ -196,8 +235,21 @@ void Manager::request_shutdown()
 
 void Manager::transition_to_light_sleep()
 {
+    // fire_callbacks() below is now OUTSIDE every critical section in
+    // this function -- audit finding Q-06, a real, confirmed-correct
+    // deadlock risk: transition_mutex_ (xSemaphoreCreateMutex()) is
+    // NOT recursive, so a callback that calls back into this Manager's
+    // own public API (request_sleep() in particular, which calls
+    // straight back into this same function) while still inside the
+    // critical section that invoked it would block forever trying to
+    // re-take a mutex this exact task already holds. state_ is set to
+    // LightSleep and the mutex released BEFORE firing callbacks, in
+    // that order specifically, so a reentrant call sees state_ !=
+    // Active and takes the early-return path below instead of
+    // deadlocking -- the callback-visible state is correct at the
+    // moment callbacks observe it either way, this only changes
+    // whether the mutex is held while they run.
     xSemaphoreTake(transition_mutex_, portMAX_DELAY);
-
     // Another task may have already handled this (e.g. request_sleep()
     // raced with the idle-timeout check). Nothing to do if we're not
     // Active anymore by the time we get the mutex.
@@ -205,29 +257,38 @@ void Manager::transition_to_light_sleep()
         xSemaphoreGive(transition_mutex_);
         return;
     }
+    state_ = State::LightSleep;
+    xSemaphoreGive(transition_mutex_);
 
     ESP_LOGI(TAG, "Entering light sleep");
     fire_callbacks(State::LightSleep);
-    state_ = State::LightSleep;
 
     configure_wake_sources_light_sleep();
     esp_light_sleep_start(); // blocks here until a wake source fires
 
+    xSemaphoreTake(transition_mutex_, portMAX_DELAY);
     state_ = State::Active;
     last_activity_ms_ = now_ms();
+    xSemaphoreGive(transition_mutex_);
+
     ESP_LOGI(TAG, "Woke from light sleep");
     fire_callbacks(State::Active);
-
-    xSemaphoreGive(transition_mutex_);
 }
 
 void Manager::transition_to_deep_sleep()
 {
+    // Same reentrancy reasoning as transition_to_light_sleep() above
+    // -- fire_callbacks() here runs after the mutex is released, not
+    // while still holding it, for the same deadlock-avoidance reason.
+    // No "restore state_ on return" step needed here specifically:
+    // esp_deep_sleep_start() never returns, the chip resets and
+    // re-runs app_main() instead.
     xSemaphoreTake(transition_mutex_, portMAX_DELAY);
+    state_ = State::DeepSleep;
+    xSemaphoreGive(transition_mutex_);
 
     ESP_LOGI(TAG, "Entering deep sleep (shutdown)");
     fire_callbacks(State::DeepSleep);
-    state_ = State::DeepSleep;
 
     configure_wake_sources_deep_sleep();
 

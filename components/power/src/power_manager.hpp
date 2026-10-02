@@ -23,7 +23,12 @@ public:
     bool init(const Config& cfg);
     bool is_initialized() const { return task_handle_ != nullptr; }
 
-    State state() const { return state_; }
+    // Not defined inline anymore -- needs transition_mutex_ (audit
+    // finding Q-05: this used to read state_ with no synchronization
+    // at all, while transition_to_light_sleep()/transition_to_deep_sleep()
+    // write it from a different task while holding that same mutex).
+    // See the .cpp for the actual body.
+    State state() const;
 
     void notify_activity();
 
