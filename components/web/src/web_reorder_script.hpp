@@ -224,6 +224,11 @@ constexpr char ACCOUNT_REORDER_SCRIPT[] = R"JS(<script>
     }
 
     const currentEntries = window.entries || [];
+    const visibleIds = new Set(currentEntries.map(e => Number(e.id)));
+    for (const id of [...selected]) {
+      if (!visibleIds.has(id)) selected.delete(id);
+    }
+
     items.forEach((item, index) => {
       const entry = currentEntries[index];
       if (!entry) return;
