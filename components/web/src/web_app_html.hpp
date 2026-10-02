@@ -110,7 +110,8 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
 <div id="login-view">
   <h2>KeyKeeper2</h2>
   <p id="login-msg"></p>
-  <input id="pin" type="password" inputmode="numeric" placeholder="PIN" autofocus>
+  <input id="pin" type="password" inputmode="numeric" placeholder="PIN" autofocus
+    onkeydown="if (event.key === 'Enter') login()">
   <button onclick="login()">Unlock</button>
 </div>
 
