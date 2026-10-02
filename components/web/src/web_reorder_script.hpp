@@ -92,7 +92,7 @@ constexpr char ACCOUNT_REORDER_SCRIPT[] = R"JS(<script>
       .kk-entry-shell { display:flex; align-items:stretch; gap:6px; margin:8px 0; }
       .kk-entry-shell .entry-item { flex:1; margin:0; }
       .kk-entry-tools { width:42px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; }
-      .kk-drag-handle { width:30px; height:42px; border:1px solid #cbd5e1; border-radius:6px; background:transparent; display:grid; grid-template-columns:repeat(2,4px); grid-auto-rows:4px; justify-content:center; align-content:center; gap:3px; padding:0; cursor:grab; }
+      .kk-drag-handle { width:30px; height:42px; border:1px solid #cbd5e1; border-radius:6px; background:transparent; display:grid; grid-template-columns:repeat(2,4px); grid-auto-rows:4px; justify-content:center; align-content:center; gap:3px; padding:0; cursor:grab; touch-action:none; }
       .kk-drag-handle span { display:block; width:4px; height:4px; border:1px solid #64748b; border-radius:1px; }
       .kk-drag-handle:active { cursor:grabbing; }
       .kk-entry-shell.kk-selected .entry-item { outline:2px solid #2563eb; }
