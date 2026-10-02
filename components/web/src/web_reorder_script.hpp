@@ -171,7 +171,20 @@ constexpr char ACCOUNT_REORDER_SCRIPT[] = R"JS(<script>
     dragSourceId = null;
 
     if (await saveOrder()) {
-      const currentEntries = window.entries || [];
+      // `entries` (bare identifier, NOT window.entries) -- the main
+      // app script declares it via `let entries = [];` at its own
+      // top level (web_app_html.hpp). Top-level let/const bindings
+      // are never exposed as window properties, unlike var/function
+      // declarations -- window.entries was always undefined here,
+      // which is why decorateList() (below) silently never built any
+      // reorder UI despite the account list itself rendering fine
+      // (confirmed on real hardware: list visible, no drag handles,
+      // no console errors -- exactly this failure mode). Classic
+      // (non-module) <script> tags on the same page share one global
+      // lexical environment, so the bare name resolves correctly
+      // even across separate <script> blocks like this one and the
+      // main app's.
+      const currentEntries = entries || [];
       originalRenderEntryList(sortEntries(currentEntries), tr('No accounts yet'));
       decorateList();
     }
@@ -236,7 +249,9 @@ constexpr char ACCOUNT_REORDER_SCRIPT[] = R"JS(<script>
       return;
     }
 
-    const currentEntries = window.entries || [];
+    // See finishDrag()'s own comment above on why this is the bare
+    // `entries` identifier, not window.entries.
+    const currentEntries = entries || [];
     const visibleIds = new Set(currentEntries.map(e => Number(e.id)));
     for (const id of [...selected]) {
       if (!visibleIds.has(id)) selected.delete(id);
