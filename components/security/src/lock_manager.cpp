@@ -155,8 +155,18 @@ void transition_to_unlocked()
     notify_activity();
 
     if (event_bus::is_initialized()) {
-        event_bus::publish(event_bus::Category::System,
-                            static_cast<uint32_t>(event_bus::SystemEventId::DeviceUnlocked));
+        // Return value checked (audit finding Q-12) -- event_bus's own
+        // queue-full fallback already logs a warning/error on its own
+        // when this happens, but DeviceUnlocked specifically is worth
+        // this module's own ESP_LOGE too: something elsewhere in the
+        // firmware subscribing to it (clearing a stale "locked" UI
+        // state, say) silently never finding out the device actually
+        // unlocked is exactly the kind of security-relevant miss this
+        // finding was about.
+        if (!event_bus::publish(event_bus::Category::System,
+                                 static_cast<uint32_t>(event_bus::SystemEventId::DeviceUnlocked))) {
+            ESP_LOGE(TAG, "Failed to publish DeviceUnlocked -- event bus queue full");
+        }
     }
 
     ESP_LOGI(TAG, "Unlocked");
@@ -303,8 +313,17 @@ void lock()
     vault_key::clear();
 
     if (event_bus::is_initialized()) {
-        event_bus::publish(event_bus::Category::System,
-                            static_cast<uint32_t>(event_bus::SystemEventId::DeviceLocked));
+        // Return value checked (audit finding Q-12) -- see
+        // transition_to_unlocked()'s own comment on the matching
+        // DeviceUnlocked publish for the full reasoning. DeviceLocked
+        // specifically: something missing this event is arguably the
+        // more concerning direction of the two (a subscriber that was
+        // supposed to clear sensitive on-screen state on lock, say,
+        // silently not doing so).
+        if (!event_bus::publish(event_bus::Category::System,
+                                 static_cast<uint32_t>(event_bus::SystemEventId::DeviceLocked))) {
+            ESP_LOGE(TAG, "Failed to publish DeviceLocked -- event bus queue full");
+        }
     }
 
     ESP_LOGI(TAG, "Locked");

@@ -108,10 +108,34 @@ bool publish(Event event)
 
     // Queue full -- a subscriber has fallen behind. Drop the oldest
     // event to make room rather than block the publisher, same policy
-    // components/input uses for its own queue.
+    // components/input uses for its own queue. Logged here (audit
+    // finding Q-12's own underlying concern) because this already
+    // means SOME event just got silently discarded -- the one being
+    // dropped, not necessarily this new one -- worth knowing about
+    // regardless of which specific event it was: queue pressure this
+    // routine is having to paper over is itself a signal something
+    // downstream is falling behind.
+    ESP_LOGW(TAG, "Queue full -- dropping oldest event to make room (category=%d, id=%lu)",
+             static_cast<int>(event.category), static_cast<unsigned long>(event.id));
     Event discarded{};
     xQueueReceive(bus_queue, &discarded, 0);
-    return xQueueSend(bus_queue, &event, 0) == pdPASS;
+    const bool sent = xQueueSend(bus_queue, &event, 0) == pdPASS;
+    if (!sent) {
+        // The actual case Q-12 was most concerned about: even
+        // dropping the oldest entry didn't free a slot (a different
+        // task raced this one and filled it again first) and THIS
+        // event -- the one the caller is publishing right now -- is
+        // the one that's actually lost. None of this file's current
+        // 8 call sites check publish()'s own return value to notice
+        // this themselves, so it would otherwise vanish with no trace
+        // anywhere. The two genuinely security-relevant ones
+        // (DeviceLocked/DeviceUnlocked in lock_manager.cpp) now check
+        // it and log their own ESP_LOGE on failure; this line covers
+        // every OTHER call site that doesn't.
+        ESP_LOGE(TAG, "Event dropped entirely -- queue still full after evicting oldest (category=%d, id=%lu)",
+                 static_cast<int>(event.category), static_cast<unsigned long>(event.id));
+    }
+    return sent;
 }
 
 bool publish(Category category, uint32_t id, Payload payload)
