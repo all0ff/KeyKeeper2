@@ -10,6 +10,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include <atomic>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -25,11 +26,41 @@ constexpr uint8_t  TYPE_TASK_PRIO  = 3;
 
 TypeEngine engine;
 const char* status_msg = "";
+// Guards against a real, confirmed-on-hardware bug: pressing "Print
+// Password" repeatedly, about once a second, used to spawn a NEW
+// type_task() each time -- but one full run (the typed text, plus any
+// trailing Tab/Enter the configured typing order adds) can take long
+// enough that a fast-enough repeat press started a SECOND task while
+// the FIRST one was still mid-flight, both calling into the same
+// shared `engine` above and the same underlying USB HID endpoint from
+// two different FreeRTOS tasks concurrently -- neither is written to
+// be safe against that. std::atomic, not a plain bool, because it's
+// genuinely set from one task (the UI task calling spawn_type_task())
+// and cleared from another (the typing task itself).
+std::atomic<bool> typing_in_progress{false};
 
 void set_status(const char* msg)
 {
     status_msg = msg;
     ESP_LOGI(TAG, "%s", msg);
+}
+
+// std::string::size() is BYTES; TypeEngine::type_string() reports how
+// many CHARACTERS it typed. Identical for ASCII, different for
+// Cyrillic (2 bytes each in UTF-8) -- comparing them directly made
+// "all typed" false for any non-ASCII login/password/secret word,
+// silently reporting "Partially typed" for a fully-typed field (and,
+// before this component grew a configurable typing order, would have
+// skipped a trailing Enter/Tab the same way).
+size_t count_chars(const std::string& text)
+{
+    size_t n = 0;
+    for (unsigned char c : text) {
+        if ((c & 0xC0) != 0x80) {
+            ++n;
+        }
+    }
+    return n;
 }
 
 struct TypeTaskParams {
@@ -41,8 +72,10 @@ void type_task(void* arg)
 {
     auto* params = static_cast<TypeTaskParams*>(arg);
     const size_t sent = engine.type_string(params->text, params->timing);
+    // Accept either unit -- see count_chars()'s own comment.
+    const bool text_complete = (sent == count_chars(params->text)) || (sent == params->text.size());
 
-    if (sent == params->text.size()) {
+    if (text_complete) {
         set_status("Typed OK");
     } else if (sent > 0) {
         set_status("Partially typed");
@@ -51,11 +84,28 @@ void type_task(void* arg)
     }
 
     delete params;
+    // Cleared LAST, right before the task actually ends -- a new
+    // request arriving between set_status() above and this line
+    // should still see "busy" and be refused, not slip through into
+    // the same kind of race this flag exists to prevent.
+    typing_in_progress.store(false, std::memory_order_release);
     vTaskDelete(nullptr);
 }
 
 void spawn_type_task(const std::string& text, const TypeEngine::Timing& timing = TypeEngine::Timing{})
 {
+    // Atomic check-and-set (not a separate if-check then store --
+    // that would itself be a smaller version of the exact race this
+    // flag exists to close) -- refuses to start a second task while
+    // one is already running rather than letting them race. expected
+    // starts false; compare_exchange_strong only succeeds (and only
+    // then flips it to true) if that's still the case.
+    bool expected = false;
+    if (!typing_in_progress.compare_exchange_strong(expected, true, std::memory_order_acq_rel)) {
+        set_status("Already typing -- try again in a moment");
+        return;
+    }
+
     auto* params = new TypeTaskParams{text, timing};
     const BaseType_t created = xTaskCreate(
         type_task, "usb_type", TYPE_TASK_STACK, params, TYPE_TASK_PRIO, nullptr);
@@ -63,6 +113,9 @@ void spawn_type_task(const std::string& text, const TypeEngine::Timing& timing =
     if (created != pdPASS) {
         set_status("Failed to start typing task");
         delete params;
+        // Task never actually started -- nothing will ever clear the
+        // flag on this attempt's behalf, so this call site has to.
+        typing_in_progress.store(false, std::memory_order_release);
     }
 }
 
