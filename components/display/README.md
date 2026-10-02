@@ -1,18 +1,26 @@
 # components/display
 
-## External dependencies (action required before `idf.py build`)
+## External dependencies
 
-1. **LovyanGFX** — not published on the ESP Component Registry, so
-   `idf_component.yml` cannot pull it automatically. Vendor it manually:
+1. **LovyanGFX** — not published on the ESP Component Registry, so it
+   can't be listed as a plain `namespace/name` dependency the way
+   `lvgl/lvgl` below is. It IS fetched automatically, though, via a
+   Git dependency pinned to a specific commit in this component's own
+   `idf_component.yml` (see that file's own comment for why that
+   exact commit). `idf.py build` fetches it the same way it already
+   does for LVGL -- no manual step anymore.
+
+   **If you already have a manually-cloned `components/LovyanGFX/`
+   from before this changed**: remove or rename that directory first.
+   ESP-IDF searches `components/` before `managed_components/`, so a
+   local copy there would silently keep being used instead of the
+   pinned dependency below it -- which would hide whether the pinned
+   version actually works, not just preserve the old behavior.
 
    ```
-   cd components
-   git clone --depth 1 https://github.com/lovyan03/LovyanGFX.git LovyanGFX
+   # only needed if components/LovyanGFX/ already exists locally:
+   rm -rf components/LovyanGFX
    ```
-
-   The cloned repo's own `CMakeLists.txt` registers it as an ESP-IDF
-   component named `LovyanGFX`, matching `PRIV_REQUIRES` in this
-   component's `CMakeLists.txt`.
 
 2. **LVGL** — pulled automatically by `idf_component.yml`
    (`lvgl/lvgl ^9.2`) the first time you run `idf.py build`, provided the

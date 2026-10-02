@@ -20,9 +20,10 @@ idf_component_register(
         esp_timer
         log
 
-    # LovyanGFX is not published on the ESP Component Registry and must
-    # be vendored manually into components/LovyanGFX (see README in this
-    # directory). lvgl is pulled automatically via idf_component.yml.
+    # LovyanGFX is not published on the ESP Component Registry, so it's
+    # pulled as a Git dependency instead (pinned to a specific commit --
+    # see idf_component.yml in this directory for why). lvgl is pulled
+    # automatically too, from the registry.
     PRIV_REQUIRES
         LovyanGFX
         lvgl

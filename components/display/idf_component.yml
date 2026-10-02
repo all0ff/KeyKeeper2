@@ -1,3 +1,30 @@
 dependencies:
   idf: ">=6.0"
   lvgl/lvgl: "^9.2"
+  # Previously a manual step (see this component's own README.md,
+  # updated alongside this) -- "git clone --depth 1 ... LovyanGFX"
+  # run by hand before idf.py build, easy to forget on a fresh clone
+  # and (audit finding B-05) untracked by dependencies.lock, so a
+  # build could silently use whatever commit happened to be HEAD on
+  # whatever day someone ran that clone, not a reproducible one.
+  #
+  # Pinned to the exact commit this project has actually been built
+  # and tested against (confirmed via `git rev-parse HEAD` in an
+  # existing components/LovyanGFX checkout), not the newest tag --
+  # switching to a newer release here was NOT verified against this
+  # project's own display code and isn't a safe substitute for
+  # knowing what was actually tested.
+  #
+  # Named "LovyanGFX" here (not a namespace/name pair the way
+  # registry dependencies are keyed, e.g. lvgl/lvgl above) to match
+  # components/display/CMakeLists.txt's own PRIV_REQUIRES LovyanGFX --
+  # unlike this project's existing registry-sourced dependencies, a
+  # git dependency's component name comes from its own repo content,
+  # not from this key, but ESP-IDF's component manager still uses
+  # this key to name the directory it fetches into, and that's what
+  # REQUIRES/PRIV_REQUIRES actually match against. VERIFY WITH A REAL
+  # BUILD before trusting this -- not something that could be
+  # confirmed without running idf.py build on real hardware.
+  LovyanGFX:
+    git: https://github.com/lovyan03/LovyanGFX.git
+    version: 3f78b7058fca0fd1fc1ddb32f75a18262e01d440
