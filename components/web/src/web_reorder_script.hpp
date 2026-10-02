@@ -18,6 +18,54 @@ constexpr char ACCOUNT_REORDER_SCRIPT[] = R"JS(<script>
   let dragging = false;
   let dragIds = [];
   let dragSourceId = null;
+  // Auto-scroll while dragging near a screen edge (confirmed as a
+  // real, reported gap: without this, a drag can only reorder within
+  // whatever's already visible on screen -- there was no way to drag
+  // an account from the top of a long list down past the fold at
+  // all). The page itself scrolls (there's no separate scrollable
+  // container around #entry-list -- window.scrollBy is the right
+  // target, not some inner element's scrollTop), and a drag target
+  // held still near an edge still needs to keep scrolling even
+  // though no further pointermove event is firing -- hence a
+  // requestAnimationFrame loop driven by the last known pointer
+  // position, not just the move handler alone.
+  const EDGE_ZONE_PX = 60;
+  const MAX_SCROLL_PX_PER_FRAME = 16;
+  let lastPointerX = 0;
+  let lastPointerY = 0;
+
+  function updateDropMarker(clientX, clientY) {
+    const target = document.elementFromPoint(clientX, clientY)?.closest('.kk-entry-shell');
+    clearDropMarkers();
+    if (!target) return;
+    const targetId = Number(target.dataset.id);
+    if (dragIds.includes(targetId)) return;
+    const rect = target.getBoundingClientRect();
+    target.classList.add(clientY < rect.top + rect.height / 2 ? 'kk-drop-before' : 'kk-drop-after');
+  }
+
+  function autoScrollStep() {
+    if (!dragging) return;
+    const viewportHeight = window.innerHeight;
+    let delta = 0;
+    if (lastPointerY < EDGE_ZONE_PX) {
+      const intensity = (EDGE_ZONE_PX - lastPointerY) / EDGE_ZONE_PX;
+      delta = -Math.ceil(intensity * MAX_SCROLL_PX_PER_FRAME);
+    } else if (lastPointerY > viewportHeight - EDGE_ZONE_PX) {
+      const intensity = (lastPointerY - (viewportHeight - EDGE_ZONE_PX)) / EDGE_ZONE_PX;
+      delta = Math.ceil(intensity * MAX_SCROLL_PX_PER_FRAME);
+    }
+    if (delta !== 0) {
+      window.scrollBy(0, delta);
+      // The page just moved under a pointer that didn't -- no new
+      // pointermove event is coming on its own to refresh the drop
+      // marker, so this loop does it itself using the pointer's last
+      // known viewport position (still valid: scrolling moves page
+      // CONTENT, not the pointer's own clientX/clientY).
+      updateDropMarker(lastPointerX, lastPointerY);
+    }
+    requestAnimationFrame(autoScrollStep);
+  }
 
   function tr(s) {
     const translated = (window.krTranslate && window.krTranslate(s));
@@ -197,16 +245,15 @@ constexpr char ACCOUNT_REORDER_SCRIPT[] = R"JS(<script>
     dragSourceId = id;
     dragIds = selected.has(id) ? [...selected] : [id];
     shell.classList.add('kk-dragging');
+    lastPointerX = event.clientX;
+    lastPointerY = event.clientY;
+    requestAnimationFrame(autoScrollStep);
 
     const move = ev => {
       if (!dragging) return;
-      const target = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.kk-entry-shell');
-      clearDropMarkers();
-      if (!target) return;
-      const targetId = Number(target.dataset.id);
-      if (dragIds.includes(targetId)) return;
-      const rect = target.getBoundingClientRect();
-      target.classList.add(ev.clientY < rect.top + rect.height / 2 ? 'kk-drop-before' : 'kk-drop-after');
+      lastPointerX = ev.clientX;
+      lastPointerY = ev.clientY;
+      updateDropMarker(ev.clientX, ev.clientY);
     };
 
     const up = async ev => {
