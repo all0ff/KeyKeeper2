@@ -5,7 +5,6 @@
 #include "tinyusb.h"
 #include "tinyusb_default_config.h"
 #include "class/hid/hid_device.h"
-#include "class/hid/hid_device.h"
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"

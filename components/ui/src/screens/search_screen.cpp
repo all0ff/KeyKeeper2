@@ -120,7 +120,7 @@ void SearchScreen::update_results()
     if (results_.empty()) {
         lv_label_set_text(status_label_, current_query.empty() ? i18n::tr(i18n::Key::VaultEmpty) : i18n::tr(i18n::Key::NoMatches));
     } else {
-        lv_label_set_text_fmt(status_label_, "%u result%s", static_cast<unsigned>(results_.size()),
+        lv_label_set_text_fmt(status_label_, i18n::tr(i18n::Key::ResultsCountFmt), static_cast<unsigned>(results_.size()),
                                results_.size() == 1 ? "" : "s");
     }
 
