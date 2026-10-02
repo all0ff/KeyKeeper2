@@ -20,7 +20,20 @@ constexpr char ACCOUNT_REORDER_SCRIPT[] = R"JS(<script>
   let dragSourceId = null;
 
   function tr(s) {
-    return (window.krTranslate && window.krTranslate(s)) || s;
+    const translated = (window.krTranslate && window.krTranslate(s));
+    if (translated && translated !== s) return translated;
+    let russian = false;
+    try { russian = localStorage.getItem('kr_lang') === 'russian'; } catch (_) {}
+    if (russian) {
+      const extra = {
+        'Selected: ': 'Выбрано: ',
+        'Clear selection': 'Снять выделение',
+        'Drag to reorder': 'Перетащить для изменения порядка',
+        'Failed to save order': 'Не удалось сохранить порядок'
+      };
+      return extra[s] || s;
+    }
+    return s;
   }
 
   function ensureStyle() {
