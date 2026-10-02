@@ -8,6 +8,9 @@
 #include "web_app_html.hpp"
 #include "web_backup_routes.hpp"
 #include "web_json_helpers.hpp"
+#include "web_reorder_routes.hpp"
+#include "web_reorder_script.hpp"
+#include "web_reorder_state.hpp"
 #include "web_russian_localization.hpp"
 #include "web_settings_routes.hpp"
 #include "web_vault_routes.hpp"
@@ -62,6 +65,7 @@ esp_err_t handle_root(httpd_req_t* req)
         const size_t pos = result.find(marker);
         if (pos != std::string::npos) {
             result.insert(pos, RUSSIAN_LOCALIZATION_SCRIPT);
+            result.insert(pos + std::strlen(RUSSIAN_LOCALIZATION_SCRIPT), ACCOUNT_REORDER_SCRIPT);
         }
         return result;
     }();
@@ -71,8 +75,8 @@ esp_err_t handle_root(httpd_req_t* req)
 }
 
 // Catches every request that didn't match one of the specific routes
-// registered below (registered LAST, as the wildcard "/*" -- see the
-// uri_match_fn comment in start()) -- a 302 redirect to this device's
+// registered below (registered LAST, as the wildcard "/*" -- see
+// the uri_match_fn comment in start()) -- a 302 redirect to this device's
 // own root page instead of a bare 404.
 //
 // This is the HTTP half of the captive portal -- see
@@ -234,6 +238,7 @@ bool init()
         return true;
     }
     initialized = true;
+    reorder::init();
     ESP_LOGI(TAG, "WebService initialized (server not started yet -- call start())");
     return true;
 }
@@ -305,6 +310,7 @@ bool start()
     register_vault_routes(server);
     register_settings_routes(server);
     register_backup_routes(server);
+    register_reorder_routes(server);
 
     // Registered LAST and as a literal "/*" (NOT built via
     // build_prefixed_path() -- the whole point is to catch requests
