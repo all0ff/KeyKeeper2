@@ -112,4 +112,4 @@ void clear_error(uint32_t flag);
  */
 void reset();
 
-} // namespace app_system::stateЫ
+} // namespace app_system::state
