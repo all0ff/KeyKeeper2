@@ -8,6 +8,7 @@
 #include "ui/ui_manager.hpp"
 
 #include "vault/vault.hpp"
+#include "vault/vault_order.hpp"
 
 #include "esp_log.h"
 
@@ -76,9 +77,20 @@ void VaultListScreen::reload()
     const size_t total = vault::entry_count();
     const size_t to_load = (total > MAX_ROWS) ? MAX_ROWS : total;
 
+    // Via vault::order (shared with the Web UI's own drag-to-reorder
+    // feature -- see vault_order.hpp's own comment), not
+    // vault::list_entries()'s native storage order directly. get_order()
+    // already returns every current entry's ID in the user's chosen
+    // display order (new/never-ordered entries appended in native
+    // order); taking its first to_load IDs and fetching each one by
+    // ID is what makes a reorder made on the Web UI show up here too,
+    // including after a reboot -- list_entries()'s own offset-based
+    // pagination has no way to express "give me these specific IDs,
+    // in this order."
+    const std::vector<uint32_t> order = vault::order::get_order();
     entries_.assign(to_load, vault::VaultEntry{});
-    if (to_load > 0) {
-        vault::list_entries(entries_.data(), to_load, 0);
+    for (size_t i = 0; i < to_load && i < order.size(); ++i) {
+        vault::get_entry(order[i], entries_[i]);
     }
 
     if (total > MAX_ROWS) {

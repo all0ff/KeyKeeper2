@@ -4,6 +4,8 @@ idf_component_register(
         "src/web_vault_routes.cpp"
         "src/web_settings_routes.cpp"
         "src/web_backup_routes.cpp"
+        "src/web_reorder_state.cpp"
+        "src/web_reorder_routes.cpp"
 
     INCLUDE_DIRS
         "include"
@@ -16,6 +18,7 @@ idf_component_register(
         display
         event_bus
         esp_http_server
+        nvs_flash
         log
 
     # cJSON comes from espressif/cjson (see idf_component.yml) --
