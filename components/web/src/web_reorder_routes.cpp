@@ -8,6 +8,7 @@
 #include "esp_log.h"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace web {
