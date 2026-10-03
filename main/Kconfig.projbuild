@@ -1,0 +1,47 @@
+# Lives in main/, not the bare project root -- ESP-IDF's Kconfig
+# auto-discovery scans COMPONENT directories (anything with its own
+# CMakeLists.txt calling idf_component_register()), not the project
+# root itself. A Kconfig.projbuild placed directly at the repo root
+# is silently never found: no build error, no warning, sdkconfig just
+# never gets the option at all, every single time, regardless of
+# idf.py fullclean or any other cache-clearing (confirmed the hard
+# way -- this file briefly lived at the repo root and that's exactly
+# what happened). main/ is this project's own "main" component
+# (main/CMakeLists.txt), the conventional place ESP-IDF's own docs
+# and examples put a project-wide Kconfig.projbuild.
+
+menu "KeyKeeper2"
+
+    config KEYKEEPER_LITE
+        bool "Build the Lite variant (strip paid-tier features)"
+        default n
+        help
+            KeyKeeper2 ships as two variants from one codebase, feature-
+            flagged rather than kept on a separate branch -- same
+            precedent as excluding a whole component (see
+            EXCLUDE_COMPONENTS in the top-level CMakeLists.txt for
+            components/gui), just applied per-feature instead of
+            per-component where a feature doesn't cleanly own its own
+            component.
+
+            When enabled, code behind "#if !CONFIG_KEYKEEPER_LITE" (C/
+            C++) or "if(NOT CONFIG_KEYKEEPER_LITE)" (CMakeLists.txt) is
+            compiled out of the build entirely -- not hidden at
+            runtime behind a settings toggle the user could re-enable.
+            See profiles/README.md for the exact build commands for
+            each variant, and profiles/lite.defaults for the actual
+            flag.
+
+            Lite strips (tracked as each is actually wired up, not all
+            landing in one commit): the dial-style PIN entry mode,
+            on-device Backup, the password generator, display
+            rotation, the Wi-Fi captive portal, and PIN hashing
+            (reverted to the project's original single-pass salted
+            SHA-256, no PBKDF2 stretching). None of these are security
+            boundaries between the two variants -- Lite is a feature
+            tier, not a reduced-trust build -- except PIN hashing
+            specifically, which genuinely weakens offline brute-force
+            resistance and is a deliberate, documented trade for a
+            free/advertising tier, not an oversight.
+
+endmenu

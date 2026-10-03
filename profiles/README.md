@@ -92,7 +92,7 @@ would need to stay in sync by hand.
 
 ## Which flag controls what
 
-- `CONFIG_KEYKEEPER_LITE` (`Kconfig.projbuild` at the repo root) --
+- `CONFIG_KEYKEEPER_LITE` (`main/Kconfig.projbuild`) --
   see that file's own help text for the current list of what Lite
   strips, and why PIN hashing specifically is a real security
   trade-off while the rest are plain feature-tier differences.

@@ -51,7 +51,7 @@ set(ui_requires
     log
 )
 
-# Lite build (see Kconfig.projbuild at the repo root): strips the
+# Lite build (see main/Kconfig.projbuild): strips the
 # password generator entirely, component and its one UI screen both --
 # CONFIG_KEYKEEPER_LITE is an ESP-IDF Kconfig value, automatically
 # available as a plain CMake variable here, no extra wiring needed.

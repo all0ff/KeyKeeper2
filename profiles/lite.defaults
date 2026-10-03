@@ -1,6 +1,6 @@
 # KeyKeeper2 Lite build profile
 #
-# Flips the single project-level flag (see Kconfig.projbuild at the
+# Flips the single project-level flag (see main/Kconfig.projbuild at the
 # repo root for the full feature list this strips) that everything
 # else -- CMakeLists.txt SRCS/REQUIRES conditionals, #if blocks in
 # the affected .cpp files -- checks.
