@@ -82,8 +82,21 @@ void SecuritySettingsScreen::initialize(lv_obj_t* content_parent)
     ///auto_lock_enabled_ = s.auto_lock_enabled;
     auto_lock_timeout_s_ = s.auto_lock_enabled ? s.auto_lock_timeout_s : 0;
     web_ui_view_accounts_ = (s.web_ui_permissions & settings::WEB_UI_VIEW_ACCOUNTS) != 0;
+#if !CONFIG_KEYKEEPER_LITE
     pin_entry_dial_mode_ = s.pin_entry_dial_mode;
     dial_last_digit_reverses_ = s.dial_last_digit_reverses;
+#endif
+    // In Lite builds, the two members above are deliberately left at
+    // their default-constructed false/true (see the .hpp) rather than
+    // read from settings:: here -- a device that was Full with dial
+    // mode enabled, then reflashed to Lite, would otherwise read a
+    // stale pin_entry_dial_mode=true straight out of still-present
+    // NVS. save() below writes these same two members back
+    // unconditionally (not itself behind #if), so the first time
+    // anyone saves ANY security setting on a Lite build, that stale
+    // stored value gets corrected to false too -- not just
+    // overridden at this screen and lock_screen.cpp's own read, but
+    // actually healed in storage.
 
     build_rows();
 }
@@ -161,6 +174,12 @@ void SecuritySettingsScreen::render_rows()
                                     web_ui_view_accounts_ ? i18n::tr(i18n::Key::AllowedValue) : i18n::tr(i18n::Key::OffValue));
                 break;
 
+            case Row::Save:
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SaveRowFmt), prefix);
+                
+                break;
+
+#if !CONFIG_KEYKEEPER_LITE
             case Row::PinEntryStyle:
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::PinEntryRowFmt), prefix,
                                     pin_entry_dial_mode_ ? i18n::tr(i18n::Key::DialValue) : i18n::tr(i18n::Key::StandardValue));
@@ -170,11 +189,18 @@ void SecuritySettingsScreen::render_rows()
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::DialLastDigitRowFmt), prefix,
                                     dial_last_digit_reverses_ ? i18n::tr(i18n::Key::ReverseValue) : i18n::tr(i18n::Key::OkShortValue));
                 break;
-
-            case Row::Save:
-                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SaveRowFmt), prefix);
-                
+#else
+            case Row::PinEntryStyle:
+            case Row::DialLastDigit:
+                // Unreachable in a Lite build -- ROW_COUNT is 6, so
+                // selected_row_ (clamped in move_selection()) can
+                // never equal either enumerator's ordinal (6, 7).
+                // Both cases kept, not omitted, so this switch stays
+                // exhaustive over Row either way -- same reasoning as
+                // SettingsScreen::activate()'s own Item::PasswordGen
+                // case.
                 break;
+#endif
         }
     }
 
@@ -227,6 +253,7 @@ void SecuritySettingsScreen::adjust_value(int32_t delta)
             web_ui_view_accounts_ = (delta > 0);
             break;
 
+#if !CONFIG_KEYKEEPER_LITE
         case Row::PinEntryStyle:
             // DIAGNOSTIC -- logged before AND after the toggle so a
             // captured log shows directly whether this handler is
@@ -252,6 +279,13 @@ void SecuritySettingsScreen::adjust_value(int32_t delta)
             dial_last_digit_reverses_ = (delta > 0);
             ESP_LOGI(TAG, "DialLastDigit adjust: after=%d", static_cast<int>(dial_last_digit_reverses_));
             break;
+#else
+        case Row::PinEntryStyle:
+        case Row::DialLastDigit:
+            // Unreachable in a Lite build -- see render_rows()'s own
+            // comment on the matching #else branch there.
+            break;
+#endif
 
         default:
             break;

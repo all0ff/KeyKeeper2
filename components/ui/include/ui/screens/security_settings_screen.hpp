@@ -80,6 +80,16 @@ public:
     bool on_input(InputAction action) override;
 
 private:
+    // PinEntryStyle/DialLastDigit moved after Save (Lite strips them --
+    // see ROW_COUNT below): both still exist as real enumerators
+    // either way (never behind #if themselves, same reasoning as
+    // SettingsScreen's own Item::PasswordGen), just unreachable in a
+    // Lite build since ROW_COUNT clamps selected_row_ below their
+    // ordinal. Reordering them to come after Save, rather than
+    // leaving them in their original position before it, is what
+    // makes a Lite build's row list a plain prefix of Full's (6 of
+    // the same 8, in the same order) instead of needing to splice two
+    // rows out of the middle and renumber Save around them.
     enum class Row : uint8_t
     {
         ChangePin,
@@ -87,11 +97,15 @@ private:
         FactoryReset,
         AutoLock,
         WebUiViewAccounts,
+        Save,
         PinEntryStyle,
         DialLastDigit,
-        Save,
     };
+#if CONFIG_KEYKEEPER_LITE
+    static constexpr size_t ROW_COUNT = 6;
+#else
     static constexpr size_t ROW_COUNT = 8;
+#endif
 
     enum class Mode : uint8_t
     {

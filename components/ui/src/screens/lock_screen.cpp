@@ -51,8 +51,23 @@ void LockScreen::initialize(lv_obj_t* content_parent)
     }
     cfg.min_length = cfg.length;
     cfg.finish_on_short = true;
+#if CONFIG_KEYKEEPER_LITE
+    // Forced false here, not just left unreachable via a hidden
+    // settings toggle (security_settings_screen.cpp) -- a device that
+    // was Full with this setting enabled, then reflashed to Lite,
+    // would still carry pin_entry_dial_mode=true in its existing NVS
+    // blob (settings don't get reset by reflashing). Reading that
+    // stale value here would silently bring dial mode back despite
+    // Lite supposedly not having it. Matches this project's own
+    // stated Lite philosophy (see main/Kconfig.projbuild's help
+    // text): compiled out for real, not hidden behind a toggle the
+    // user (or a leftover NVS value) could still reach.
+    cfg.dial_mode = false;
+    cfg.dial_last_reverses = true;
+#else
     cfg.dial_mode = settings::all().security.pin_entry_dial_mode;
     cfg.dial_last_reverses = settings::all().security.dial_last_digit_reverses;
+#endif
 
     pin_entry_.init(content_parent, cfg);
 
