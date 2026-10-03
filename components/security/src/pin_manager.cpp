@@ -43,6 +43,24 @@ constexpr uint32_t PBKDF2_ITERATIONS_LEGACY = 100'000;
 constexpr uint32_t PBKDF2_ITERATIONS_TEST = 10'000;
 constexpr uint8_t PBKDF2_PROFILE_LEGACY = 0;
 constexpr uint8_t PBKDF2_PROFILE_TEST = 1;
+// Lite build only (see main/Kconfig.projbuild's own help text on why
+// this specific strip is a real security trade-off, not just a
+// feature-tier one: compute_hash()'s PBKDF2 output feeds
+// derive_vault_key() too, so this profile's weaker stretching weakens
+// vault.db's own offline brute-force resistance, not merely on-device
+// login throttling). A single salted SHA-256 pass, same construction
+// as compute_duress_hash() below -- not PBKDF2 with iterations=1,
+// which is a different, still-HMAC-based construction, not what "one
+// plain SHA-256 pass" actually means.
+//
+// Read UNCONDITIONALLY by verify() in BOTH Full and Lite builds, not
+// behind #if -- which variant is CURRENTLY RUNNING doesn't decide how
+// a given STORED hash gets checked, what's actually in the stored
+// profile byte does. A device reflashed Full-to-Lite (or back) must
+// still verify correctly against whatever PIN hash it already had on
+// disk from before the reflash; only WRITING a brand new PIN (see
+// store_new_pin() below) depends on which variant is running now.
+constexpr uint8_t PROFILE_SHA256_LITE = 2;
 constexpr uint32_t PIN_BLOB_MAGIC = 0x4B4B5032; // "KKP2"
 constexpr uint8_t PIN_BLOB_VERSION = 1;
 constexpr uint8_t DURESS_PIN_BLOB_VERSION = 2;
@@ -111,6 +129,38 @@ bool compute_hash(const uint8_t* salt, const char* pin_digits,
 
     if (status != PSA_SUCCESS) {
         ESP_LOGE(TAG, "PBKDF2 failed (status %d)", static_cast<int>(status));
+        return false;
+    }
+
+    return true;
+}
+
+// Lite build's own PIN hash -- single salted SHA-256 pass, exact same
+// construction as compute_duress_hash() below (that function predates
+// this one and was the template for it), just sized for a regular
+// PIN's own variable length rather than duress's fixed 6 digits. See
+// PROFILE_SHA256_LITE's own comment above for why this is a real
+// security trade-off, not just a feature-tier one.
+bool compute_hash_sha256_lite(const uint8_t* salt, const char* pin_digits, uint8_t out_hash[HASH_LEN])
+{
+    const size_t pin_len = strlen(pin_digits);
+    uint8_t input[SALT_LEN + 16]{}; // 16 >= StoredPin::pin_length's own practical max (6)
+    if (pin_len > sizeof(input) - SALT_LEN) {
+        return false; // defensive -- pin_format_ok()'s own length check already prevents this
+    }
+
+    std::memcpy(input, salt, SALT_LEN);
+    std::memcpy(input + SALT_LEN, pin_digits, pin_len);
+
+    size_t hash_len = 0;
+    const psa_status_t status =
+        psa_hash_compute(PSA_ALG_SHA_256, input, SALT_LEN + pin_len, out_hash, HASH_LEN, &hash_len);
+
+    std::memset(input, 0, sizeof(input));
+
+    if (status != PSA_SUCCESS || hash_len != HASH_LEN) {
+        ESP_LOGE(TAG, "Lite PIN SHA-256 failed (status %d)", static_cast<int>(status));
+        std::memset(out_hash, 0, HASH_LEN);
         return false;
     }
 
@@ -384,12 +434,20 @@ bool store_new_pin(const char* new_pin)
     next.magic = PIN_BLOB_MAGIC;
     next.version = PIN_BLOB_VERSION;
     next.pin_length = static_cast<uint8_t>(std::strlen(new_pin));
-    next.reserved[0] = PBKDF2_PROFILE_TEST;
     generate_salt(next.salt);
+#if CONFIG_KEYKEEPER_LITE
+    next.reserved[0] = PROFILE_SHA256_LITE;
+    if (!compute_hash_sha256_lite(next.salt, new_pin, next.hash)) {
+        ESP_LOGE(TAG, "store_new_pin: Lite SHA-256 computation failed");
+        return false;
+    }
+#else
+    next.reserved[0] = PBKDF2_PROFILE_TEST;
     if (!compute_hash(next.salt, new_pin, PBKDF2_ITERATIONS_TEST, next.hash)) {
         ESP_LOGE(TAG, "store_new_pin: PBKDF2 computation failed");
         return false;
     }
+#endif
 
     if (!storage::nvs::set_blob(NVS_NAMESPACE, NVS_KEY, &next, sizeof(next))) {
         ESP_LOGE(TAG, "Failed to persist PIN to NVS");
@@ -500,12 +558,25 @@ VerifyResult verify(const char* pin)
         return VerifyResult::WrongPin;
     }
 
-    const uint32_t iterations =
-        (stored.reserved[0] == PBKDF2_PROFILE_TEST) ?
-        PBKDF2_ITERATIONS_TEST : PBKDF2_ITERATIONS_LEGACY;
-
+    // Branches on the STORED profile byte, not on CONFIG_KEYKEEPER_LITE
+    // -- unconditional in both Full and Lite builds. See
+    // PROFILE_SHA256_LITE's own comment above: which variant is
+    // running right now doesn't decide how an EXISTING hash gets
+    // checked, only which profile a BRAND NEW one gets written as
+    // (store_new_pin() above). A device carrying a PIN hashed under
+    // either variant must still verify correctly after being
+    // reflashed to the other one.
     uint8_t candidate_hash[HASH_LEN]{};
-    if (!compute_hash(stored.salt, pin, iterations, candidate_hash)) {
+    bool hash_ok = false;
+    if (stored.reserved[0] == PROFILE_SHA256_LITE) {
+        hash_ok = compute_hash_sha256_lite(stored.salt, pin, candidate_hash);
+    } else {
+        const uint32_t iterations =
+            (stored.reserved[0] == PBKDF2_PROFILE_TEST) ?
+            PBKDF2_ITERATIONS_TEST : PBKDF2_ITERATIONS_LEGACY;
+        hash_ok = compute_hash(stored.salt, pin, iterations, candidate_hash);
+    }
+    if (!hash_ok) {
         return VerifyResult::WrongPin;
     }
 
@@ -690,10 +761,28 @@ bool verify_duress(const char* pin)
 
 void consume_pbkdf2_time()
 {
+#if CONFIG_KEYKEEPER_LITE
+    // No-op in Lite -- the timing gap this exists to close (see this
+    // function's own call site in lock_manager.cpp: duress's own
+    // fast SHA-256 verify finishing near-instantly next to a REGULAR
+    // unlock's ~10s PBKDF2, an observable difference an attacker
+    // forcing someone to unlock could use to tell a triggered duress
+    // PIN from a real one) doesn't exist in Lite in the first place --
+    // Lite's own REGULAR PIN check (see PROFILE_SHA256_LITE's own
+    // comment, store_new_pin() and verify() above) is ALSO a single
+    // SHA-256 pass now, already comparably fast to duress's own
+    // check. Padding this back up to ~10s here would not preserve
+    // the original property, it would actively INVERT it: duress
+    // would become the distinctly SLOW path instead of regular PIN
+    // entry, exactly the kind of observable difference this function
+    // exists to prevent, just pointed the other way.
+    return;
+#else
     uint8_t dummy_salt[SALT_LEN]{};
     uint8_t dummy_hash[HASH_LEN]{};
     compute_hash(dummy_salt, "000000", PBKDF2_ITERATIONS_TEST, dummy_hash);
     std::memset(dummy_hash, 0, sizeof(dummy_hash));
+#endif
 }
 
 } // namespace security::pin
