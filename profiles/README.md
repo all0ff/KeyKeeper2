@@ -36,6 +36,50 @@ listed first -- later files in the semicolon-separated list override
 earlier ones for any key they both set, and the project-wide base
 values still need to apply everywhere.
 
+## Switching between profiles (read this before you get confused)
+
+`SDKCONFIG_DEFAULTS` only seeds `sdkconfig` the first time it's
+created. Once `sdkconfig` exists in the build directory, `idf.py
+build` keeps using IT, not the defaults file -- so running the Full
+command, then the Lite command, in the SAME build directory produces
+a second Full build, silently, no error, no warning. Confirmed: this
+is exactly what happened the first time these two commands were tried
+back to back here -- both builds "succeeded," both flashed, and the
+Lite one still had the password generator in its menu, because it was
+never actually a Lite build at all.
+
+**Safest fix -- separate build directories, one per profile, so their
+`sdkconfig` files can never collide:**
+
+```bash
+# Full
+idf.py build
+idf.py flash
+
+# Lite -- own build directory via -B
+idf.py -B build_lite -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;profiles/lite.defaults" build
+idf.py -B build_lite flash
+```
+
+**If sharing one `build/` directory between profiles**: delete
+`sdkconfig` (not the whole `build/` directory -- just that one file,
+at the project root, next to this `profiles/` directory) before
+switching, every time:
+
+```bash
+rm sdkconfig
+idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;profiles/lite.defaults" build
+```
+
+A clean way to check which profile a given build directory is
+actually configured for, if ever in doubt:
+
+```bash
+idf.py -B build_lite confcheck 2>/dev/null; grep KEYKEEPER_LITE build_lite/sdkconfig
+```
+
+`CONFIG_KEYKEEPER_LITE=y` confirms Lite; no match (or `=n` / `# CONFIG_KEYKEEPER_LITE is not set`) means it's actually Full, whatever the last command typed claimed.
+
 ## Why two separate directories, not one
 
 `profiles/` (here) and `security/profiles/` answer genuinely different
