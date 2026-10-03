@@ -1,0 +1,16 @@
+# KeyKeeper2 Lite build profile
+#
+# Flips the single project-level flag (see Kconfig.projbuild at the
+# repo root for the full feature list this strips) that everything
+# else -- CMakeLists.txt SRCS/REQUIRES conditionals, #if blocks in
+# the affected .cpp files -- checks.
+#
+# Build with:
+#   idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.defaults;profiles/lite.defaults" build
+#
+# See profiles/README.md for why this lives here rather than under
+# security/profiles/ (that directory is specifically about Secure
+# Boot/Flash Encryption/NVS Encryption -- a different axis from this
+# one, and the two can combine independently).
+
+CONFIG_KEYKEEPER_LITE=y

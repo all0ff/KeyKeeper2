@@ -36,6 +36,13 @@ public:
     bool on_input(InputAction action) override;
 
 private:
+    // PasswordGen stays a real enumerator even in a Lite build --
+    // Item is still a complete, always-valid type either way, just
+    // never reached (ITEM_COUNT below clamps selected_ to a smaller
+    // range) when CONFIG_KEYKEEPER_LITE excludes the menu entry and
+    // the screen it would open (see settings_screen.cpp and
+    // ../../../CMakeLists.txt's own matching #if/if() blocks -- all
+    // three have to agree).
     enum class Item : uint8_t
     {
         General,
@@ -45,7 +52,11 @@ private:
         Wifi,
         PasswordGen,
     };
+#if CONFIG_KEYKEEPER_LITE
+    static constexpr size_t ITEM_COUNT = 5;
+#else
     static constexpr size_t ITEM_COUNT = 6;
+#endif
 
     void render();
     void move_selection(int32_t delta);

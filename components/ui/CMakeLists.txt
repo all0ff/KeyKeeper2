@@ -1,57 +1,79 @@
+set(ui_srcs
+    "src/ui.cpp"
+    "src/ui_manager.cpp"
+    "src/theme.cpp"
+    "src/icon.cpp"
+    "src/localization.cpp"
+    "src/screens/quick_screen.cpp"
+    "src/screens/lock_screen.cpp"
+    "src/screens/setup_pin_screen.cpp"
+    "src/screens/main_menu.cpp"
+    "src/screens/accounts_screen.cpp"
+    "src/screens/vault_list_screen.cpp"
+    "src/screens/account_view_screen.cpp"
+    "src/screens/account_edit_screen.cpp"
+    "src/screens/favorites_screen.cpp"
+    "src/screens/categories_screen.cpp"
+    "src/screens/search_screen.cpp"
+    "src/screens/about_screen.cpp"
+    "src/screens/backup_screen.cpp"
+    "src/screens/settings_screen.cpp"
+    "src/screens/general_settings_screen.cpp"
+    "src/screens/security_settings_screen.cpp"
+    "src/screens/password_gen_settings_screen.cpp"
+    "src/screens/usb_settings_screen.cpp"
+    "src/screens/system_info_screen.cpp"
+    "src/screens/wifi_settings_screen.cpp"
+    "src/widgets/keyboard.cpp"
+    "src/widgets/text_entry.cpp"
+    "src/async_pin_check.cpp"
+)
+
+set(ui_requires
+    bsp
+    display
+    input
+    security
+    password_gen
+    settings
+    storage
+    vault
+    usb
+    wifi
+    rtc_time
+    totp
+    imu
+    web
+    power
+    esp_app_format
+    efuse
+    lvgl
+    log
+)
+
+# Lite build (see Kconfig.projbuild at the repo root): strips the
+# password generator entirely, component and its one UI screen both --
+# CONFIG_KEYKEEPER_LITE is an ESP-IDF Kconfig value, automatically
+# available as a plain CMake variable here, no extra wiring needed.
+# settings_screen.cpp/.hpp have their own matching #if blocks for the
+# menu entry that would otherwise reference this now-uncompiled
+# screen -- both sides have to agree, or the lite build either shows a
+# dead menu item (screen excluded, menu entry not) or fails to link
+# (menu entry calls into a screen whose .cpp was never compiled).
+if(NOT CONFIG_KEYKEEPER_LITE)
+    list(APPEND ui_srcs "src/screens/password_gen_settings_screen.cpp")
+    list(APPEND ui_requires password_gen)
+endif()
+
 idf_component_register(
     SRCS
-        "src/ui.cpp"
-        "src/ui_manager.cpp"
-        "src/theme.cpp"
-        "src/icon.cpp"
-        "src/localization.cpp"
-        "src/screens/quick_screen.cpp"
-        "src/screens/lock_screen.cpp"
-        "src/screens/setup_pin_screen.cpp"
-        "src/screens/main_menu.cpp"
-        "src/screens/accounts_screen.cpp"
-        "src/screens/vault_list_screen.cpp"
-        "src/screens/account_view_screen.cpp"
-        "src/screens/account_edit_screen.cpp"
-        "src/screens/favorites_screen.cpp"
-        "src/screens/categories_screen.cpp"
-        "src/screens/search_screen.cpp"
-        "src/screens/about_screen.cpp"
-        "src/screens/backup_screen.cpp"
-        "src/screens/settings_screen.cpp"
-        "src/screens/general_settings_screen.cpp"
-        "src/screens/security_settings_screen.cpp"
-        "src/screens/password_gen_settings_screen.cpp"
-        "src/screens/usb_settings_screen.cpp"
-        "src/screens/system_info_screen.cpp"
-        "src/screens/wifi_settings_screen.cpp"
-        "src/widgets/keyboard.cpp"
-        "src/widgets/text_entry.cpp"
-        "src/async_pin_check.cpp"
+        ${ui_srcs}
 
     INCLUDE_DIRS
         "include"
 
     REQUIRES
-        bsp
-        display
-        input
-        security
-        password_gen
-        settings
-        storage
-        vault
-        usb
-        wifi
-        rtc_time
-        totp
-        imu
-        web
-        power
-        esp_app_format
-        efuse
-        lvgl
-        log
+        ${ui_requires}
 
     # lvgl is public REQUIRES (not PRIV_REQUIRES) because screen.hpp
     # and ui_manager.hpp -- both public headers -- use lv_obj_t

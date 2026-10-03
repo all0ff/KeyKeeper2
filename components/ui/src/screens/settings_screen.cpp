@@ -1,7 +1,9 @@
 #include "ui/screens/settings_screen.hpp"
 
 #include "ui/screens/general_settings_screen.hpp"
+#if !CONFIG_KEYKEEPER_LITE
 #include "ui/screens/password_gen_settings_screen.hpp"
+#endif
 #include "ui/screens/security_settings_screen.hpp"
 #include "ui/screens/system_info_screen.hpp"
 #include "ui/screens/usb_settings_screen.hpp"
@@ -28,7 +30,9 @@ const char* item_name(size_t index)
             case 2: return "Безопасность";
             case 3: return "Система";
             case 4: return "Wi-Fi";
+#if !CONFIG_KEYKEEPER_LITE
             case 5: return "Генератор паролей";
+#endif
             default: return "";
         }
     }
@@ -39,7 +43,9 @@ const char* item_name(size_t index)
         case 2: return "Security";
         case 3: return "System";
         case 4: return "WiFi";
+#if !CONFIG_KEYKEEPER_LITE
         case 5: return "Password Gen";
+#endif
         default: return "";
     }
 }
@@ -140,9 +146,22 @@ void SettingsScreen::activate()
             manager().push(std::make_unique<WifiSettingsScreen>());
             return;
 
+#if !CONFIG_KEYKEEPER_LITE
         case Item::PasswordGen:
             manager().push(std::make_unique<PasswordGenSettingsScreen>());
             return;
+#else
+        case Item::PasswordGen:
+            // Unreachable in a Lite build -- ITEM_COUNT is 5, so
+            // selected_ (clamped in move_selection()) can never equal
+            // this enumerator's ordinal (5). Case kept, not omitted,
+            // specifically so the switch stays exhaustive over Item
+            // either way -- Item itself isn't behind #if (see the
+            // header's own comment), so an omitted case here would
+            // warn on every Lite build, every time, for a branch that
+            // was never actually a bug.
+            return;
+#endif
     }
 }
 
