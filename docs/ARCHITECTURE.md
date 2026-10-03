@@ -128,20 +128,40 @@ section further below for the full reasoning.
 ```text
 components/
 
-app/
+app_system/
 bsp/
-gui/
-storage/
-vault/
+display/
+event_bus/
+imu/
+input/
+interfaces/
+password_gen/
+power/
+rtc_time/
 security/
-usb/
-wifi/
-web/
 settings/
-system/
+storage/
+totp/
+ui/
+usb/
+vault/
+web/
+wifi/
 ```
 
 Каждый компонент имеет собственную область ответственности и публичный API.
+
+**Note:** this list used to show `app/`, `gui/`, `system/`, and was
+missing half the project's real components (`ui`, `event_bus`,
+`power`, `rtc_time`, `totp`, `display`, `input`, `interfaces`, `imu`,
+`password_gen`) entirely. `app/` and `system/` were early names for
+what's now the single `app_system` component; `gui/` is a leftover,
+unbuilt skeleton (excluded from the build -- see its own
+`components/gui/README.md` for why, and why `ui/` is the component
+actually doing this work). This list is now the real
+`components/` directory, not yet the detailed per-component write-ups
+below it (`# Component Overview`), which still describe the old list
+-- a larger pass, not done as part of this one-line fix.
 
 ---
 
