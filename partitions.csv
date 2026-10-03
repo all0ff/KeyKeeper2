@@ -1,10 +1,30 @@
 # KeyKeeper2 partition table
 # Board has 16 MB flash (CONFIG_ESPTOOLPY_FLASHSIZE_16MB).
 #
-# No OTA slots yet -- single "factory" app. Add ota_0/ota_1 +
-# otadata later if/when OTA updates are actually implemented; that
-# requires a full reflash anyway, so no reason to reserve the space
-# now.
+# OTA layout added in preparation for firmware updates (SD-card and
+# Web UI delivery, both planned -- see docs/ROADMAP.md). Built now,
+# ahead of the Production/Secure Boot v2 work, specifically so the
+# partition table itself (which requires a full reflash to change)
+# doesn't need touching again once Secure Boot is actually enabled.
+# IMPORTANT: until Secure Boot v2 is burned, the bootloader does NOT
+# verify an OTA image's signature before booting it -- actual update
+# code (SD-card reader, Web UI upload handler) must not be wired up
+# to actually install an image until that's active. This table only
+# reserves the space; see docs/ROADMAP.md for the dependency.
+#
+# "storage" (vault.db's own LittleFS partition) keeps its EXACT
+# previous offset (0x320000) and size on purpose -- an existing
+# device's vault.db is untouched by flashing this new table, no
+# backup/restore needed for that part of this specific migration.
+# The old single "factory" partition (0x20000, 3 MB) is gone; nothing
+# now occupies that freed range (0x14000-0x320000) deliberately --
+# placing ota_0/ota_1 there instead would have meant giving each OTA
+# slot well under 1.5 MB (half of factory's old 3 MB), too tight for
+# this app's current ~1.57 MB binary to have any room left to grow.
+# ota_0/ota_1 instead sit past storage, each given a fresh 3 MB (same
+# budget the old single factory partition had), comfortably covering
+# the current binary with real headroom. 13.12 MB of 16 MB used
+# overall; 2.88 MB left spare.
 #
 # "storage" is the internal LittleFS partition that holds
 # /vault/vault.db (see storage_paths.hpp) -- it must always be
@@ -14,8 +34,15 @@
 # is whatever esp_vfs_littlefs_register() is called with in
 # filesystem.cpp, not something the CSV subtype name implies.
 #
+# Every partition is looked up by name at runtime (esp_partition_find()
+# / esp_vfs_littlefs_register(), confirmed via grep -- no hardcoded
+# offset anywhere in components/storage/), so this table is the only
+# place that needed to change for this migration.
+#
 # Name,     Type, SubType,  Offset,    Size,      Flags
 nvs,        data, nvs,      0x9000,    0x8000,
 phy_init,   data, phy,      0x11000,   0x1000,    encrypted
-factory,    app,  factory,  0x20000,   0x300000,
-storage,    data, spiffs,   0x320000,  0x400000, encrypted
+otadata,    data, ota,      0x12000,   0x2000,
+storage,    data, spiffs,   0x320000,  0x400000,  encrypted
+ota_0,      app,  ota_0,    0x720000,  0x300000,
+ota_1,      app,  ota_1,    0xA20000,  0x300000,

@@ -4,11 +4,13 @@
 
 1. **Custom partition table.** A `partitions.csv` was added at the
    **project root** (next to the top-level `CMakeLists.txt`), sized
-   for 16 MB flash: `nvs` (32K) + `phy_init` (4K) + `factory` app (3M)
-   + `storage` LittleFS data (4M) — see the file for the exact layout
-   and reasoning. This needs two lines added to `sdkconfig.defaults`
-   (see the separate patch I'm sending) so ESP-IDF actually uses it
-   instead of the tiny built-in default table:
+   for 16 MB flash: `nvs` (32K) + `phy_init` (4K) + `otadata` (8K) +
+   `storage` LittleFS data (4M) + `ota_0`/`ota_1` app slots (3M each,
+   replacing the single `factory` app partition this table used to
+   have) — see the file for the exact layout and reasoning, including
+   why `storage` deliberately keeps its old offset across that change.
+   This needs two lines added to `sdkconfig.defaults` so ESP-IDF
+   actually uses it instead of the tiny built-in default table:
    ```
    CONFIG_PARTITION_TABLE_CUSTOM=y
    CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
@@ -16,6 +18,15 @@
    **This changes the flash layout.** If you'd already flashed
    anything with the old (default) partition table, do a full erase
    before the next flash: `idf.py erase-flash`, then `idf.py flash`.
+   Moving from THIS project's own previous custom table (single
+   `factory`, no OTA slots) to the current one is gentler: `storage`
+   keeps its exact old offset and size, so an existing device's
+   vault.db survives a normal `idf.py flash` with no erase needed --
+   only the (previously bootable) `factory` app slot becomes
+   unreachable, replaced by `ota_0`/`ota_1`, which is why a normal
+   `idf.py flash` after this change still needs to target one of the
+   new OTA slots (`idf.py` does this automatically) rather than the
+   no-longer-existing `factory`.
 2. **LittleFS** is pulled automatically via `idf_component.yml`
    (`joltwallet/littlefs`), same mechanism as `lvgl` in
    `components/display` — needs network on first build.
