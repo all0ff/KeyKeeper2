@@ -5,6 +5,7 @@
 #include "lvgl.h"
 
 #include <cstdint>
+#include <memory>
 
 // =============================================================================
 // ui::AsyncPinCheck
@@ -135,7 +136,16 @@ private:
 
     static void task_entry(void* arg);
     static void timer_callback(lv_timer_t* timer);
-    void launch(SharedState* state, ResultCallback on_done, void* ctx);
+    // Takes ownership by value (moved in) -- audit finding Q-10:
+    // every caller below constructs its own SharedState with
+    // std::make_unique and moves it in here, rather than this file's
+    // old manual `new SharedState()` + a `delete` at each of several
+    // different exit points scattered across task_entry()/
+    // timer_callback()/the destructor. See launch()'s own definition
+    // in the .cpp for where ownership actually goes from here --
+    // it's handed to the worker task on success, not kept by this
+    // function or by AsyncPinCheck itself.
+    void launch(std::unique_ptr<SharedState> state, ResultCallback on_done, void* ctx);
 
     SharedState* state_ = nullptr;
     lv_timer_t* poll_timer_ = nullptr;

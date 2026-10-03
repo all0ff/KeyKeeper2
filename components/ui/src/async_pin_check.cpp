@@ -11,6 +11,7 @@
 
 #include <atomic>
 #include <cstring>
+#include <memory>
 
 namespace ui {
 
@@ -65,7 +66,19 @@ struct AsyncPinCheck::SharedState
 
 void AsyncPinCheck::task_entry(void* arg)
 {
-    SharedState* state = static_cast<SharedState*>(arg);
+    // Reclaims ownership from the raw pointer launch() had to hand
+    // xTaskCreate() (a C API -- plain void*). This function has TWO
+    // possible owners of `state` by the time it's done (see the
+    // abandoned-check below) -- in BOTH branches, ownership is
+    // settled with an explicit reset()/release() before
+    // vTaskDelete(nullptr) at the bottom, never left to this
+    // unique_ptr's own destructor at scope exit. vTaskDelete(nullptr)
+    // deletes THIS task from within itself and never actually returns
+    // to this stack frame the ordinary way a C++ function does, so a
+    // destructor that would only run at the closing brace never gets
+    // the chance to -- true of EITHER exit path here, not just one.
+    std::unique_ptr<SharedState> owned_state(static_cast<SharedState*>(arg));
+    SharedState* state = owned_state.get();
 
     security::pin::VerifyResult result = security::pin::VerifyResult::WrongPin;
 
@@ -142,9 +155,15 @@ void AsyncPinCheck::task_entry(void* arg)
 
     if (state->abandoned) {
         // The AsyncPinCheck that started this was destroyed before we
-        // finished -- nobody is polling `done` anymore. We're the
-        // last owner of `state`, so we free it.
-        delete state;
+        // finished (or launch() itself marked this abandoned right
+        // after starting us -- see that function's own comment on a
+        // failed lv_timer_create()) -- nobody is polling `done`
+        // anymore either way. We're the last owner of `state`, so we
+        // free it -- explicitly, right here, not left to
+        // owned_state's own destructor (see this function's opening
+        // comment on why that wouldn't actually run before
+        // vTaskDelete(nullptr) below).
+        owned_state.reset();
         vTaskDelete(nullptr);
         return;
     }
@@ -152,6 +171,11 @@ void AsyncPinCheck::task_entry(void* arg)
     state->result = result;
     state->done = true; // must be the last field written
 
+    // Ownership passes to whichever of timer_callback() or
+    // ~AsyncPinCheck() observes `done` first (see each of their own
+    // comments) -- release(), not reset(): the memory must survive
+    // this task ending, just no longer be this unique_ptr's to free.
+    owned_state.release();
     vTaskDelete(nullptr);
 }
 
@@ -176,30 +200,50 @@ void AsyncPinCheck::timer_callback(lv_timer_t* timer)
     self->running_ = false;
     self->state_ = nullptr;
 
+    // Reclaims ownership task_entry() released on the "done, not
+    // abandoned" path (see that function's own comment). Safe to let
+    // this unique_ptr free the memory via its own destructor at the
+    // end of this function -- unlike task_entry(), this is an
+    // ordinary LVGL timer callback that returns normally; no
+    // vTaskDelete()-style non-return to work around here.
+    std::unique_ptr<SharedState> owned_state(state);
+
     const security::pin::VerifyResult result = state->result;
     const ResultCallback callback = state->callback;
     void* const ctx = state->callback_ctx;
-    delete state;
 
     if (callback != nullptr) {
         callback(result, ctx);
     }
 }
 
-void AsyncPinCheck::launch(SharedState* state, ResultCallback on_done, void* ctx)
+void AsyncPinCheck::launch(std::unique_ptr<SharedState> state, ResultCallback on_done, void* ctx)
 {
     state->callback = on_done;
     state->callback_ctx = ctx;
 
-    state_ = state;
+    // state_ (an AsyncPinCheck member) stays a plain observing
+    // pointer, not itself a unique_ptr -- its own lifecycle is
+    // inherently conditional (the destructor either deletes it
+    // directly or hands ownership to the worker task depending on
+    // `done`, see ~AsyncPinCheck() below), which a member unique_ptr
+    // couldn't express any more simply than the raw pointer already
+    // does. The unique_ptr here is about THIS function's own local
+    // ownership of the allocation on the way to becoming task_entry()'s.
+    state_ = state.get();
     running_ = true;
 
+    // xTaskCreate() takes a plain void* (a C API, no smart-pointer
+    // overload) -- .get(), not .release(), for this call specifically:
+    // state still owns the memory at this point, so if xTaskCreate()
+    // fails, letting state run out of scope below frees it
+    // automatically (what used to be an explicit `delete state;` on
+    // this exact failure path).
     const BaseType_t created =
-        xTaskCreate(task_entry, "pin_check", TASK_STACK_SIZE, state, TASK_PRIORITY, nullptr);
+        xTaskCreate(task_entry, "pin_check", TASK_STACK_SIZE, state.get(), TASK_PRIORITY, nullptr);
 
     if (created != pdPASS) {
         ESP_LOGE(TAG, "Failed to create pin_check task");
-        delete state;
         state_ = nullptr;
         running_ = false;
         if (on_done != nullptr) {
@@ -208,7 +252,43 @@ void AsyncPinCheck::launch(SharedState* state, ResultCallback on_done, void* ctx
         return;
     }
 
+    // The new task reclaims ownership itself, at the top of
+    // task_entry() below -- release(), not reset(), since the memory
+    // must survive this call, just no longer be this function's to
+    // free.
+    state.release();
+
     poll_timer_ = lv_timer_create(timer_callback, POLL_PERIOD_MS, this);
+    if (poll_timer_ == nullptr) {
+        // Real, independent defect (found in review, not the
+        // original Q-10 new/delete audit item): the worker task is
+        // ALREADY running at this point -- xTaskCreate() above
+        // succeeded, and there is no way to cancel an in-flight
+        // FreeRTOS task cleanly, especially one that may already be
+        // mid-PBKDF2. Without this block, the task would finish
+        // normally and set state->done = true, but nothing would
+        // ever be polling for that (no timer exists), so SharedState
+        // would leak permanently, AND running_ -- only ever cleared
+        // in timer_callback(), which would also never fire -- would
+        // stay true forever, silently blocking this AsyncPinCheck
+        // instance from starting any FUTURE check until the whole
+        // object is destroyed and recreated. lv_timer_create()
+        // failing is rare in practice (LVGL-internal memory
+        // exhaustion), but when it does, the fix is to mark this
+        // abandoned right away -- the exact same protocol
+        // ~AsyncPinCheck() already uses when the UI object itself is
+        // destroyed mid-check (see that destructor and task_entry()'s
+        // own abandoned branch): the worker, once it finishes, will
+        // see abandoned == true and free SharedState itself, with no
+        // poll timer ever needed.
+        ESP_LOGE(TAG, "Failed to create poll timer -- abandoning this check, worker will self-clean on finish");
+        state_->abandoned = true;
+        state_ = nullptr;
+        running_ = false;
+        if (on_done != nullptr) {
+            on_done(security::pin::VerifyResult::WrongPin, ctx);
+        }
+    }
 }
 
 void AsyncPinCheck::start(Kind kind, const char* pin, ResultCallback on_done, void* ctx)
@@ -218,11 +298,11 @@ void AsyncPinCheck::start(Kind kind, const char* pin, ResultCallback on_done, vo
         return;
     }
 
-    auto* state = new SharedState();
+    auto state = std::make_unique<SharedState>();
     state->kind = kind;
     std::strncpy(state->pin, pin, sizeof(state->pin) - 1);
 
-    launch(state, on_done, ctx);
+    launch(std::move(state), on_done, ctx);
 }
 
 void AsyncPinCheck::start_set_pin(const char* new_pin, const char* old_pin, ResultCallback on_done, void* ctx)
@@ -232,7 +312,7 @@ void AsyncPinCheck::start_set_pin(const char* new_pin, const char* old_pin, Resu
         return;
     }
 
-    auto* state = new SharedState();
+    auto state = std::make_unique<SharedState>();
     state->kind = Kind::SetPin;
     std::strncpy(state->pin, new_pin, sizeof(state->pin) - 1);
     if (old_pin != nullptr) {
@@ -240,7 +320,7 @@ void AsyncPinCheck::start_set_pin(const char* new_pin, const char* old_pin, Resu
         std::strncpy(state->old_pin, old_pin, sizeof(state->old_pin) - 1);
     }
 
-    launch(state, on_done, ctx);
+    launch(std::move(state), on_done, ctx);
 }
 
 void AsyncPinCheck::start_set_pin_after_verify(const char* new_pin, ResultCallback on_done, void* ctx)
@@ -250,13 +330,13 @@ void AsyncPinCheck::start_set_pin_after_verify(const char* new_pin, ResultCallba
         return;
     }
 
-    auto* state = new SharedState();
+    auto state = std::make_unique<SharedState>();
     state->kind = Kind::SetPinAfterVerify;
     std::strncpy(state->pin, new_pin, sizeof(state->pin) - 1);
     // No old_pin needed at all -- security::pin::set_pin_after_verify()
     // doesn't take one.
 
-    launch(state, on_done, ctx);
+    launch(std::move(state), on_done, ctx);
 }
 
 void AsyncPinCheck::start_set_duress_pin(const char* duress_pin, const char* current_pin, ResultCallback on_done,
@@ -267,13 +347,13 @@ void AsyncPinCheck::start_set_duress_pin(const char* duress_pin, const char* cur
         return;
     }
 
-    auto* state = new SharedState();
+    auto state = std::make_unique<SharedState>();
     state->kind = Kind::SetDuressPin;
     std::strncpy(state->pin, duress_pin, sizeof(state->pin) - 1);
     state->has_old_pin = true;
     std::strncpy(state->old_pin, current_pin, sizeof(state->old_pin) - 1);
 
-    launch(state, on_done, ctx);
+    launch(std::move(state), on_done, ctx);
 }
 
 void AsyncPinCheck::start_set_duress_pin_after_verify(const char* duress_pin, const char* current_pin,
@@ -284,7 +364,7 @@ void AsyncPinCheck::start_set_duress_pin_after_verify(const char* duress_pin, co
         return;
     }
 
-    auto* state = new SharedState();
+    auto state = std::make_unique<SharedState>();
     state->kind = Kind::SetDuressPinAfterVerify;
     std::strncpy(state->pin, duress_pin, sizeof(state->pin) - 1);
     // current_pin's VALUE is still needed (length-match/distinctness
@@ -294,7 +374,7 @@ void AsyncPinCheck::start_set_duress_pin_after_verify(const char* duress_pin, co
     state->has_old_pin = true;
     std::strncpy(state->old_pin, current_pin, sizeof(state->old_pin) - 1);
 
-    launch(state, on_done, ctx);
+    launch(std::move(state), on_done, ctx);
 }
 
 AsyncPinCheck::~AsyncPinCheck()
@@ -308,8 +388,14 @@ AsyncPinCheck::~AsyncPinCheck()
         if (state_->done) {
             // Worker already finished, nobody consumed the result --
             // safe to free directly, the worker task won't touch it
-            // again.
-            delete state_;
+            // again. A destructor returning normally (this one) has
+            // no vTaskDelete()-style non-return to work around, so a
+            // brief owning unique_ptr, freeing state_ via its own
+            // destructor at the end of this scope, is exactly as
+            // correct as the explicit `delete state_;` this replaced
+            // -- just consistent with every other ownership-settling
+            // point in this file.
+            std::unique_ptr<SharedState> owned(state_);
         } else {
             // Still in flight -- hand off ownership to the worker
             // task, which will free it once done (see task_entry()).

@@ -83,7 +83,20 @@ struct TypeTaskParams {
 
 void type_task(void* arg)
 {
-    auto* params = static_cast<TypeTaskParams*>(arg);
+    // Reclaims ownership from the raw pointer spawn_type_task() had
+    // to hand xTaskCreate() (a C API -- plain void*, no smart-pointer
+    // overload exists). Freed with an explicit reset() further down,
+    // not left to this unique_ptr's own destructor at scope exit --
+    // vTaskDelete(nullptr) below deletes THIS task from within
+    // itself and never actually returns to this stack frame the
+    // ordinary way a C++ function does, so a destructor that would
+    // only run at the closing brace never gets the chance to (audit
+    // finding Q-09: converting the old raw new/delete pair to
+    // unique_ptr is correct for the OTHER path below, in
+    // spawn_type_task() -- see that function's own comment -- but
+    // doing the same thing *here* without the explicit reset() would
+    // silently leak every single successful typing task).
+    std::unique_ptr<TypeTaskParams> params(static_cast<TypeTaskParams*>(arg));
     const size_t sent = engine.type_string(params->text, params->timing);
     // Accept either unit -- see count_chars()'s own comment.
     const bool text_complete = (sent == count_chars(params->text)) || (sent == params->text.size());
@@ -96,7 +109,7 @@ void type_task(void* arg)
         set_status(engine.last_error());
     }
 
-    delete params;
+    params.reset();
     // Cleared LAST, right before the task actually ends -- a new
     // request arriving between set_status() above and this line
     // should still see "busy" and be refused, not slip through into
@@ -119,17 +132,29 @@ void spawn_type_task(const std::string& text, const TypeEngine::Timing& timing =
         return;
     }
 
-    auto* params = new TypeTaskParams{text, timing};
+    auto params = std::make_unique<TypeTaskParams>(TypeTaskParams{text, timing});
+    // .get(), not .release(), for this call -- params still owns the
+    // memory at this point. Only released below, once xTaskCreate()
+    // has actually succeeded; if it hasn't, letting params run out of
+    // scope at the end of this function frees it automatically --
+    // what used to be an explicit `delete params;` on this exact
+    // failure path.
     const BaseType_t created = xTaskCreate(
-        type_task, "usb_type", TYPE_TASK_STACK, params, TYPE_TASK_PRIO, nullptr);
+        type_task, "usb_type", TYPE_TASK_STACK, params.get(), TYPE_TASK_PRIO, nullptr);
 
     if (created != pdPASS) {
         set_status("Failed to start typing task");
-        delete params;
-        // Task never actually started -- nothing will ever clear the
-        // flag on this attempt's behalf, so this call site has to.
+        // Nothing will ever clear the flag on this attempt's behalf,
+        // so this call site has to.
         typing_in_progress.store(false, std::memory_order_release);
+        return;
     }
+
+    // The new task reclaims ownership itself, at the top of
+    // type_task() above -- release(), not reset(), since the memory
+    // must survive this call, just no longer be this unique_ptr's to
+    // free.
+    params.release();
 }
 
 } // namespace
