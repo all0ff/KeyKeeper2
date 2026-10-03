@@ -521,7 +521,21 @@ bool init()
     // unavailable.
     imu::init();
     {
+#if CONFIG_KEYKEEPER_LITE
+        // Forced Rotate0 here, not read from settings:: -- a device
+        // that was Full with Auto or Rotate180 selected, then
+        // reflashed to Lite, would otherwise still carry that in its
+        // existing NVS (settings don't get reset by reflashing) and
+        // this boot-time read happens before the user could ever open
+        // GeneralSettingsScreen to save its own self-healing
+        // (see that screen's own comment on orientation_). Matches
+        // this project's Lite philosophy -- compiled out for real,
+        // not hidden behind a toggle (or a leftover NVS value) the
+        // device could still reach.
+        const settings::Orientation orientation = settings::Orientation::Rotate0;
+#else
         const settings::Orientation orientation = settings::all().general.orientation;
+#endif
         if (orientation == settings::Orientation::Auto) {
             if (!imu::start_auto_rotate()) {
                 lvgl_port::set_rotation(false);

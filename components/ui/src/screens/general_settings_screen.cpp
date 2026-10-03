@@ -45,7 +45,20 @@ void GeneralSettingsScreen::initialize(lv_obj_t* content_parent)
     const settings::GeneralSettings& g = settings::all().general;
     language_ = g.language;
     theme_ = g.theme;
+#if !CONFIG_KEYKEEPER_LITE
     orientation_ = g.orientation;
+#endif
+    // In Lite, orientation_ is deliberately left at its default-
+    // constructed Rotate0 (see the .hpp) rather than read from
+    // settings:: here -- same stale-NVS reasoning as
+    // SecuritySettingsScreen's own pin_entry_dial_mode_: a device
+    // that was Full with Auto or Rotate180 selected, then reflashed
+    // to Lite, would otherwise read that straight out of still-
+    // present NVS. save() below writes orientation_ back
+    // unconditionally (not itself behind #if) -- always Rotate0 in
+    // Lite, since it's never set to anything else here -- so the
+    // first save on a Lite build corrects any stale stored value too,
+    // not just this screen's own read.
     brightness_ = g.display_brightness;
     screen_timeout_s_ = g.display_off_timeout_s;
     original_brightness_ = g.display_brightness;
@@ -106,13 +119,6 @@ void GeneralSettingsScreen::render()
                                       theme_ == settings::Theme::Light ? i18n::tr(i18n::Key::Light)
                                                                         : i18n::tr(i18n::Key::Dark));
                 break;
-            case Row::Orientation: {
-                const char* value = i18n::tr(i18n::Key::Rotate0);
-                if (orientation_ == settings::Orientation::Rotate180) value = i18n::tr(i18n::Key::Rotate180);
-                if (orientation_ == settings::Orientation::Auto) value = i18n::tr(i18n::Key::Auto);
-                lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, i18n::tr(i18n::Key::Orientation), value);
-                break;
-            }
             case Row::Brightness:
                 lv_label_set_text_fmt(row_labels_[i], "%s%s: %u%%", prefix,
                                       i18n::tr(i18n::Key::Brightness),
@@ -133,6 +139,26 @@ void GeneralSettingsScreen::render()
                 lv_label_set_text_fmt(row_labels_[i], "%s%s", prefix,
                                       i18n::tr(i18n::Key::Save));
                 break;
+
+#if !CONFIG_KEYKEEPER_LITE
+            case Row::Orientation: {
+                const char* value = i18n::tr(i18n::Key::Rotate0);
+                if (orientation_ == settings::Orientation::Rotate180) value = i18n::tr(i18n::Key::Rotate180);
+                if (orientation_ == settings::Orientation::Auto) value = i18n::tr(i18n::Key::Auto);
+                lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, i18n::tr(i18n::Key::Orientation), value);
+                break;
+            }
+#else
+            case Row::Orientation:
+                // Unreachable in a Lite build -- ROW_COUNT is 5, so
+                // selected_row_ (clamped in move_selection()) can
+                // never equal this enumerator's ordinal (5). Kept,
+                // not omitted, so this switch stays exhaustive over
+                // Row either way -- same reasoning as
+                // SecuritySettingsScreen's own PinEntryStyle/
+                // DialLastDigit cases.
+                break;
+#endif
         }
     }
 
@@ -169,13 +195,6 @@ void GeneralSettingsScreen::adjust_value(int32_t delta)
         case Row::Theme:
             theme_ = (theme_ == settings::Theme::Dark) ? settings::Theme::Light : settings::Theme::Dark;
             break;
-        case Row::Orientation:
-            switch (orientation_) {
-                case settings::Orientation::Rotate0: orientation_ = settings::Orientation::Rotate180; break;
-                case settings::Orientation::Rotate180: orientation_ = settings::Orientation::Auto; break;
-                case settings::Orientation::Auto: orientation_ = settings::Orientation::Rotate0; break;
-            }
-            break;
         case Row::Brightness: {
             int32_t value = static_cast<int32_t>(brightness_) + delta * BRIGHTNESS_STEP;
             if (value < 0) value = 0;
@@ -201,6 +220,21 @@ void GeneralSettingsScreen::adjust_value(int32_t delta)
         }
         case Row::Save:
             break;
+
+#if !CONFIG_KEYKEEPER_LITE
+        case Row::Orientation:
+            switch (orientation_) {
+                case settings::Orientation::Rotate0: orientation_ = settings::Orientation::Rotate180; break;
+                case settings::Orientation::Rotate180: orientation_ = settings::Orientation::Auto; break;
+                case settings::Orientation::Auto: orientation_ = settings::Orientation::Rotate0; break;
+            }
+            break;
+#else
+        case Row::Orientation:
+            // Unreachable in a Lite build -- see render()'s own
+            // comment on the matching #else branch there.
+            break;
+#endif
     }
     render();
 }

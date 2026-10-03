@@ -50,16 +50,26 @@ public:
     bool on_input(InputAction action) override;
 
 private:
+    // Orientation moved after Save (Lite strips it -- see ROW_COUNT
+    // below, same reasoning/pattern as SecuritySettingsScreen's own
+    // PinEntryStyle/DialLastDigit reordering): stays a real
+    // enumerator either way, never behind #if itself, just
+    // unreachable in a Lite build since ROW_COUNT clamps
+    // selected_row_ below its ordinal.
     enum class Row : uint8_t
     {
         Language,
         Theme,
-        Orientation,
         Brightness,
         ScreenTimeout,
         Save,
+        Orientation,
     };
+#if CONFIG_KEYKEEPER_LITE
+    static constexpr size_t ROW_COUNT = 5;
+#else
     static constexpr size_t ROW_COUNT = 6;
+#endif
 
     enum class Mode : uint8_t
     {
