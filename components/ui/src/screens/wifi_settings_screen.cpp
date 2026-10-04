@@ -51,7 +51,23 @@ void WifiSettingsScreen::initialize(lv_obj_t* content_parent)
     std::strncpy(sta_password_, w.sta_password, sizeof(sta_password_) - 1);
     std::strncpy(ap_ssid_, w.ap_ssid, sizeof(ap_ssid_) - 1);
     std::strncpy(ap_password_, w.ap_password, sizeof(ap_password_) - 1);
+#if !CONFIG_KEYKEEPER_LITE
     captive_portal_enabled_ = w.captive_portal_enabled;
+#endif
+    // In Lite, captive_portal_enabled_ is deliberately left at its
+    // default-constructed false (see the .hpp) rather than read from
+    // settings:: here -- same stale-NVS reasoning as every other Lite
+    // strip in this project (GeneralSettingsScreen's orientation_,
+    // SecuritySettingsScreen's pin_entry_dial_mode_): a device that
+    // was Full with this enabled, then reflashed to Lite, would
+    // otherwise read a stale true straight out of still-present NVS.
+    // save() below writes this same member back unconditionally (not
+    // itself behind #if) -- always false in Lite -- so the first save
+    // on a Lite build corrects any stale stored value too. Unlike
+    // those other two screens, the ROW ITSELF stays -- see
+    // render_rows()/activate()'s own comments for why this one
+    // screen's Row enum/ROW_COUNT are NOT reordered/shrunk the same
+    // way.
     std::strncpy(secret_word_, settings::all().security.secret_word, sizeof(secret_word_) - 1);
 
     build_rows(content_parent_);
@@ -189,8 +205,29 @@ void WifiSettingsScreen::render_rows()
                                        ap_password_[0] == '\0' ? i18n::tr(i18n::Key::OpenValue) : "********");
                 break;
             case Row::CaptivePortal:
+                // Row::CaptivePortal is NOT reordered/removed in Lite
+                // the way other screens' Lite-stripped rows are
+                // (compare GeneralSettingsScreen::Orientation,
+                // SecuritySettingsScreen::PinEntryStyle) -- this
+                // screen's status_label_ position is calculated
+                // relative to Row::SecretWord's own ordinal (see
+                // build_rows() above), and this row sitting
+                // immediately before SecretWord is load-bearing for
+                // that math, confirmed on real hardware as a real
+                // positioning bug once already (status_label_
+                // overlapping a row) before that relative-offset
+                // approach was added. Lower-risk to keep this row's
+                // slot/position exactly as-is and just make its VALUE
+                // permanently off and non-interactive in Lite (see
+                // activate() below) than to touch the layout math
+                // again for a screen with that specific history.
+#if CONFIG_KEYKEEPER_LITE
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::CaptivePortalRowFmt), prefix,
+                                       i18n::tr(i18n::Key::Off));
+#else
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::CaptivePortalRowFmt), prefix,
                                        captive_portal_enabled_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
+#endif
                 break;
             case Row::SecretWord:
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SecretWordRowFmt), prefix,
@@ -258,8 +295,17 @@ void WifiSettingsScreen::activate()
         return;
     }
     if (row == Row::CaptivePortal) {
+#if !CONFIG_KEYKEEPER_LITE
         captive_portal_enabled_ = !captive_portal_enabled_;
         render_rows();
+#endif
+        // In Lite, OkShort on this row is deliberately a no-op --
+        // captive_portal_enabled_ stays permanently false (never read
+        // from settings:: to begin with, see initialize()'s own
+        // comment), matching render_rows()'s own Lite branch always
+        // showing "Off". The row stays visible and selectable (see
+        // that comment for why it isn't removed outright), just
+        // inert.
         return;
     }
 

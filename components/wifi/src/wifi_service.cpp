@@ -263,7 +263,25 @@ bool start_access_point(const settings::WifiSettings& cfg)
     portEXIT_CRITICAL(&state_lock);
     publish(WifiEventId::ApStarted);
 
-    if (!cfg.captive_portal_enabled) {
+#if CONFIG_KEYKEEPER_LITE
+    // This is the ACTUAL enforcement point for the Lite strip, not
+    // just the UI (wifi_settings_screen.cpp's own CaptivePortal row,
+    // forced to always show/act as off) -- cfg.captive_portal_enabled
+    // below reads straight from stored settings::WifiSettings, which
+    // a device previously Full with this ON, then reflashed to Lite,
+    // would still carry as true in existing NVS (settings don't get
+    // reset by reflashing, and that screen's own stale-NVS guard only
+    // stops the UI from ever WRITING true again -- it doesn't retroactively
+    // fix what's already stored, which this check would otherwise
+    // still faithfully honor). Forced false here regardless of what's
+    // actually stored -- without this, the UI would show "Off" while
+    // captive_dns::start() below still silently ran, the opposite of
+    // what Lite is supposed to guarantee.
+    constexpr bool captive_portal_enabled = false;
+#else
+    const bool captive_portal_enabled = cfg.captive_portal_enabled;
+#endif
+    if (!captive_portal_enabled) {
         ESP_LOGI(TAG, "Captive portal disabled in settings -- AP running as a plain access point");
         return true;
     }
