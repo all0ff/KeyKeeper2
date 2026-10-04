@@ -96,14 +96,18 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
   .recovery-code-row .code { font-family: ui-monospace, Consolas, monospace; flex: 1; }
   .recovery-code-row.used .code { text-decoration: line-through; color: #9ca3af; }
   .recovery-code-row button { width: auto; padding: 3px 10px; font-size: 0.78rem; margin: 0; }
-  .backup-row {
+)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML(  .backup-row {
     display: flex; align-items: center; gap: 8px; padding: 8px 0;
     border-bottom: 1px solid #f0f0f0; font-size: 0.92rem;
   }
   .backup-row .name { font-family: ui-monospace, Consolas, monospace; flex: 1; }
   .backup-row .size { color: #6b7280; font-size: 0.85rem; }
   .backup-row button { width: auto; padding: 4px 10px; font-size: 0.8rem; margin: 0; }
-</style>
+)HTML"
+#endif
+R"HTML(</style>
 </head>
 <body>
 
@@ -121,8 +125,12 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     <div class="topbar" style="flex-direction:column; align-items:stretch; gap:8px">
       <div style="display:flex; gap:8px; justify-content:flex-start; flex-wrap:wrap">
         <button class="small secondary" onclick="showView('help-view')">Help</button>
-        <button class="small secondary" onclick="openBackup()">Backup</button>
-        <button class="small secondary" onclick="openSettings()">Settings</button>
+)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML(        <button class="small secondary" onclick="openBackup()">Backup</button>
+)HTML"
+#endif
+R"HTML(        <button class="small secondary" onclick="openSettings()">Settings</button>
         <button class="small" onclick="openEdit(null)">+ New</button>
       </div>
       <h2>Accounts</h2>
@@ -194,7 +202,11 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
       </div>
       <div class="note" style="margin-top:8px">Anyone who has this phrase has full, irreversible control of the
         wallet it belongs to -- treat it with at least the same care as the wallet itself. This device encrypts
-        its own storage, but a Backup or CSV export of it is not (see Help).</div>
+        its own storage)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML(, but a Backup or CSV export of it is not (see Help))HTML"
+#endif
+R"HTML(.</div>
       <div id="seed-msg" style="font-size:0.85rem; margin-top:4px"></div>
     </div>
 
@@ -316,7 +328,9 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     <button onclick="saveSettings('wifi')" style="margin-top:8px">Save WiFi</button>
   </div>
 
-  <div id="backup-view" class="hidden">
+)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML(  <div id="backup-view" class="hidden">
     <div class="topbar">
       <h2>Backup</h2>
       <button class="small secondary" onclick="showView('list-view'); loadList();">&larr; Back</button>
@@ -331,7 +345,9 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
     <div id="backup-msg" style="font-size:0.85rem; margin-top:8px"></div>
   </div>
 
-  <div id="help-view" class="hidden">
+)HTML"
+#endif
+R"HTML(  <div id="help-view" class="hidden">
     <div class="topbar">
       <h2>Help</h2>
       <div style="display:flex; gap:8px">
@@ -427,7 +443,9 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         its own always just types the login by itself, with no Tab or Enter added regardless of this setting.</p>
     </div>
 
-    <div class="help-section">
+)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML(    <div class="help-section">
       <h3>Backup, export &amp; import</h3>
       <p>Two different things, both on a microSD card, both under Backup on the device:</p>
       <ul>
@@ -446,7 +464,9 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         common on 32GB+ cards &mdash; which this device can't read.</p>
     </div>
 
-    <div class="help-section">
+)HTML"
+#endif
+R"HTML(    <div class="help-section">
       <h3>Security</h3>
       <ul>
         <li>Repeated wrong PIN attempts escalate: a temporary lockout, then eventually a full wipe of the vault
@@ -455,10 +475,14 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
           for being made to unlock the device under pressure.</li>
         <li>Auto-Lock (Settings &rarr; Security) locks the device after a period of inactivity you choose.</li>
         <li>Factory Reset erases everything: vault, PIN, all settings, WiFi credentials.</li>
-        <li>The vault file on the device itself is encrypted (AES-256-GCM, keyed from the PIN) -- but a Backup or
+        <li>The vault file on the device itself is encrypted (AES-256-GCM, keyed from the PIN))HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML( -- but a Backup or
           CSV export of it is <strong>not</strong>, by design (a Backup needs to work from any KeyKeeper2 device's
           own PIN, and CSV is meant to move between different password managers). Treat a backup or export file
-          with the same care as the passwords it contains.</li>
+          with the same care as the passwords it contains)HTML"
+#endif
+R"HTML(.</li>
         <li>An alternative <strong>Dial</strong> PIN entry style (Settings &rarr; Security &rarr; PIN Entry) mimics
           a real combination lock: rotate one direction to spin a digit, then reverse direction to confirm it and
           move to the next one -- each digit alternates which direction confirms it, the same way a physical dial
@@ -489,7 +513,13 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         <li>The on-device interface's own translation (General settings &rarr; Language) is a work in progress --
           some screens are already in Russian when selected, others are still English-only regardless of the
           setting.</li>
-        <li>Search and Backup/Restore aren't available from this web page yet, only on the device itself.</li>
+        <li>Search)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML( and Backup/Restore aren't)HTML"
+#else
+R"HTML( isn't)HTML"
+#endif
+R"HTML( available from this web page yet, only on the device itself.</li>
       </ul>
     </div>
     </div>
@@ -582,7 +612,9 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         себе всегда печатает только логин, без Tab и Enter, независимо от этой настройки.</p>
     </div>
 
-    <div class="help-section">
+)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML(    <div class="help-section">
       <h3>Резервная копия, экспорт и импорт</h3>
       <p>Две разные вещи, обе на microSD-карте, обе в разделе Резервная копия на устройстве:</p>
       <ul>
@@ -601,7 +633,9 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
         (обычное дело для карт от 32ГБ), который устройство прочитать не может.</p>
     </div>
 
-    <div class="help-section">
+)HTML"
+#endif
+R"HTML(    <div class="help-section">
       <h3>Безопасность</h3>
       <ul>
         <li>Повторные неверные попытки PIN усиливают реакцию: временная блокировка, затем полное стирание хранилища
@@ -610,10 +644,14 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
           стирает хранилище — на случай если вас заставляют разблокировать устройство.</li>
         <li>Автоблокировка (Настройки &rarr; Безопасность) блокирует устройство после выбранного периода бездействия.</li>
         <li>Сброс до заводских стирает всё: хранилище, PIN, все настройки, данные WiFi.</li>
-        <li>Файл хранилища на самом устройстве зашифрован (AES-256-GCM, ключ выводится из PIN) — а резервная копия
+        <li>Файл хранилища на самом устройстве зашифрован (AES-256-GCM, ключ выводится из PIN))HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML( — а резервная копия
           или CSV-экспорт <strong>нет</strong>, осознанно (резервная копия должна работать с PIN любого устройства
           KeyKeeper2, а CSV предназначен для переноса между разными менеджерами паролей). Обращайтесь с файлом
-          резервной копии или экспорта так же бережно, как с паролями внутри него.</li>
+          резервной копии или экспорта так же бережно, как с паролями внутри него)HTML"
+#endif
+R"HTML(.</li>
         <li>Альтернативный режим набора PIN <strong>"Лимбовый"</strong> (Настройки &rarr; Безопасность &rarr; Набор
           PIN) имитирует настоящий кодовый замок: вращаете в одну сторону, чтобы прокрутить цифру, затем
           разворачиваете в другую сторону, чтобы подтвердить её и перейти к следующей — для каждой цифры
@@ -645,7 +683,13 @@ constexpr char APP_PAGE[] = R"HTML(<!DOCTYPE html>
       <ul>
         <li>Перевод самого интерфейса устройства (Общие настройки &rarr; Язык) ещё в процессе — часть экранов
           уже показывается по-русски при выборе языка, часть пока остаётся на английском независимо от настройки.</li>
-        <li>Поиск и Backup/Restore пока недоступны с этой веб-страницы, только на самом устройстве.</li>
+        <li>Поиск)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML( и Backup/Restore пока недоступны)HTML"
+#else
+R"HTML( пока недоступен)HTML"
+#endif
+R"HTML( с этой веб-страницы, только на самом устройстве.</li>
       </ul>
     </div>
     </div>
@@ -685,7 +729,11 @@ let seedRevealed = false;
 let seedClearConfirmPending = false;
 
 function showView(id) {
-  ['list-view', 'detail-view', 'edit-view', 'settings-view', 'backup-view', 'help-view'].forEach(v => {
+  ['list-view', 'detail-view', 'edit-view', 'settings-view', )HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML('backup-view', )HTML"
+#endif
+R"HTML('help-view'].forEach(v => {
     document.getElementById(v).classList.toggle('hidden', v !== id);
   });
 }
@@ -1322,7 +1370,9 @@ async function saveSettings(section) {
   msg.textContent = t('Saved.');
 }
 
-// ---------- Backup ----------
+)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML(// ---------- Backup ----------
 
 let backupRestoreConfirmPending = null; // filename currently pending a second confirm tap, or null
 
@@ -1432,7 +1482,9 @@ async function deleteBackup(filename) {
   loadBackups();
 }
 
-checkAuth();
+)HTML"
+#endif
+R"HTML(checkAuth();
 </script>
 </body>
 </html>

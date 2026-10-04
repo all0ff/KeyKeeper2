@@ -2,7 +2,9 @@
 
 #include "ui/screens/about_screen.hpp"
 #include "ui/screens/accounts_screen.hpp"
+#if !CONFIG_KEYKEEPER_LITE
 #include "ui/screens/backup_screen.hpp"
+#endif
 #include "ui/screens/settings_screen.hpp"
 #include "ui/localization.hpp"
 #include "ui/theme.hpp"
@@ -24,7 +26,9 @@ constexpr char TAG[] = "ui.main_menu";
 constexpr i18n::Key ITEM_KEYS[] = {
     i18n::Key::Accounts,
     i18n::Key::Settings,
+#if !CONFIG_KEYKEEPER_LITE
     i18n::Key::Backup,
+#endif
     i18n::Key::Lock,
     i18n::Key::About,
 };
@@ -205,10 +209,12 @@ void MainMenu::activate()
             ESP_LOGI(TAG, "Settings selected");
             break;
 
+#if !CONFIG_KEYKEEPER_LITE
         case Item::Backup:
             manager().push(std::make_unique<BackupScreen>());
             ESP_LOGI(TAG, "Backup selected");
             break;
+#endif
 
         case Item::Lock:
             security::lock::lock();

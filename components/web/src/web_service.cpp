@@ -6,7 +6,9 @@
 #include "settings/settings.hpp"
 #include "wifi/wifi_service.hpp"
 #include "web_app_html.hpp"
+#if !CONFIG_KEYKEEPER_LITE
 #include "web_backup_routes.hpp"
+#endif
 #include "web_json_helpers.hpp"
 #include "web_reorder_routes.hpp"
 #include "web_reorder_script.hpp"
@@ -309,7 +311,9 @@ bool start()
 
     register_vault_routes(server);
     register_settings_routes(server);
+#if !CONFIG_KEYKEEPER_LITE
     register_backup_routes(server);
+#endif
     register_reorder_routes(server);
 
     // Registered LAST and as a literal "/*" (NOT built via

@@ -32,16 +32,32 @@ menu "KeyKeeper2"
             each variant, and profiles/lite.defaults for the actual
             flag.
 
-            Lite strips (tracked as each is actually wired up, not all
-            landing in one commit): the dial-style PIN entry mode,
-            on-device Backup, the password generator, display
-            rotation, the Wi-Fi captive portal, and PIN hashing
-            (reverted to the project's original single-pass salted
-            SHA-256, no PBKDF2 stretching). None of these are security
-            boundaries between the two variants -- Lite is a feature
-            tier, not a reduced-trust build -- except PIN hashing
-            specifically, which genuinely weakens offline brute-force
-            resistance and is a deliberate, documented trade for a
-            free/advertising tier, not an oversight.
+            Lite strips (all six now wired up):
+
+              - Dial-style PIN entry mode (Security settings rows +
+                lock screen).
+              - Password generator: its Settings screen AND the
+                "Hold OK = Generate" action on the Password row of the
+                account edit screen (plus that row's footer hint).
+              - Backup: the whole Backup screen on the device (Create/
+                Restore Backup, Export/Import Vault as CSV, SD card
+                Refresh/Format -- one screen, one main-menu entry), the
+                Web UI's Backup page/button/help text, and the
+                vault::backup / vault::csv / web backup-route code
+                behind them. NOTE this includes CSV import/export, not
+                just the raw backup file -- they live on the same
+                screen, so they go together.
+              - Display orientation setting (always Rotate0).
+              - Wi-Fi captive portal (DNS hijack never started).
+              - PIN hashing: single-pass salted SHA-256 instead of
+                PBKDF2 (see pin_manager.cpp's PROFILE_SHA256_LITE).
+
+            None of these are security boundaries between the two
+            variants -- Lite is a feature tier, not a reduced-trust
+            build -- except PIN hashing specifically, which genuinely
+            weakens offline brute-force resistance (the vault.db
+            encryption key is derived from the same hash) and is a
+            deliberate, documented trade for a free/advertising tier,
+            not an oversight.
 
 endmenu

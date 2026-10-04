@@ -40,11 +40,24 @@ public:
     bool on_input(InputAction action) override;
 
 private:
+    // Unlike SettingsScreen/SecuritySettingsScreen/GeneralSettingsScreen
+    // (which keep a stripped item as a real, unreachable enumerator --
+    // their rows are positional AND persisted-adjacent, and reordering
+    // them last kept Full's own order intact), Backup here sits in the
+    // MIDDLE of a menu whose visible order must not change in Full, and
+    // nothing about this enum is ever stored or compared against a
+    // saved value -- it only ever indexes ITEM_KEYS in main_menu.cpp
+    // and drives one switch. So in Lite the enumerator is simply not
+    // there at all (Count shrinks with it, ITEM_COUNT follows
+    // automatically, ITEM_KEYS drops the matching entry): no dead
+    // enumerator, no reordering, no unreachable case.
     enum class Item : uint8_t
     {
         Accounts = 0,
         Settings,
+#if !CONFIG_KEYKEEPER_LITE
         Backup,
+#endif
         Lock,
         About,
         Count,

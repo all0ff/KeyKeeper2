@@ -6,7 +6,9 @@
 #include "ui/ui_manager.hpp"
 
 #include "vault/vault.hpp"
+#if !CONFIG_KEYKEEPER_LITE
 #include "password_gen/password_gen.hpp"
+#endif
 #include "settings/settings.hpp"
 
 #include "esp_log.h"
@@ -62,9 +64,16 @@ const char* AccountEditScreen::footer_hint() const
     if (mode_ == Mode::EditField) {
         return i18n::tr(i18n::Key::EditFooterTyping);
     }
+#if !CONFIG_KEYKEEPER_LITE
+    // This row's own footer advertises "Hold OK  Generate" (see
+    // EditFooterOtpSecret's text) -- true only while the password
+    // generator exists. In Lite (generate_password() compiled out
+    // below) it falls through to the same hint every other row shows,
+    // rather than promising an action that no longer does anything.
     if (static_cast<FieldId>(selected_row_) == FieldId::Password) {
         return i18n::tr(i18n::Key::EditFooterOtpSecret);
     }
+#endif
     return i18n::tr(i18n::Key::EditFooterViewUnsaved);
 }
 
@@ -337,6 +346,7 @@ void AccountEditScreen::try_save()
     }
 }
 
+#if !CONFIG_KEYKEEPER_LITE
 void AccountEditScreen::generate_password()
 {
     char buf[password_gen::MAX_LENGTH + 1];
@@ -355,6 +365,7 @@ void AccountEditScreen::generate_password()
         lv_label_set_text(status_label_, i18n::tr(i18n::Key::PasswordGenerated));
     }
 }
+#endif // !CONFIG_KEYKEEPER_LITE
 
 bool AccountEditScreen::on_input(InputAction action)
 {
@@ -391,12 +402,16 @@ bool AccountEditScreen::on_input(InputAction action)
             enter_edit_mode();
             return true;
 
+#if !CONFIG_KEYKEEPER_LITE
         case InputAction::OkLong:
             if (static_cast<FieldId>(selected_row_) == FieldId::Password) {
                 generate_password();
                 return true;
             }
             return false;
+#endif
+        // In Lite, OkLong is simply unhandled here and takes the same
+        // `default: return false` path as any other unused action.
 
         case InputAction::BackShort:
             return false; // pop, discarding unsaved changes -- see header comment

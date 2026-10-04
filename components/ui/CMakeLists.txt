@@ -16,11 +16,9 @@ set(ui_srcs
     "src/screens/categories_screen.cpp"
     "src/screens/search_screen.cpp"
     "src/screens/about_screen.cpp"
-    "src/screens/backup_screen.cpp"
     "src/screens/settings_screen.cpp"
     "src/screens/general_settings_screen.cpp"
     "src/screens/security_settings_screen.cpp"
-    "src/screens/password_gen_settings_screen.cpp"
     "src/screens/usb_settings_screen.cpp"
     "src/screens/system_info_screen.cpp"
     "src/screens/wifi_settings_screen.cpp"
@@ -34,7 +32,6 @@ set(ui_requires
     display
     input
     security
-    password_gen
     settings
     storage
     vault
@@ -51,18 +48,33 @@ set(ui_requires
     log
 )
 
-# Lite build (see main/Kconfig.projbuild): strips the
-# password generator entirely, component and its one UI screen both --
+# Lite build (see main/Kconfig.projbuild): everything below is ONLY
+# added to the build when NOT Lite -- it must not also appear in the
+# base ui_srcs/ui_requires lists above, or the exclusion does nothing.
+# (A first version of this block listed password_gen_settings_screen.cpp
+# and password_gen in BOTH places: Full got them twice, harmlessly, but
+# Lite still compiled and linked them anyway -- the only thing that
+# actually disappeared there was the menu entry, not the code.)
+#
 # CONFIG_KEYKEEPER_LITE is an ESP-IDF Kconfig value, automatically
 # available as a plain CMake variable here, no extra wiring needed.
-# settings_screen.cpp/.hpp have their own matching #if blocks for the
-# menu entry that would otherwise reference this now-uncompiled
-# screen -- both sides have to agree, or the lite build either shows a
-# dead menu item (screen excluded, menu entry not) or fails to link
-# (menu entry calls into a screen whose .cpp was never compiled).
+# Every .cpp that references one of these screens has its own matching
+# #if !CONFIG_KEYKEEPER_LITE around that reference (settings_screen.cpp,
+# account_edit_screen.cpp, main_menu.cpp) -- both sides have to agree,
+# or Lite either shows a dead entry (screen excluded, caller not) or
+# fails to link (caller references a screen whose .cpp was never
+# compiled).
 if(NOT CONFIG_KEYKEEPER_LITE)
+    # Password generator: its settings screen, and the component
+    # itself (account_edit_screen.cpp's own generate action also uses
+    # password_gen::generate(), so in Lite that call site has to be
+    # compiled out too, not just this screen).
     list(APPEND ui_srcs "src/screens/password_gen_settings_screen.cpp")
     list(APPEND ui_requires password_gen)
+
+    # Backup screen: Create/Restore Backup, CSV Export/Import, SD card
+    # Refresh/Format -- one screen, opened from one main-menu entry.
+    list(APPEND ui_srcs "src/screens/backup_screen.cpp")
 endif()
 
 idf_component_register(

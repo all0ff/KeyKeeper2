@@ -97,7 +97,9 @@ private:
     void apply_edited_field();
     void move_selection(int32_t delta);
     void try_save();
+#if !CONFIG_KEYKEEPER_LITE
     void generate_password();
+#endif
 
     const char* field_label(FieldId field) const;
     size_t field_max_length(FieldId field) const;
