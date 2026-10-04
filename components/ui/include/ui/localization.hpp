@@ -197,7 +197,7 @@ enum class Key : uint8_t {
     StationPasswordRowFmt,
     ApSsidRowFmt,
     ApPasswordRowFmt,
-    CaptivePortalRowFmt,
+    ModeAccessPointCaptive,
     SecretWordRowFmt,
     SaveApplyRowFmt,
     OnValue,

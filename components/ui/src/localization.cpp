@@ -197,7 +197,7 @@ struct Strings {
     const char* station_password_row_fmt;
     const char* ap_ssid_row_fmt;
     const char* ap_password_row_fmt;
-    const char* captive_portal_row_fmt;
+    const char* mode_access_point_captive;
     const char* secret_word_row_fmt;
     const char* save_apply_row_fmt;
     const char* on_value;
@@ -332,7 +332,7 @@ constexpr Strings EN = {
     "Idle", "Connecting...", "Connected", "Disconnected", "AP running", "Failed",
     "%s: %s", "%s: %s (%u client%s)",
     "%sMode: %s", "%sStation SSID: %s", "%sStation Password: %s",
-    "%sAP SSID: %s", "%sAP Password: %s", "%sCaptive Portal: %s", "%sSecret Word: %s",
+    "%sAP SSID: %s", "%sAP Password: %s", "Access Point + CP", "%sSecret Word: %s",
     "%sSave & Apply", "on",
     "Editing: AP Password", "Editing: AP SSID", "Editing: Secret Word",
     "Editing: Station Password", "Editing: Station SSID",
@@ -426,7 +426,7 @@ constexpr Strings RU = {
     "Простой", "Подключение...", "Подключено", "Отключено", "Точка доступа активна", "Ошибка",
     "%s: %s", "%s: %s (клиентов: %u)",
     "%sРежим: %s", "%sSSID клиента: %s", "%sПароль клиента: %s",
-    "%sSSID точки доступа: %s", "%sПароль точки доступа: %s", "%sCaptive-портал: %s", "%sСекретное слово: %s",
+    "%sSSID точки доступа: %s", "%sПароль точки доступа: %s", "Точка доступа + CP", "%sСекретное слово: %s",
     "%sСохранить и применить", "вкл.",
     "Изменение: пароль точки доступа", "Изменение: SSID точки доступа", "Изменение: секретное слово",
     "Изменение: пароль клиента", "Изменение: SSID клиента",
@@ -664,7 +664,7 @@ const char* tr(Key key)
         case Key::StationPasswordRowFmt: return s.station_password_row_fmt;
         case Key::ApSsidRowFmt: return s.ap_ssid_row_fmt;
         case Key::ApPasswordRowFmt: return s.ap_password_row_fmt;
-        case Key::CaptivePortalRowFmt: return s.captive_portal_row_fmt;
+        case Key::ModeAccessPointCaptive: return s.mode_access_point_captive;
         case Key::SecretWordRowFmt: return s.secret_word_row_fmt;
         case Key::SaveApplyRowFmt: return s.save_apply_row_fmt;
         case Key::OnValue: return s.on_value;

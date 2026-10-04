@@ -22,6 +22,76 @@ constexpr char TAG[] = "ui.wifi_settings";
 constexpr lv_coord_t ROW_Y_START = 4;
 constexpr lv_coord_t ROW_SPACING = 20;
 
+// BEGIN mode-choice helpers
+// What the Mode row DISPLAYS and cycles through is not the same set as
+// the stored settings::WifiMode enum: "Access Point + CP" is
+// (AccessPoint, captive_portal_enabled == true), a pair, not a third
+// enumerator of its own -- the stored shape (that enum plus a separate
+// bool) is deliberately left exactly as it was, so existing NVS blobs,
+// the Web UI's own checkbox and wifi_service.cpp need no changes. The
+// order here is the order rotation walks them in.
+enum class ModeChoice : uint8_t
+{
+    Disabled,
+    AccessPoint,
+    AccessPointCaptive,
+    Station,
+};
+
+constexpr ModeChoice MODE_CYCLE[] = {
+    ModeChoice::Disabled,
+    ModeChoice::AccessPoint,
+#if !CONFIG_KEYKEEPER_LITE
+    ModeChoice::AccessPointCaptive, // Lite has no captive portal -- see main/Kconfig.projbuild
+#endif
+    ModeChoice::Station,
+};
+constexpr int MODE_CYCLE_COUNT = static_cast<int>(sizeof(MODE_CYCLE) / sizeof(MODE_CYCLE[0]));
+
+ModeChoice choice_from(settings::WifiMode mode, bool captive)
+{
+    switch (mode) {
+        case settings::WifiMode::Disabled:    return ModeChoice::Disabled;
+        case settings::WifiMode::Station:     return ModeChoice::Station;
+        case settings::WifiMode::AccessPoint: return captive ? ModeChoice::AccessPointCaptive : ModeChoice::AccessPoint;
+    }
+    return ModeChoice::Disabled;
+}
+
+// Picking Disabled or Station deliberately leaves `captive` alone: it
+// only means anything in AccessPoint mode, and keeping it means
+// cycling past them and back doesn't silently forget the choice.
+// Picking either AP value always sets it explicitly.
+void apply_choice(ModeChoice choice, settings::WifiMode& mode, bool& captive)
+{
+    switch (choice) {
+        case ModeChoice::Disabled:           mode = settings::WifiMode::Disabled; break;
+        case ModeChoice::Station:            mode = settings::WifiMode::Station; break;
+        case ModeChoice::AccessPoint:        mode = settings::WifiMode::AccessPoint; captive = false; break;
+        case ModeChoice::AccessPointCaptive: mode = settings::WifiMode::AccessPoint; captive = true; break;
+    }
+}
+
+int cycle_index(ModeChoice choice)
+{
+    for (int i = 0; i < MODE_CYCLE_COUNT; ++i) {
+        if (MODE_CYCLE[i] == choice) {
+            return i;
+        }
+    }
+    // Only reachable in a Lite build if captive_portal_enabled_ were
+    // somehow true (initialize() always forces it false there) -- fall
+    // back to plain Access Point rather than to index 0 (Disabled),
+    // which would silently switch the radio off.
+    for (int i = 0; i < MODE_CYCLE_COUNT; ++i) {
+        if (MODE_CYCLE[i] == ModeChoice::AccessPoint) {
+            return i;
+        }
+    }
+    return 0;
+}
+// END mode-choice helpers
+
 } // namespace
 
 const char* WifiSettingsScreen::title() const
@@ -51,23 +121,22 @@ void WifiSettingsScreen::initialize(lv_obj_t* content_parent)
     std::strncpy(sta_password_, w.sta_password, sizeof(sta_password_) - 1);
     std::strncpy(ap_ssid_, w.ap_ssid, sizeof(ap_ssid_) - 1);
     std::strncpy(ap_password_, w.ap_password, sizeof(ap_password_) - 1);
-#if !CONFIG_KEYKEEPER_LITE
+#if CONFIG_KEYKEEPER_LITE
+    // Assigned EXPLICITLY false in Lite, not left to the member's
+    // default -- and not read from settings::, same stale-NVS reasoning
+    // as every other Lite strip in this project: a device that was Full
+    // with Access Point + CP selected, then reflashed to Lite, would
+    // otherwise read a stale true straight out of still-present NVS and
+    // show "Access Point + CP", a choice Lite's cycle doesn't have.
+    // save() writes this member back unconditionally, so the first save
+    // on a Lite build also corrects the stored value, not just the
+    // display. (An earlier version of this comment claimed the member's
+    // default was already false; it was true. Harmless then -- the row
+    // always showed "off" -- but it would not be harmless now.)
+    captive_portal_enabled_ = false;
+#else
     captive_portal_enabled_ = w.captive_portal_enabled;
 #endif
-    // In Lite, captive_portal_enabled_ is deliberately left at its
-    // default-constructed false (see the .hpp) rather than read from
-    // settings:: here -- same stale-NVS reasoning as every other Lite
-    // strip in this project (GeneralSettingsScreen's orientation_,
-    // SecuritySettingsScreen's pin_entry_dial_mode_): a device that
-    // was Full with this enabled, then reflashed to Lite, would
-    // otherwise read a stale true straight out of still-present NVS.
-    // save() below writes this same member back unconditionally (not
-    // itself behind #if) -- always false in Lite -- so the first save
-    // on a Lite build corrects any stale stored value too. Unlike
-    // those other two screens, the ROW ITSELF stays -- see
-    // render_rows()/activate()'s own comments for why this one
-    // screen's Row enum/ROW_COUNT are NOT reordered/shrunk the same
-    // way.
     std::strncpy(secret_word_, settings::all().security.secret_word, sizeof(secret_word_) - 1);
 
     build_rows(content_parent_);
@@ -90,11 +159,15 @@ void WifiSettingsScreen::build_rows(lv_obj_t* parent)
         // against. A row that fits just sits still, same as before.
         lv_obj_set_width(label, LV_PCT(96));
         lv_label_set_long_mode(label, LV_LABEL_LONG_SCROLL);
-        // SecretWord and Save (i >= 6) get pushed down one extra
-        // ROW_SPACING to make room for status_label_'s own dedicated
-        // slot right after CaptivePortal -- see status_label_'s own
-        // comment just below for why it moved here instead of staying
-        // pinned to the bottom of the screen.
+        // SecretWord and Save (everything from Row::SecretWord on) get
+        // pushed down one extra ROW_SPACING to make room for
+        // status_label_'s own dedicated slot right before SecretWord
+        // (i.e. right after the AP Password row) -- see status_label_'s
+        // own comment just below for why it moved here instead of
+        // staying pinned to the bottom of the screen. Keyed to
+        // Row::SecretWord's ordinal, not a literal row number, so it
+        // keeps working when rows are added or removed before it (the
+        // CaptivePortal row used to sit here).
         const lv_coord_t extra_offset = (i >= static_cast<size_t>(Row::SecretWord)) ? ROW_SPACING : 0;
         lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4,
                      ROW_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i) + extra_offset);
@@ -112,12 +185,12 @@ void WifiSettingsScreen::build_rows(lv_obj_t* parent)
     lv_obj_set_width(status_label_, LV_PCT(96));
     lv_label_set_long_mode(status_label_, LV_LABEL_LONG_SCROLL);
     // Inline in the scrolling row sequence now (its own dedicated slot
-    // between CaptivePortal and SecretWord), NOT pinned to the bottom
+    // between AP Password and SecretWord), NOT pinned to the bottom
     // of the screen -- a fixed-bottom position used to sit UNDER
     // whichever row the scroll-to-view below happened to bring into
     // that same physical spot (confirmed on real hardware: this
     // status text, which can run long -- AP mode shows the IP address
-    // and client count -- visibly overlapped the Captive Portal row).
+    // and client count -- visibly overlapped the row above it).
     // Scrolling together with the rest of the content means it can
     // never land on top of a row again, regardless of which one is
     // selected.
@@ -130,10 +203,11 @@ void WifiSettingsScreen::build_rows(lv_obj_t* parent)
 
 const char* WifiSettingsScreen::mode_label() const
 {
-    switch (wifi_mode_) {
-        case settings::WifiMode::Disabled:    return i18n::tr(i18n::Key::ModeDisabled);
-        case settings::WifiMode::Station:     return i18n::tr(i18n::Key::ModeStation);
-        case settings::WifiMode::AccessPoint: return i18n::tr(i18n::Key::ModeAccessPoint);
+    switch (choice_from(wifi_mode_, captive_portal_enabled_)) {
+        case ModeChoice::Disabled:           return i18n::tr(i18n::Key::ModeDisabled);
+        case ModeChoice::AccessPoint:        return i18n::tr(i18n::Key::ModeAccessPoint);
+        case ModeChoice::AccessPointCaptive: return i18n::tr(i18n::Key::ModeAccessPointCaptive);
+        case ModeChoice::Station:            return i18n::tr(i18n::Key::ModeStation);
     }
     return "";
 }
@@ -204,31 +278,6 @@ void WifiSettingsScreen::render_rows()
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::ApPasswordRowFmt), prefix,
                                        ap_password_[0] == '\0' ? i18n::tr(i18n::Key::OpenValue) : "********");
                 break;
-            case Row::CaptivePortal:
-                // Row::CaptivePortal is NOT reordered/removed in Lite
-                // the way other screens' Lite-stripped rows are
-                // (compare GeneralSettingsScreen::Orientation,
-                // SecuritySettingsScreen::PinEntryStyle) -- this
-                // screen's status_label_ position is calculated
-                // relative to Row::SecretWord's own ordinal (see
-                // build_rows() above), and this row sitting
-                // immediately before SecretWord is load-bearing for
-                // that math, confirmed on real hardware as a real
-                // positioning bug once already (status_label_
-                // overlapping a row) before that relative-offset
-                // approach was added. Lower-risk to keep this row's
-                // slot/position exactly as-is and just make its VALUE
-                // permanently off and non-interactive in Lite (see
-                // activate() below) than to touch the layout math
-                // again for a screen with that specific history.
-#if CONFIG_KEYKEEPER_LITE
-                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::CaptivePortalRowFmt), prefix,
-                                       i18n::tr(i18n::Key::Off));
-#else
-                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::CaptivePortalRowFmt), prefix,
-                                       captive_portal_enabled_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
-#endif
-                break;
             case Row::SecretWord:
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SecretWordRowFmt), prefix,
                                        secret_word_[0] == '\0' ? i18n::tr(i18n::Key::DisabledValue) : secret_word_);
@@ -268,16 +317,16 @@ void WifiSettingsScreen::adjust_value(int32_t delta)
         return;
     }
 
-    // Cycle Disabled -> Station -> AccessPoint -> Disabled ...
-    int value = static_cast<int>(wifi_mode_) + delta;
-    constexpr int MODE_COUNT = 3;
-    if (value < 0) {
-        value = MODE_COUNT - 1;
+    // Disabled -> Access Point -> Access Point + CP -> Station -> Disabled
+    // (Lite: no "+ CP" step) -- see ModeChoice/MODE_CYCLE above.
+    int index = cycle_index(choice_from(wifi_mode_, captive_portal_enabled_)) + delta;
+    if (index < 0) {
+        index = MODE_CYCLE_COUNT - 1;
     }
-    if (value >= MODE_COUNT) {
-        value = 0;
+    if (index >= MODE_CYCLE_COUNT) {
+        index = 0;
     }
-    wifi_mode_ = static_cast<settings::WifiMode>(value);
+    apply_choice(MODE_CYCLE[index], wifi_mode_, captive_portal_enabled_);
     render_rows();
 }
 
@@ -294,21 +343,6 @@ void WifiSettingsScreen::activate()
         render_rows();
         return;
     }
-    if (row == Row::CaptivePortal) {
-#if !CONFIG_KEYKEEPER_LITE
-        captive_portal_enabled_ = !captive_portal_enabled_;
-        render_rows();
-#endif
-        // In Lite, OkShort on this row is deliberately a no-op --
-        // captive_portal_enabled_ stays permanently false (never read
-        // from settings:: to begin with, see initialize()'s own
-        // comment), matching render_rows()'s own Lite branch always
-        // showing "Off". The row stays visible and selectable (see
-        // that comment for why it isn't removed outright), just
-        // inert.
-        return;
-    }
-
     enter_edit_text(row);
 }
 
