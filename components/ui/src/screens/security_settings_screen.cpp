@@ -294,6 +294,25 @@ void SecuritySettingsScreen::adjust_value(int32_t delta)
     render_rows();
 }
 
+void SecuritySettingsScreen::begin_adjust()
+{
+    adjust_snapshot_ = {auto_lock_timeout_s_, web_ui_view_accounts_, pin_entry_dial_mode_, dial_last_digit_reverses_};
+    mode_ = Mode::Adjust;
+    render_rows();
+}
+
+void SecuritySettingsScreen::end_adjust(bool commit)
+{
+    if (!commit) {
+        auto_lock_timeout_s_ = adjust_snapshot_.auto_lock_timeout_s;
+        web_ui_view_accounts_ = adjust_snapshot_.web_ui_view_accounts;
+        pin_entry_dial_mode_ = adjust_snapshot_.pin_entry_dial_mode;
+        dial_last_digit_reverses_ = adjust_snapshot_.dial_last_digit_reverses;
+    }
+    mode_ = Mode::Browse;
+    render_rows();
+}
+
 void SecuritySettingsScreen::activate()
 {
     const auto row = static_cast<Row>(selected_row_);
@@ -321,8 +340,7 @@ void SecuritySettingsScreen::activate()
         return;
     }
 
-    mode_ = Mode::Adjust;
-    render_rows();
+    begin_adjust();
 }
 
 void SecuritySettingsScreen::save()
@@ -851,9 +869,10 @@ bool SecuritySettingsScreen::on_input(InputAction action)
                 adjust_value(+1);
                 return true;
             case InputAction::OkShort:
+                end_adjust(true);
+                return true;
             case InputAction::BackShort:
-                mode_ = Mode::Browse;
-                render_rows();
+                end_adjust(false);
                 return true;
             default:
                 return false;

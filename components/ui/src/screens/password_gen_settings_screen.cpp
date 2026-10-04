@@ -166,6 +166,26 @@ void PasswordGenSettingsScreen::adjust_value(int32_t delta)
     render_rows();
 }
 
+void PasswordGenSettingsScreen::begin_adjust()
+{
+    adjust_snapshot_ = {length_, uppercase_, lowercase_, digits_, symbols_};
+    mode_ = Mode::Adjust;
+    render_rows();
+}
+
+void PasswordGenSettingsScreen::end_adjust(bool commit)
+{
+    if (!commit) {
+        length_ = adjust_snapshot_.length;
+        uppercase_ = adjust_snapshot_.uppercase;
+        lowercase_ = adjust_snapshot_.lowercase;
+        digits_ = adjust_snapshot_.digits;
+        symbols_ = adjust_snapshot_.symbols;
+    }
+    mode_ = Mode::Browse;
+    render_rows();
+}
+
 void PasswordGenSettingsScreen::activate()
 {
     if (static_cast<Row>(selected_row_) == Row::Save) {
@@ -178,8 +198,7 @@ void PasswordGenSettingsScreen::activate()
         return;
     }
 
-    mode_ = Mode::Adjust;
-    render_rows();
+    begin_adjust();
 }
 
 void PasswordGenSettingsScreen::generate_and_type()
@@ -240,9 +259,10 @@ bool PasswordGenSettingsScreen::on_input(InputAction action)
                 adjust_value(+1);
                 return true;
             case InputAction::OkShort:
+                end_adjust(true);
+                return true;
             case InputAction::BackShort:
-                mode_ = Mode::Browse;
-                render_rows();
+                end_adjust(false);
                 return true;
             default:
                 return false;

@@ -330,6 +330,23 @@ void WifiSettingsScreen::adjust_value(int32_t delta)
     render_rows();
 }
 
+void WifiSettingsScreen::begin_adjust()
+{
+    adjust_snapshot_ = {wifi_mode_, captive_portal_enabled_};
+    mode_ = Mode::Adjust;
+    render_rows();
+}
+
+void WifiSettingsScreen::end_adjust(bool commit)
+{
+    if (!commit) {
+        wifi_mode_ = adjust_snapshot_.wifi_mode;
+        captive_portal_enabled_ = adjust_snapshot_.captive_portal_enabled;
+    }
+    mode_ = Mode::Browse;
+    render_rows();
+}
+
 void WifiSettingsScreen::activate()
 {
     const auto row = static_cast<Row>(selected_row_);
@@ -339,8 +356,7 @@ void WifiSettingsScreen::activate()
         return;
     }
     if (row == Row::Mode) {
-        mode_ = Mode::Adjust;
-        render_rows();
+        begin_adjust();
         return;
     }
     enter_edit_text(row);
@@ -507,9 +523,10 @@ bool WifiSettingsScreen::on_input(InputAction action)
                 adjust_value(+1);
                 return true;
             case InputAction::OkShort:
+                end_adjust(true);
+                return true;
             case InputAction::BackShort:
-                mode_ = Mode::Browse;
-                render_rows();
+                end_adjust(false);
                 return true;
             default:
                 return false;

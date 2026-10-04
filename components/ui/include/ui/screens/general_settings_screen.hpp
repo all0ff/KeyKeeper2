@@ -20,8 +20,10 @@
 // layout.
 //
 // Rotate moves the row selection; OkShort enters "adjust" mode for a
-// row (rotate now changes ITS value instead), OkShort/BackShort exits
-// adjust mode back to the row list. Brightness is applied live via
+// row (rotate now changes ITS value instead); OkShort CONFIRMS the new
+// value and returns to the row list, BackShort CANCELS -- the row goes
+// back to what it was when OK was pressed (see begin_adjust()/
+// end_adjust()). Brightness is applied live via
 // display::set_brightness() as you adjust it (so you can see the
 // effect immediately) and reverted to the value that was active on
 // entry if you leave without saving.
@@ -80,6 +82,26 @@ private:
     void render();
     void move_selection(int32_t delta);
     void adjust_value(int32_t delta);
+
+    // Adjust mode is "OK confirms, BACK cancels": begin_adjust()
+    // snapshots every value adjust_value() can change, end_adjust(true)
+    // keeps whatever the encoder left them at, end_adjust(false) puts
+    // them back exactly as they were when this row was entered. Only
+    // THIS row's pending change is discarded -- earlier confirmed
+    // changes on other rows stay in the working copy until the
+    // screen's own Save (or leaving it, which discards them all).
+    void begin_adjust();
+    void end_adjust(bool commit);
+
+    struct AdjustSnapshot
+    {
+        settings::Language language;
+        settings::Theme theme;
+        settings::Orientation orientation;
+        uint8_t brightness;
+        uint32_t screen_timeout_s;
+    };
+    AdjustSnapshot adjust_snapshot_{};
     void activate();
     void save();
 

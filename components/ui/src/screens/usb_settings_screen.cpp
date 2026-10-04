@@ -224,6 +224,26 @@ void UsbSettingsScreen::adjust_value(int32_t delta)
     render_rows();
 }
 
+void UsbSettingsScreen::begin_adjust()
+{
+    adjust_snapshot_ = {delay_before_typing_ms_, delay_between_chars_ms_, delay_between_fields_ms_, typing_order_, cyrillic_auto_switch_layout_};
+    mode_ = Mode::Adjust;
+    render_rows();
+}
+
+void UsbSettingsScreen::end_adjust(bool commit)
+{
+    if (!commit) {
+        delay_before_typing_ms_ = adjust_snapshot_.delay_before_typing_ms;
+        delay_between_chars_ms_ = adjust_snapshot_.delay_between_chars_ms;
+        delay_between_fields_ms_ = adjust_snapshot_.delay_between_fields_ms;
+        typing_order_ = adjust_snapshot_.typing_order;
+        cyrillic_auto_switch_layout_ = adjust_snapshot_.cyrillic_auto_switch_layout;
+    }
+    mode_ = Mode::Browse;
+    render_rows();
+}
+
 void UsbSettingsScreen::activate()
 {
     const auto row = static_cast<Row>(selected_row_);
@@ -237,8 +257,7 @@ void UsbSettingsScreen::activate()
         return;
     }
 
-    mode_ = Mode::Adjust;
-    render_rows();
+    begin_adjust();
 }
 
 void UsbSettingsScreen::enter_edit_password()
@@ -333,9 +352,10 @@ bool UsbSettingsScreen::on_input(InputAction action)
                 adjust_value(+1);
                 return true;
             case InputAction::OkShort:
+                end_adjust(true);
+                return true;
             case InputAction::BackShort:
-                mode_ = Mode::Browse;
-                render_rows();
+                end_adjust(false);
                 return true;
             default:
                 return false;

@@ -239,14 +239,38 @@ void GeneralSettingsScreen::adjust_value(int32_t delta)
     render();
 }
 
+void GeneralSettingsScreen::begin_adjust()
+{
+    adjust_snapshot_ = {language_, theme_, orientation_, brightness_, screen_timeout_s_};
+    mode_ = Mode::Adjust;
+    render();
+}
+
+void GeneralSettingsScreen::end_adjust(bool commit)
+{
+    if (!commit) {
+        language_ = adjust_snapshot_.language;
+        theme_ = adjust_snapshot_.theme;
+        orientation_ = adjust_snapshot_.orientation;
+        brightness_ = adjust_snapshot_.brightness;
+        screen_timeout_s_ = adjust_snapshot_.screen_timeout_s;
+        // Brightness is previewed LIVE while adjusting (see
+        // adjust_value()), so restoring brightness_ alone would leave the
+        // backlight at the cancelled value until the screen was left --
+        // put the real backlight back too.
+        display::set_brightness(brightness_);
+    }
+    mode_ = Mode::Browse;
+    render();
+}
+
 void GeneralSettingsScreen::activate()
 {
     if (static_cast<Row>(selected_row_) == Row::Save) {
         save();
         return;
     }
-    mode_ = Mode::Adjust;
-    render();
+    begin_adjust();
 }
 
 void GeneralSettingsScreen::save()
@@ -300,9 +324,10 @@ bool GeneralSettingsScreen::on_input(InputAction action)
                 adjust_value(+1);
                 return true;
             case InputAction::OkShort:
+                end_adjust(true);
+                return true;
             case InputAction::BackShort:
-                mode_ = Mode::Browse;
-                render();
+                end_adjust(false);
                 return true;
             default:
                 return false;

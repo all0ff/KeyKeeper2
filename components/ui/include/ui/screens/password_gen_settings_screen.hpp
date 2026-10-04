@@ -61,6 +61,26 @@ private:
     void render_rows();
     void move_selection(int32_t delta);
     void adjust_value(int32_t delta);
+
+    // Adjust mode is "OK confirms, BACK cancels": begin_adjust()
+    // snapshots every value adjust_value() can change, end_adjust(true)
+    // keeps whatever the encoder left them at, end_adjust(false) puts
+    // them back exactly as they were when this row was entered. Only
+    // THIS row's pending change is discarded -- earlier confirmed
+    // changes on other rows stay in the working copy until the
+    // screen's own Save (or leaving it, which discards them all).
+    void begin_adjust();
+    void end_adjust(bool commit);
+
+    struct AdjustSnapshot
+    {
+        uint8_t length;
+        bool uppercase;
+        bool lowercase;
+        bool digits;
+        bool symbols;
+    };
+    AdjustSnapshot adjust_snapshot_{};
     void activate();
     void save();
     void generate_and_type();
