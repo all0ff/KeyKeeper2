@@ -309,8 +309,13 @@ R"HTML(.</div>
     <div class="field-label">Mode</div>
     <select id="set-wifi-mode">
       <option value="disabled">Disabled</option>
-      <option value="station">Station</option>
       <option value="access_point">Access Point</option>
+)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML(      <option value="access_point_captive">Access Point + CP</option>
+)HTML"
+#endif
+R"HTML(      <option value="station">Station</option>
     </select>
     <div class="field-label">Station SSID</div>
     <input id="set-sta-ssid" type="text">
@@ -320,15 +325,7 @@ R"HTML(.</div>
     <input id="set-ap-ssid" type="text">
     <div class="field-label">AP Password</div>
     <input id="set-ap-password" type="text">
-)HTML"
-#if !CONFIG_KEYKEEPER_LITE
-R"HTML(    <label class="checkbox" style="margin-top:12px">
-      <input id="set-captive-portal" type="checkbox">
-      Captive Portal (Access Point mode only)
-    </label>
-)HTML"
-#endif
-R"HTML(    <div id="set-wifi-msg"></div>
+    <div id="set-wifi-msg"></div>
     <button onclick="saveSettings('wifi')" style="margin-top:8px">Save WiFi</button>
   </div>
 
@@ -506,9 +503,8 @@ R"HTML(.</li>
         IP.</p>
 )HTML"
 #if !CONFIG_KEYKEEPER_LITE
-R"HTML(      <p><strong>Captive Portal</strong> (on the device: Settings &rarr; WiFi &rarr; Mode &rarr;
-        <strong>Access Point + CP</strong>; on this page: the Captive Portal checkbox under WiFi settings &mdash;
-        Access Point mode only) makes a phone or laptop
+R"HTML(      <p><strong>Captive Portal</strong> (choose <strong>Access Point + CP</strong> as the WiFi Mode &mdash; on the device under Settings &rarr; WiFi
+        &rarr; Mode, or on this page under Settings &rarr; WiFi) makes a phone or laptop
         that just joined the device's network pop this page up automatically &mdash; the same "tap to sign in"
         prompt public WiFi networks show &mdash; instead of needing to type the device's IP address by hand. Works
         by answering every DNS lookup with the device's own address and redirecting any plain HTTP request here;
@@ -682,9 +678,8 @@ R"HTML(.</li>
         случайного попадания на страницу перебором IP.</p>
 )HTML"
 #if !CONFIG_KEYKEEPER_LITE
-R"HTML(      <p><strong>Captive Portal</strong> (на устройстве: Настройки &rarr; WiFi &rarr; Режим &rarr;
-        <strong>Точка доступа + CP</strong>; на этой странице: флажок Captive Portal в настройках WiFi &mdash;
-        только в режиме Точки доступа) делает так, что
+R"HTML(      <p><strong>Captive Portal</strong> (выберите режим WiFi <strong>Точка доступа + CP</strong> &mdash; на устройстве в Настройки &rarr; WiFi
+        &rarr; Режим, или на этой странице в Настройки &rarr; WiFi) делает так, что
         телефон или ноутбук, только что подключившийся к сети устройства, сам показывает эту страницу — то же самое
         "нажмите, чтобы войти", что показывают публичные WiFi-сети — вместо того чтобы вручную вводить IP-адрес
         устройства. Работает за счёт того, что отвечает на любой DNS-запрос собственным адресом устройства и
@@ -1322,17 +1317,20 @@ async function openSettings() {
   document.getElementById('set-auto-lock-enabled').checked = !!d.security.auto_lock_enabled;
   document.getElementById('set-auto-lock-timeout').value = d.security.auto_lock_timeout_s;
 
-  document.getElementById('set-wifi-mode').value = d.wifi.mode;
-  document.getElementById('set-sta-ssid').value = d.wifi.sta_ssid;
+)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML(  document.getElementById('set-wifi-mode').value =
+    (d.wifi.mode === 'access_point' && d.wifi.captive_portal_enabled) ? 'access_point_captive' : d.wifi.mode;
+)HTML"
+#else
+R"HTML(  document.getElementById('set-wifi-mode').value = d.wifi.mode;
+)HTML"
+#endif
+R"HTML(  document.getElementById('set-sta-ssid').value = d.wifi.sta_ssid;
   document.getElementById('set-sta-password').value = d.wifi.sta_password;
   document.getElementById('set-ap-ssid').value = d.wifi.ap_ssid;
   document.getElementById('set-ap-password').value = d.wifi.ap_password;
-)HTML"
-#if !CONFIG_KEYKEEPER_LITE
-R"HTML(  document.getElementById('set-captive-portal').checked = !!d.wifi.captive_portal_enabled;
-)HTML"
-#endif
-R"HTML(
+
   ['general', 'usb', 'security', 'wifi'].forEach(s => {
     document.getElementById('set-' + s + '-msg').textContent = '';
   });
@@ -1361,20 +1359,35 @@ async function saveSettings(section) {
       auto_lock_timeout_s: parseInt(document.getElementById('set-auto-lock-timeout').value, 10) || 0
     };
   } else if (section === 'wifi') {
+)HTML"
+#if !CONFIG_KEYKEEPER_LITE
+R"HTML(    const wifiChoice = document.getElementById('set-wifi-mode').value;
     payload = {
+      mode: wifiChoice === 'access_point_captive' ? 'access_point' : wifiChoice,
+      sta_ssid: document.getElementById('set-sta-ssid').value,
+      sta_password: document.getElementById('set-sta-password').value,
+      ap_ssid: document.getElementById('set-ap-ssid').value,
+      ap_password: document.getElementById('set-ap-password').value
+    };
+    // Captive portal only means anything in Access Point mode, so only the two
+    // AP choices set it; Disabled/Station leave it out and the device keeps
+    // whatever it had stored.
+    if (wifiChoice === 'access_point') payload.captive_portal_enabled = false;
+    if (wifiChoice === 'access_point_captive') payload.captive_portal_enabled = true;
+  }
+)HTML"
+#else
+R"HTML(    payload = {
       mode: document.getElementById('set-wifi-mode').value,
       sta_ssid: document.getElementById('set-sta-ssid').value,
       sta_password: document.getElementById('set-sta-password').value,
       ap_ssid: document.getElementById('set-ap-ssid').value,
-      ap_password: document.getElementById('set-ap-password').value)HTML"
-#if !CONFIG_KEYKEEPER_LITE
-R"HTML(,
-      captive_portal_enabled: document.getElementById('set-captive-portal').checked)HTML"
-#endif
-R"HTML(
+      ap_password: document.getElementById('set-ap-password').value
     };
   }
-
+)HTML"
+#endif
+R"HTML(
   msg.style.color = '#000';
   msg.textContent = t('Saving...');
 
