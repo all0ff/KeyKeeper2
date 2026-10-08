@@ -25,13 +25,19 @@
 #include "display/lvgl_port.hpp"
 #include "kkproto/crypto_port.hpp"
 #include "kkproto/link.hpp"
+#include "usb/dongle_sink.hpp"
+#include "usb/plan_wire.hpp"
+#include "usb/typing_plan.hpp"
+#include "usb/wire_executor.hpp"
 
+#include "sdkconfig.h"
 #include "actions.hpp"
 #include "button.hpp"
 #include "link_frame.hpp"
 #include "status_model.hpp"
 #include "store.hpp"
 #include "ui.hpp"
+#include "usb_dev.hpp"
 
 namespace {
 
@@ -79,13 +85,70 @@ void hex8(const uint8_t* p, char out[17])
 
 // ---------------------------------------------------------------------------------------------
 
-class App : public kk::link::Io {
+// The dongle's "keyboard" for now: it logs the keys and waits the real time. The USB HID keyboard
+// replaces it later; everything above (decoding, the executor rules, the Result) stays.
+class LogKeyIo final : public usb::KeyIo {
+public:
+    bool ready() override { return true; }
+    bool send_key(uint8_t keycode, uint8_t modifier, uint32_t hold_ms) override
+    {
+        ESP_LOGI(TAG, "KEY mods=%02x usage=%02x hold=%ums", modifier, keycode, static_cast<unsigned>(hold_ms));
+        ++keys;
+        return true;
+    }
+    void delay_ms(uint32_t ms) override
+    {
+        const TickType_t t = pdMS_TO_TICKS(ms);
+        vTaskDelay(t > 0 ? t : 1);
+    }
+    const char* last_error() const override { return ""; }
+    unsigned keys = 0;
+};
+
+#if CONFIG_DONGLE_USB_HID
+// The real keyboard: presses go to the PC through TinyUSB (usb_dev.cpp).
+class HidKeyIo final : public usb::KeyIo {
+public:
+    bool ready() override { return dongle::usbdev::mounted(); }
+    bool send_key(uint8_t keycode, uint8_t modifier, uint32_t hold_ms) override
+    {
+        ESP_LOGI(TAG, "KEY mods=%02x usage=%02x hold=%ums", modifier, keycode, static_cast<unsigned>(hold_ms));
+        if (!dongle::usbdev::send_key(keycode, modifier, hold_ms)) {
+            return false;
+        }
+        ++keys;
+        return true;
+    }
+    void delay_ms(uint32_t ms) override
+    {
+        const TickType_t t = pdMS_TO_TICKS(ms);
+        vTaskDelay(t > 0 ? t : 1);
+    }
+    const char* last_error() const override { return dongle::usbdev::last_error(); }
+    unsigned keys = 0;
+};
+using DongleKeyIo = HidKeyIo;
+#else
+using DongleKeyIo = LogKeyIo;
+#endif
+
+class App : public kk::link::Io, public usb::DongleChannel {
 public:
     kk::link::Endpoint* ep = nullptr;
     dongle::Notice notice = dongle::Notice::None;
     uint32_t notice_until = 0;
     uint32_t window_end = 0;
     bool connect_after_pairing = false;
+    char text[48] = {};   // Notice::Text
+    bool text_ok = true;
+
+    // The dongle: executes TypeKeys. The vault simulator: waits for the Result of its last TypeKeys.
+    DongleKeyIo keys;
+    usb::WireExecutor exec;
+    bool have_result = false;
+    kk::msg::Result result;
+    uint16_t sent_seq = 0;
+    void (*service)(TickType_t) = nullptr; // runs the link for a while (set in app_main)
 
     // kk::link::Io
     void send(const uint8_t* data, size_t n) override
@@ -97,6 +160,54 @@ public:
         if (m != 0) {
             uart_write_bytes(UART, s_frame, m);
         }
+    }
+
+    void message(const kk::msg::Header& h, const uint8_t* body) override
+    {
+        if (ROLE == kk::link::Role::Dongle && h.type == kk::msg::Type::TypeKeys) {
+            const unsigned before = keys.keys;
+            const kk::msg::Result r = usb::execute_type_keys(exec, body, h.len, h.seq, keys);
+            uint8_t out[4];
+            if (kk::msg::encode_result(r, out)) {
+                ep->send_message(kk::msg::Type::Result, 0, out, sizeof out);
+            }
+            ESP_LOGI(TAG, "TypeKeys: code %u, %u of the events done, %u keys", static_cast<unsigned>(r.code),
+                     static_cast<unsigned>(r.done_events), keys.keys - before);
+            std::snprintf(text, sizeof text, "Typed %u keys", keys.keys - before);
+            text_ok = r.code == kk::msg::ResultCode::Ok;
+            set_notice(dongle::Notice::Text);
+        } else if (ROLE == kk::link::Role::Vault && h.type == kk::msg::Type::Result) {
+            kk::msg::Result r;
+            if (kk::msg::decode_result(body, h.len, &r)) {
+                result = r;
+                have_result = true;
+            }
+        }
+    }
+
+    // usb::DongleChannel (the vault simulator types through the dongle)
+    bool linked() override { return ep->state() == kk::link::State::Linked; }
+    bool usb_ready() override { return ep->peer_usb_mounted(); }
+    bool type_keys(const uint8_t* body, size_t n, kk::msg::Result* r, uint32_t timeout_ms) override
+    {
+        have_result = false;
+        if (!ep->send_message(kk::msg::Type::TypeKeys, 0, body, n, &sent_seq)) {
+            return false;
+        }
+        const uint32_t start = now_ms();
+        while (static_cast<int32_t>(now_ms() - start) < static_cast<int32_t>(timeout_ms)) {
+            if (service != nullptr) {
+                service(POLL_TICKS);
+            }
+            if (have_result && result.seq == sent_seq) {
+                *r = result;
+                return true;
+            }
+            if (!linked()) {
+                return false;
+            }
+        }
+        return false;
     }
 
     void event(kk::link::Event e) override
@@ -129,6 +240,11 @@ public:
         case Event::Linked:
             notice = dongle::Notice::None;
             break;
+        case Event::LinkLost:
+            if (ROLE == kk::link::Role::Dongle && exec.close_run(keys)) {
+                ESP_LOGW(TAG, "link lost while a Cyrillic run was open: layout switched back");
+            }
+            break;
         default: break;
         }
     }
@@ -139,6 +255,27 @@ public:
         notice_until = now_ms() + NOTICE_MS;
     }
 };
+
+uartlink::Parser s_parser;
+App* s_app = nullptr;
+
+// Runs the link for up to `wait` ticks: reads the UART, hands complete frames to the endpoint, ticks it.
+// The main loop calls it; so does the vault simulator while it waits for the dongle's Result.
+void service_link(TickType_t wait)
+{
+    kk::link::Endpoint& ep = *s_app->ep;
+    const int n = uart_read_bytes(UART, s_rx, sizeof s_rx, wait);
+    const uint32_t now = now_ms();
+    if (n > 0) {
+        s_parser.feed(s_rx, static_cast<size_t>(n), [&](const uint8_t* payload, size_t len) {
+            if (ep.state() != kk::link::State::Linked) {
+                ESP_LOGI(TAG, "rx %u B (state %s)", static_cast<unsigned>(len), kk::link::state_name(ep.state()));
+            }
+            ep.on_frame(payload, len, now);
+        });
+    }
+    ep.tick(now_ms());
+}
 
 bool init_uart()
 {
@@ -247,6 +384,20 @@ extern "C" void app_main(void)
     params.handshake_timeout_ms = 8000;
     static kk::link::Endpoint ep(ROLE, app, key, params);
     app.ep = &ep;
+    s_app = &app;
+    app.service = &service_link;
+#if CONFIG_DONGLE_USB_HID
+    if (ROLE == kk::link::Role::Dongle) {
+        if (!dongle::usbdev::init()) {
+            ESP_LOGE(TAG, "USB init failed: %s", dongle::usbdev::last_error());
+        }
+        ep.set_usb_mounted(false); // until the PC enumerates us; tracked in the loop below
+    } else {
+        ep.set_usb_mounted(true);
+    }
+#else
+    ep.set_usb_mounted(true); // the simulator's "keyboard" is always there
+#endif
     ep.set_device_info(FW_MAJOR, FW_MINOR);
     if (have_peer) {
         ep.set_trusted_peer(peer);
@@ -260,23 +411,31 @@ extern "C" void app_main(void)
         ep.connect(now_ms());
     }
 
-    static uartlink::Parser parser;
     static dongle::ButtonDetector button(LONG_PRESS_MS);
     ESP_LOGI(TAG, "ready");
 
     uint32_t last_status_log = now_ms();
+#if CONFIG_DONGLE_USB_HID
+    bool usb_was_mounted = false;
+#endif
     for (;;) {
-        const int n = uart_read_bytes(UART, s_rx, sizeof s_rx, POLL_TICKS);
+        service_link(POLL_TICKS);
         const uint32_t now = now_ms();
-        if (n > 0) {
-            parser.feed(s_rx, static_cast<size_t>(n), [&](const uint8_t* payload, size_t len) {
-                if (ep.state() != kk::link::State::Linked) {
-                    ESP_LOGI(TAG, "rx %u B (state %s)", static_cast<unsigned>(len), kk::link::state_name(ep.state()));
+#if CONFIG_DONGLE_USB_HID
+        if (ROLE == kk::link::Role::Dongle) {
+            dongle::usbdev::pump();
+            const bool m = dongle::usbdev::mounted();
+            if (m != usb_was_mounted) {
+                usb_was_mounted = m;
+                ESP_LOGI(TAG, "USB %s", m ? "connected to the PC" : "disconnected");
+                ep.set_usb_mounted(m);
+                if (ep.state() == kk::link::State::Linked) {
+                    const uint8_t flags = m ? (kk::msg::kStateUsbMounted | kk::msg::kStateHidReady) : 0;
+                    ep.send_message(kk::msg::Type::State, 0, &flags, 1);
                 }
-                ep.on_frame(payload, len, now);
-            });
+            }
         }
-        ep.tick(now);
+#endif
 
         if (app.connect_after_pairing) {
             app.connect_after_pairing = false;
@@ -323,6 +482,24 @@ extern "C" void app_main(void)
             ESP_LOGI(TAG, "code rejected on this device");
             ep.reject_pairing();
             break;
+        case dongle::Action::TypeTest: {
+            usb::PlanOptions opt;
+            opt.auto_switch_layout = true;
+            const usb::TypingPlan plan = usb::plan_events("Test 123 \xD0\x9F\xD1\x80\xD0\xBE\xD0\xB2\xD0\xB5\xD1\x80\xD0\xBA\xD0\xB0!", opt);
+            usb::DongleSink sink(app);
+            ESP_LOGI(TAG, "typing a test text through the dongle");
+            const usb::RunResult rr = sink.play(plan);
+            ESP_LOGI(TAG, "test text: %s, %u characters%s%s", rr.ok ? "ok" : "FAILED", static_cast<unsigned>(rr.chars_sent),
+                     rr.error != nullptr ? ", note: " : "", rr.error != nullptr ? rr.error : "");
+            if (rr.ok) {
+                std::snprintf(app.text, sizeof app.text, "Typed %u characters", static_cast<unsigned>(rr.chars_sent));
+            } else {
+                std::snprintf(app.text, sizeof app.text, "%s", rr.error != nullptr ? rr.error : "Typing failed");
+            }
+            app.text_ok = rr.ok;
+            app.set_notice(dongle::Notice::Text);
+            break;
+        }
         case dongle::Action::Forget:
             ESP_LOGI(TAG, "forgetting the pairing");
             ep.forget_peer();
@@ -345,7 +522,14 @@ extern "C" void app_main(void)
         snap.local_confirmed = ep.local_confirmed();
         snap.remote_confirmed = ep.remote_confirmed();
         snap.notice = app.notice;
+        std::snprintf(snap.text, sizeof snap.text, "%s", app.text);
+        snap.text_ok = app.text_ok;
         snap.long_s = LONG_PRESS_MS / 1000;
+#if CONFIG_DONGLE_USB_HID
+        if (ROLE == kk::link::Role::Dongle) {
+            snap.usb = dongle::usbdev::mounted() ? 1 : 0;
+        }
+#endif
         {
             dongle::Situation held = sit;
             const uint32_t held_s = button.held_ms(now) / 1000;
@@ -359,7 +543,7 @@ extern "C" void app_main(void)
         if (static_cast<int32_t>(now - last_status_log) >= 10000) {
             last_status_log = now;
             ESP_LOGI(TAG, "[%s] link: %" PRIu32 " frames ok, %" PRIu32 " bad CRC, %" PRIu32 " junk bytes",
-                     kk::link::state_name(ep.state()), parser.frames_ok, parser.bad_crc, parser.junk_bytes);
+                     kk::link::state_name(ep.state()), s_parser.frames_ok, s_parser.bad_crc, s_parser.junk_bytes);
         }
     }
 }

@@ -15,11 +15,12 @@
 //        short press   dongle: open (or close) the pairing window   vault: start a pairing
 //                      only when nothing is connected or being connected
 //        long press    forget the pairing (only if there is one)
+//   vault simulator, Linked: short press types a test text through the dongle
 // =============================================================================
 
 namespace dongle {
 
-enum class Action : uint8_t { None, OpenPairing, CancelPairing, StartPairing, Confirm, Reject, Forget };
+enum class Action : uint8_t { None, OpenPairing, CancelPairing, StartPairing, Confirm, Reject, Forget, TypeTest };
 
 struct Situation {
     kk::link::Role role = kk::link::Role::Dongle;
@@ -47,9 +48,11 @@ inline Action action_for(const Situation& s, Press p)
         if (s.role == Role::Dongle) return s.window_open ? Action::CancelPairing : Action::OpenPairing;
         return Action::StartPairing;
     case State::Connecting:
-    case State::Linked:
         if (p == Press::Long) return s.paired ? Action::Forget : Action::None;
         return Action::None;
+    case State::Linked:
+        if (p == Press::Long) return s.paired ? Action::Forget : Action::None;
+        return s.role == Role::Vault ? Action::TypeTest : Action::None;
     }
     return Action::None;
 }

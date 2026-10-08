@@ -1,0 +1,10 @@
+# Added on top of sdkconfig.defaults to build the DONGLE AS A REAL USB KEYBOARD.
+# The board's USB port is then owned by TinyUSB: the PC sees a keyboard plus a serial port (the log).
+CONFIG_DONGLE_USB_HID=y
+
+# The log goes to the USB serial port (installed by the firmware) and to UART0 (GPIO43/44), not to USB Serial/JTAG.
+CONFIG_ESP_CONSOLE_UART_DEFAULT=y
+
+CONFIG_TINYUSB_CDC_ENABLED=y
+CONFIG_TINYUSB_CDC_COUNT=1
+CONFIG_TINYUSB_HID_COUNT=1

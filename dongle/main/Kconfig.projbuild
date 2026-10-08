@@ -11,6 +11,15 @@ menu "Dongle"
             bool "Vault simulator (for testing the dongle; starts pairings and connects)"
     endchoice
 
+    config DONGLE_USB_HID
+        bool "Dongle: act as a real USB keyboard (USB composite: keyboard + serial port for logs)"
+        depends on DONGLE_ROLE_DONGLE
+        default n
+        help
+            Off: the dongle only logs the keys it would press (and the board's USB port stays the console).
+            On (use sdkconfig.hid): the USB port belongs to TinyUSB. The PC sees a keyboard and a serial port;
+            the log is written to that serial port (and to UART0).
+
     config DONGLE_UART_NUM
         int "UART controller for the link (1 or 2; 0 is the console)"
         range 1 2

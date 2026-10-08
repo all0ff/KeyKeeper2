@@ -127,10 +127,12 @@ void test_actions()
     // a working link: a short press must never disturb it; a long press forgets
     for (Role r : {Role::Dongle, Role::Vault}) {
         for (State st : {State::Connecting, State::Linked}) {
-            CHECK(act(r, st, true, false, false, Press::Short) == Action::None);
+            const bool test_press = r == Role::Vault && st == State::Linked; // the simulator types a test text
+            CHECK(act(r, st, true, false, false, Press::Short) == (test_press ? Action::TypeTest : Action::None));
             CHECK(act(r, st, true, false, false, Press::Long) == Action::Forget);
         }
     }
+    CHECK(act(Role::Dongle, State::Linked, true, false, false, Press::Short) == Action::None);
 }
 
 bool all_fit(const Screen& s)
@@ -190,6 +192,35 @@ void test_screens()
     CHECK(std::strcmp(o.title, "Vault (simulator)") == 0);
     s.paired = true;
     CHECK(std::strcmp(describe(s).status, "Paired. Not connected") == 0);
+    // the dongle shows whether a PC is behind its USB port
+    {
+        Snapshot d;
+        d.role = Role::Dongle;
+        d.paired = true;
+        d.state = State::Linked;
+        CHECK(std::strstr(describe(d).hint, "forget pairing") != nullptr); // unknown: the old hint
+        d.usb = 1;
+        CHECK(std::strstr(describe(d).hint, "USB: ready") != nullptr);
+        d.usb = 0;
+        CHECK(std::strstr(describe(d).hint, "USB: no PC") != nullptr);
+        CHECK(std::strlen(describe(d).hint) < 63);
+    }
+    // a free-text notice (typing results) and the simulator's hint
+    s = Snapshot();
+    s.role = Role::Vault;
+    s.paired = true;
+    s.state = State::Linked;
+    CHECK(std::strstr(describe(s).hint, "type test") != nullptr);
+    s.notice = Notice::Text;
+    std::snprintf(s.text, sizeof s.text, "Typed 18 characters");
+    s.text_ok = true;
+    o = describe(s);
+    CHECK(std::strcmp(o.status, "Typed 18 characters") == 0 && o.tone == Tone::Good);
+    s.text_ok = false;
+    CHECK(describe(s).tone == Tone::Bad);
+    s = Snapshot();
+    s.state = State::Linked;
+    CHECK(std::strstr(describe(s).hint, "type test") == nullptr);  // the dongle itself has no test press
     // notices
     s = Snapshot();
     s.notice = Notice::Paired;

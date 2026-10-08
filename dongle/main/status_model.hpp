@@ -16,7 +16,7 @@
 
 namespace dongle {
 
-enum class Notice : uint8_t { None, Paired, Rejected, Failed, WindowClosed, Forgotten };
+enum class Notice : uint8_t { None, Paired, Rejected, Failed, WindowClosed, Forgotten, Text };
 enum class Tone : uint8_t { Normal, Good, Warn, Bad };
 
 struct Snapshot {
@@ -29,6 +29,9 @@ struct Snapshot {
     bool local_confirmed = false;
     bool remote_confirmed = false;
     Notice notice = Notice::None; ///< a short message about what just happened
+    char text[48] = {};           ///< the message for Notice::Text
+    bool text_ok = true;          ///< Notice::Text is good news (green) or bad (red)
+    int usb = -1;                 ///< dongle: -1 not known, 0 not plugged into a PC, 1 plugged
     uint32_t held_s = 0;          ///< how long the button has been held (shown while it is)
     uint32_t long_s = 3;          ///< hold time that counts as a long press
 };
@@ -70,7 +73,11 @@ inline Screen describe(const Snapshot& s)
     switch (s.state) {
     case State::Linked:
         put(o.status, sizeof o.status, "Connected");
-        put(o.hint, sizeof o.hint, "Hold BOOT: forget pairing");
+        if (dongle && s.usb >= 0) {
+            put(o.hint, sizeof o.hint, s.usb > 0 ? "USB: ready   Hold BOOT: forget" : "USB: no PC   Hold BOOT: forget");
+        } else {
+            put(o.hint, sizeof o.hint, dongle ? "Hold BOOT: forget pairing" : "BOOT: type test   Hold: forget");
+        }
         o.tone = Tone::Good;
         break;
     case State::Connecting:
@@ -110,6 +117,7 @@ inline Screen describe(const Snapshot& s)
     case Notice::Failed: put(o.status, sizeof o.status, "No answer. Pairing failed"); o.tone = Tone::Bad; break;
     case Notice::WindowClosed: put(o.status, sizeof o.status, "Pairing time is over"); o.tone = Tone::Bad; break;
     case Notice::Forgotten: put(o.status, sizeof o.status, "Pairing forgotten"); o.tone = Tone::Bad; break;
+    case Notice::Text: put(o.status, sizeof o.status, s.text); o.tone = s.text_ok ? Tone::Good : Tone::Bad; break;
     }
 
     if (s.held_s > 0) {
