@@ -64,4 +64,36 @@ void cyrillic_physical_key(uint32_t codepoint, char& out_physical_key, bool& out
 /// modern Russian alphabet, 0x410-0x44F (А-я) plus Ёё (0x401/0x451).
 bool is_cyrillic(uint32_t codepoint);
 
+// -----------------------------------------------------------------------------
+// ASCII characters while the HOST is on the Russian layout.
+//
+// When Cyrillic is typed WITHOUT the automatic layout switch, the person has put
+// the host on the Russian layout by hand, so EVERY key the device presses is read
+// by that layout -- including the ones for ASCII punctuation. The US key for "."
+// is the Russian "ю"; the Russian "." lives on the key a US keyboard labels "/".
+// This describes, for one ASCII character, how to get it out of the standard
+// Windows Russian layout (ЙЦУКЕН). It is NOT used with the automatic switch (the
+// host is on the US layout when ASCII is typed there) nor for text without Cyrillic.
+//
+// Verified against published descriptions of the layout: digits and "! % * ( ) - _ = +"
+// stay on their US keys; "." and "," share the key labelled "/" ("," with Shift);
+// Shift+2 gives a double quote, Shift+4 ";", Shift+6 ":", Shift+7 "?".
+// NOT verified from a published source (checked on hardware instead): "/" on
+// Shift+"\" and "\" on its own key.
+// The macOS Russian layout is different; this targets Windows, like the Alt+Shift hotkey.
+// -----------------------------------------------------------------------------
+enum class RuAsciiKind : uint8_t {
+    SameKey,     ///< the US key already produces it (digits, "! % * ( ) - _ = + \", space, Tab, Enter)
+    Remapped,    ///< a DIFFERENT key: press physical_key, plus Shift if `shift`
+    Unavailable, ///< no key of the Russian layout produces it (Latin letters, @ # $ ^ & [ ] { } < > | ~ ' `)
+};
+
+struct RuAsciiKey {
+    RuAsciiKind kind;
+    char physical_key; ///< ASCII label of the US key to press (Remapped only)
+    bool shift;        ///< add Shift on top of that key's own state (Remapped only)
+};
+
+RuAsciiKey russian_layout_ascii(char c);
+
 } // namespace usb::cyrillic

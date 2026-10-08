@@ -57,6 +57,20 @@ host's own clipboard).
   UTF-8), and silently was, for a while. Unsupported characters are
   skipped but still **counted** as sent -- that is what makes
   `usb_service.cpp` report "Typed OK" for them, and the split keeps it.
+- **Punctuation on the Russian layout** -- with the automatic layout
+  switch OFF the person puts the host on the Russian layout by hand, so
+  for a text that contains Cyrillic the planner types `. , ? " ; : /` on the
+  keys the standard Windows Russian layout puts them on (the US "." key
+  is "ю" there; the Russian "." is the key a US keyboard labels "/").
+  Digits and `! % * ( ) - _ = +` already share keys. Latin letters and
+  `@ # $ ^ & [ ] { } < > | ~ '` plus the backtick have no key on that layout:
+  they are typed as before, `TypingPlan::unavailable_on_russian_layout` counts
+  them and a warning is logged -- only the automatic switch can type them.
+  With the automatic switch on, or for text without Cyrillic, nothing changes.
+  `PlanOptions::russian_layout_punctuation = false` restores the old behaviour.
+  Not verified from a published source: the slash (typed as Shift plus the
+  backslash key) and the backslash on its own key. The macOS Russian layout
+  differs; this targets Windows.
 - **Plan / execute split** -- `plan_events()` (`typing_plan.hpp`) is a
   pure function from text to a list of `HidEvent` steps (key presses,
   pacing pauses, the optional Alt+Shift layout hotkey); it has no USB,

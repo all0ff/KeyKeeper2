@@ -32,6 +32,18 @@ namespace usb {
 // comment for exactly what it depends on and what happens when that
 // doesn't hold (wrong characters typed, not just missing ones).
 //
+// PUNCTUATION WHILE THE HOST IS ON THE RUSSIAN LAYOUT. Without the automatic
+// layout switch the person puts the host on the Russian layout by hand, so every
+// key this device presses -- ASCII punctuation included -- is read by that
+// layout (the US "." key is the Russian "ю"). For a text that CONTAINS Cyrillic,
+// ". , ? \" ; : /" are therefore typed on the keys the standard Windows Russian
+// layout puts them on (see cyrillic::russian_layout_ascii()); digits and
+// "! % * ( ) - _ = +" already share keys. Latin letters and @ # $ ^ & [ ] { } < >
+// | ~ ' ` have no key on that layout at all: they are typed as before (and come
+// out as other characters), a warning is logged, and the automatic switch is the
+// only way to type them. With the automatic switch on, or for text without
+// Cyrillic, nothing changes. Targets Windows, like the Alt+Shift hotkey.
+//
 // Timing:
 //   press_ms    -- how long a key is held down (default 10 ms)
 //   inter_ms    -- delay between consecutive keys (default 10 ms)

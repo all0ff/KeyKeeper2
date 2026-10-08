@@ -68,6 +68,10 @@ echo "== unit tests"
 $CXX $FLAGS -Werror $SHIM -I. test_plan.cpp $USB/src/typing_plan.cpp $USB/src/typing_runner.cpp $REAL -o "$OUT/unit"
 "$OUT/unit"
 
+echo "== Russian-layout punctuation: plan played through an independent host model"
+$CXX $FLAGS -Werror $SHIM -I. test_ru_punct.cpp $USB/src/typing_plan.cpp $USB/src/keycode_map.cpp $USB/src/cyrillic_layout.cpp -o "$OUT/ru_punct"
+"$OUT/ru_punct"
+
 echo "== API compatibility with usb_service.cpp (compile only)"
 $CXX -std=c++17 -Wall -Wextra -Werror $SHIM -c api_compat.cpp -o /dev/null
 

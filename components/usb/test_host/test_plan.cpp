@@ -70,6 +70,37 @@ static void test_cyrillic_switch_runs()
     CHECK(on == 2 && off == 2);
 }
 
+static void test_russian_layout_punctuation()
+{
+    // With Cyrillic and no automatic switch the host is on the Russian layout: punctuation goes on its keys.
+    struct Row { const char* ch; uint8_t key; uint8_t mod; };
+    const Row rows[] = {{".", 0x38, 0}, {",", 0x38, usb::modifier::LEFT_SHIFT}, {"?", 0x24, usb::modifier::LEFT_SHIFT},
+                        {"\"", 0x1F, usb::modifier::LEFT_SHIFT}, {";", 0x21, usb::modifier::LEFT_SHIFT},
+                        {":", 0x23, usb::modifier::LEFT_SHIFT}, {"/", 0x31, usb::modifier::LEFT_SHIFT}};
+    for (const Row& r : rows) {
+        const auto p = plan(std::string("\xD0\xB6") + r.ch);          // "ж" then the character
+        CHECK(p.events.size() == 2);
+        CHECK(p.events[1].kind == Kind::Key && p.events[1].keycode == r.key && p.events[1].modifier == r.mod);
+    }
+    // The reported case: "яндекс.рф" -- the dot is no longer the US "." key (0x37 = "ю" on the Russian layout).
+    const auto url = plan("\xD1\x8F\xD0\xBD\xD0\xB4\xD0\xB5\xD0\xBA\xD1\x81.\xD1\x80\xD1\x84");
+    CHECK(url.events.size() == 9 && url.events[6].keycode == 0x38 && url.events[6].modifier == 0);
+    // Characters that already sit on the same key stay exactly as they were.
+    for (const char* same : {"1", "9", "!", "%", "*", "(", ")", "-", "_", "=", "+", "\\", " ", "\t", "\n"}) {
+        const auto a = plan(std::string("\xD0\xB6") + same);
+        usb::PlanOptions off;
+        off.russian_layout_punctuation = false;
+        const auto b = usb::plan_events(std::string("\xD0\xB6") + same, off);
+        CHECK(a.events.size() == 2 && a.events[1].keycode == b.events[1].keycode && a.events[1].modifier == b.events[1].modifier);
+    }
+    // No Cyrillic, or the automatic switch: the US key, as before.
+    CHECK(plan("a.b").events[1].keycode == 0x37);
+    CHECK(plan("\xD0\xB6.", true).events[3].keycode == 0x37);          // events: switch on, ж, switch off, "."
+    // Latin letters and some symbols have no key on the Russian layout: counted so the caller can warn.
+    CHECK(plan("\xD0\xB6" "a@1").unavailable_on_russian_layout == 2);
+    CHECK(plan("a@1").unavailable_on_russian_layout == 0);
+}
+
 static void test_chunk_pacing()
 {
     std::string a(33, 'a');
@@ -136,7 +167,7 @@ static void test_runner()
 
 int main()
 {
-    test_ascii(); test_unsupported(); test_cyrillic_plain(); test_cyrillic_switch_runs(); test_chunk_pacing(); test_runner();
+    test_ascii(); test_unsupported(); test_russian_layout_punctuation(); test_cyrillic_plain(); test_cyrillic_switch_runs(); test_chunk_pacing(); test_runner();
     std::printf("%d checks, %d failed\n", g_checks, g_failed);
     return g_failed == 0 ? 0 : 1;
 }

@@ -68,10 +68,22 @@ struct PlanOptions {
     /// Wrap each run of Cyrillic characters in the Alt+Shift layout-switch
     /// hotkey (settings::UsbSettings::cyrillic_auto_switch_layout).
     bool auto_switch_layout = false;
+    /// Without the automatic switch the person puts the host on the Russian layout
+    /// by hand, so for a text that CONTAINS Cyrillic every ASCII character is read
+    /// by that layout too: type punctuation with the keys the Russian layout puts it
+    /// on ("." on the US "/" key, ...). See cyrillic::russian_layout_ascii(). Has no
+    /// effect with auto_switch_layout, or for text without Cyrillic. Turn it off to
+    /// get the earlier behaviour (every character on its US key).
+    bool russian_layout_punctuation = true;
 };
 
 struct TypingPlan {
     std::vector<HidEvent> events;
+    /// Characters of a plan typed for a host on the Russian layout that NO key of
+    /// that layout can produce (Latin letters, @ # $ ^ & [ ] { } < > | ~ ' `). They
+    /// are typed as before and come out as other characters; the only way to type
+    /// them is the automatic layout switch. Callers use this to warn.
+    size_t unavailable_on_russian_layout = 0;
 };
 
 /// Layout-switch hotkey timing -- see the comments in typing_plan.cpp for the

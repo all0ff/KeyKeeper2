@@ -73,6 +73,13 @@ size_t TypeEngine::type_string(const std::string& text, const Timing& timing)
         ESP_LOGW(TAG, "%zu unsupported character(s) skipped", skipped);
     }
 
+    if (plan.unavailable_on_russian_layout > 0) {
+        ESP_LOGW(TAG,
+                 "%zu character(s) cannot be typed on a Russian layout (Latin letters, @ # $ ^ & [ ] { } < > | ~ ' `): "
+                 "enable the automatic layout switch",
+                 plan.unavailable_on_russian_layout);
+    }
+
     const RunResult result = out.play(plan);
     if (result.error != nullptr) {
         last_error_ = result.error;

@@ -69,4 +69,42 @@ void cyrillic_physical_key(uint32_t codepoint, char& out_physical_key, bool& out
     // Not a recognized Cyrillic letter -- out_physical_key stays '\0'.
 }
 
+RuAsciiKey russian_layout_ascii(char c)
+{
+    switch (c) {
+        // The same physical key gives the same character on both layouts.
+        case '0': case '1': case '2': case '3': case '4':
+        case '5': case '6': case '7': case '8': case '9':
+        case '!': case '%': case '*': case '(': case ')':
+        case '-': case '_': case '=': case '+':
+        case '\\':
+        case ' ': case '\t': case '\n': case '\r':
+            return {RuAsciiKind::SameKey, '\0', false};
+
+        // Different keys. Physical keys are named by their US-layout ASCII label, so
+        // ascii_to_hid() stays the single source of truth for HID key codes.
+        case '.':  return {RuAsciiKind::Remapped, '/', false};  // Russian "." is on the US "/" key
+        case ',':  return {RuAsciiKind::Remapped, '/', true};   // ...and "," is Shift+that key
+        case '?':  return {RuAsciiKind::Remapped, '7', true};   // Shift+7
+        case '"':  return {RuAsciiKind::Remapped, '2', true};   // Shift+2
+        case ';':  return {RuAsciiKind::Remapped, '4', true};   // Shift+4
+        case ':':  return {RuAsciiKind::Remapped, '6', true};   // Shift+6
+        case '/':  return {RuAsciiKind::Remapped, '\\', true}; // Shift+"\" (not verified from a source)
+
+        // Not on the Russian layout at all: letters would come out Cyrillic, and these
+        // symbols are replaced by other characters or by Cyrillic letters (х ъ ж э б ю ё).
+        case '@': case '#': case '$': case '^': case '&':
+        case '[': case ']': case '{': case '}': case '<': case '>':
+        case '|': case '~': case '\'': case '`':
+            return {RuAsciiKind::Unavailable, '\0', false};
+        default:
+            break;
+    }
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+        return {RuAsciiKind::Unavailable, '\0', false};
+    }
+    // Control characters, bytes >= 0x80: typed (or skipped) as before, nothing to remap.
+    return {RuAsciiKind::SameKey, '\0', false};
+}
+
 } // namespace usb::cyrillic

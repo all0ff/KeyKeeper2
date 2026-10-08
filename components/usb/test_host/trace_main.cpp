@@ -56,7 +56,7 @@ int main(int argc, char** argv)
     Rng r{0x9E3779B97F4A7C15ull};
     static const uint32_t T[] = {0, 1, 5, 10, 25, 50};
     for (int i = 0; i < cases; ++i) {
-        const std::string text = random_text(r);
+        std::string text = random_text(r);
         usb::TypeEngine::Timing timing;
         timing.press_ms = T[r.below(6)];
         timing.inter_ms = T[r.below(6)];
@@ -64,6 +64,19 @@ int main(int argc, char** argv)
 
         g_hid.reset();
         settings::all().usb.cyrillic_auto_switch_layout = r.below(2) != 0;
+        // INTENDED behaviour change: with Cyrillic text and no automatic layout switch, ". , ? \" ; : /" are
+        // typed on the keys the Russian layout puts them on (test_ru_punct.cpp covers that against an
+        // independent model of the layout). Here those characters are removed from exactly such texts so
+        // that everything ELSE must still match the original code byte for byte.
+        if (!settings::all().usb.cyrillic_auto_switch_layout) {
+            bool has_cyrillic = false;
+            for (unsigned char c : text) has_cyrillic = has_cyrillic || c == 0xD0 || c == 0xD1; // lead bytes of U+0400..U+047F
+            if (has_cyrillic) {
+                std::string kept;
+                for (char c : text) if (std::string(".,?\";:/").find(c) == std::string::npos) kept += c;
+                text = kept;
+            }
+        }
         const uint32_t fault = r.below(10);
         if (fault == 0) g_hid.connected_at_start = false;
         else if (fault <= 3) g_hid.fail_send_at = static_cast<int>(r.below(60));

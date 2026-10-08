@@ -57,16 +57,51 @@ size_t utf8_decode(const std::string& text, size_t pos, uint32_t& out_codepoint)
     return seq_len;
 }
 
+bool contains_cyrillic(const std::string& text)
+{
+    size_t pos = 0;
+    while (pos < text.size()) {
+        uint32_t codepoint = 0;
+        const size_t consumed = utf8_decode(text, pos, codepoint);
+        if (consumed == 0) {
+            break;
+        }
+        if (cyrillic::is_cyrillic(codepoint)) {
+            return true;
+        }
+        pos += consumed;
+    }
+    return false;
+}
+
 class Planner {
 public:
-    Planner(const PlanOptions& options, TypingPlan& plan) : opt_(options), plan_(plan) {}
+    Planner(const PlanOptions& options, TypingPlan& plan, bool russian_context)
+        : opt_(options), plan_(plan), russian_context_(russian_context)
+    {
+    }
 
     /// A non-Cyrillic character. Like the old type_char(), this takes the RAW
     /// first byte of the sequence, so a multi-byte non-Cyrillic character
     /// (e.g. "é") maps to nothing and becomes a SkipLatin.
+    ///
+    /// In a Russian-layout context (Cyrillic text, no automatic switch: the host
+    /// is on the Russian layout) punctuation is typed on the keys that layout puts
+    /// it on; everything else is typed exactly as before.
     void latin(char c)
     {
-        const KeyMapping km = ascii_to_hid(c);
+        KeyMapping km = ascii_to_hid(c);
+        if (russian_context_) {
+            const cyrillic::RuAsciiKey rk = cyrillic::russian_layout_ascii(c);
+            if (rk.kind == cyrillic::RuAsciiKind::Remapped) {
+                km = ascii_to_hid(rk.physical_key);
+                if (rk.shift) {
+                    km.modifier = static_cast<uint8_t>(km.modifier | modifier::LEFT_SHIFT);
+                }
+            } else if (rk.kind == cyrillic::RuAsciiKind::Unavailable) {
+                ++plan_.unavailable_on_russian_layout;
+            }
+        }
         HidEvent ev;
         ev.chars = 1;
         if (km.keycode == keycode::NONE) {
@@ -148,6 +183,7 @@ public:
 private:
     const PlanOptions& opt_;
     TypingPlan& plan_;
+    const bool russian_context_;
     size_t char_index_ = 0;
 };
 
@@ -157,7 +193,11 @@ TypingPlan plan_events(const std::string& text, const PlanOptions& options)
 {
     TypingPlan plan;
     plan.events.reserve(text.size() + 4);
-    Planner planner(options, plan);
+    // The host is assumed to be on the Russian layout exactly when Cyrillic is typed
+    // WITHOUT the automatic switch (otherwise the Cyrillic would not come out at all).
+    const bool russian_context =
+        options.russian_layout_punctuation && !options.auto_switch_layout && contains_cyrillic(text);
+    Planner planner(options, plan, russian_context);
 
     size_t pos = 0;
     while (pos < text.size()) {
