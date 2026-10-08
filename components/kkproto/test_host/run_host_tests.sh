@@ -11,7 +11,7 @@ cd "$(dirname "$0")"
 K=..
 CXX="${CXX:-g++}"
 OUT=$(mktemp -d)
-CORE="$K/src/noise.cpp $K/src/frames.cpp $K/src/messages.cpp $K/src/pairing.cpp $K/src/selftest.cpp"
+CORE="$K/src/noise.cpp $K/src/frames.cpp $K/src/messages.cpp $K/src/pairing.cpp $K/src/selftest.cpp $K/src/link.cpp"
 BASE="-std=c++17 -Wall -Wextra -Werror -I$K/include -I."
 # Sanitizers (memory / undefined-behaviour checks) are used when the compiler has them. The g++ that
 # ships with MSYS2/MinGW on Windows does not, so the script quietly runs without them there.
@@ -91,6 +91,8 @@ for p in "${PORTS[@]}"; do
     "$OUT/vec_$p"
     $CXX $BASE $OPT test_protocol.cpp $CORE $PS $PF -o "$OUT/proto_$p"
     "$OUT/proto_$p"
+    $CXX $BASE $OPT test_link.cpp $CORE $PS $PF -o "$OUT/link_$p"
+    "$OUT/link_$p"
     if [ "$p" = sodium ]; then
         $CXX $BASE $OPT test_codec.cpp $CORE $PS $PF -o "$OUT/codec_$p"
         "$OUT/codec_$p"
@@ -124,5 +126,6 @@ fi
 if [ "${RUN_MUTATIONS:-0}" = 1 ]; then
     echo "=========== mutation check"
     python3 mutation_check.py
+    python3 mutation_check_link.py
 fi
 echo "ALL OK"

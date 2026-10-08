@@ -11,6 +11,7 @@ the dongle firmware (nRF52840 or ESP32-S3). **Disabled by default** -- see "Enab
 | `frames.hpp/.cpp` | 2-byte length framing and a stream `Reader` that reassembles frames from arbitrary BLE chunks |
 | `messages.hpp/.cpp` | Application messages (`HELLO`, `TYPE`, `RESULT`, ...), the 6-byte typing event, the dongle's acceptance rules |
 | `pairing.hpp/.cpp` | Noise prologue and the 6-digit verification code (SAS) derived from the handshake hash |
+| `link.hpp/.cpp` | `link::Endpoint`: one end of the link as a state machine (vault or dongle role): pairing window, XX pairing with confirmation by both users, IK sessions with automatic reconnect, Hello / Ping / keep-alive. Knows nothing about the wire or about storage |
 
 Ports (exactly one is linked): `platform/psa` (ESP-IDF / PSA Crypto), `platform/sodium`
 (libsodium: nRF52840 / Arduino / host), `platform/openssl` (host reference only).

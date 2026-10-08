@@ -13,6 +13,7 @@ if(CONFIG_KEYKEEPER_KKPROTO)
         "src/frames.cpp"
         "src/messages.cpp"
         "src/pairing.cpp"
+        "src/link.cpp"
         "src/selftest.cpp"
         "platform/psa/crypto_port_psa.cpp"
     )

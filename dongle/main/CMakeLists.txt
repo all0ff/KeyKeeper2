@@ -1,0 +1,19 @@
+idf_component_register(
+    SRCS
+        "app_main.cpp"
+        "store.cpp"
+        "ui.cpp"
+    INCLUDE_DIRS
+        "."
+        "../../tools/uart_link_test/main"   # link_frame.hpp: the UART framing verified in stage 3a
+    REQUIRES
+        kkproto
+        bsp
+        display
+        lvgl
+        nvs_flash
+        esp_driver_uart
+        esp_driver_gpio
+        esp_timer
+        esp_hw_support
+)

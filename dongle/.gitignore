@@ -1,0 +1,7 @@
+build/
+build_vault/
+sdkconfig
+sdkconfig.old
+sdkconfig_vault
+sdkconfig_vault.old
+managed_components/

@@ -1,0 +1,41 @@
+menu "Dongle"
+
+    choice DONGLE_ROLE
+        prompt "What this firmware is"
+        default DONGLE_ROLE_DONGLE
+
+        config DONGLE_ROLE_DONGLE
+            bool "Dongle (waits for the vault)"
+
+        config DONGLE_ROLE_VAULT_SIM
+            bool "Vault simulator (for testing the dongle; starts pairings and connects)"
+    endchoice
+
+    config DONGLE_UART_NUM
+        int "UART controller for the link (1 or 2; 0 is the console)"
+        range 1 2
+        default 1
+
+    config DONGLE_TX_PIN
+        int "TX GPIO"
+        range 0 48
+        default 10
+        help
+            Same pins as the wiring test (tools/uart_link_test): TX of one board goes to RX of the other.
+
+    config DONGLE_RX_PIN
+        int "RX GPIO"
+        range 0 48
+        default 11
+
+    config DONGLE_BAUD
+        int "Baud rate"
+        range 9600 2000000
+        default 460800
+
+    config DONGLE_PAIRING_WINDOW_S
+        int "Dongle: how long a pairing stays open after BOOT (seconds)"
+        range 10 600
+        default 60
+
+endmenu
