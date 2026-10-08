@@ -595,7 +595,7 @@ R"HTML( available from this web page yet, only on the device itself.</li>
         <code>JBSWY3DPEHPK3PXP</code>) в поле Секрет TOTP записи. Устройство покажет живой, обновляющийся 6-значный
         код прямо на экране записи, а Напечатать OTP напечатает текущий код через USB.</p>
       <div class="note">У этой платы нет батарейного чипа часов реального времени &mdash; единственный источник
-        времени — NTP через WiFi. Коды TOTP доступны только после того, как WiFi (режим Station) подключился и хотя
+        времени — NTP через WiFi. Коды TOTP доступны только после того, как WiFi (режим Клиент) подключился и хотя
         бы раз синхронизировал время с момента включения устройства; после полного отключения питания это сбрасывается
         до следующего подключения.</div>
     </div>
@@ -671,7 +671,7 @@ R"HTML(.</li>
 
     <div class="help-section">
       <h3>WiFi и эта веб-страница</h3>
-      <p>Настройки &rarr; WiFi переключает между Station (подключение к существующей сети, нужно для синхронизации
+      <p>Настройки &rarr; WiFi переключает режимы Клиент (подключение к существующей сети, нужно для синхронизации
         времени TOTP) и Точка доступа (устройство создаёт свою собственную сеть). Эта страница доступна в обоих
         режимах, по IP-адресу устройства &mdash; а если задано Секретное слово (там же, в настройках WiFi), то только по
         адресу <code>/&lt;secret word&gt;/</code>, а не по голому адресу — как лёгкий дополнительный барьер против
@@ -683,7 +683,7 @@ R"HTML(      <p><strong>Captive Portal</strong> (выберите режим WiF
         телефон или ноутбук, только что подключившийся к сети устройства, сам показывает эту страницу — то же самое
         "нажмите, чтобы войти", что показывают публичные WiFi-сети — вместо того чтобы вручную вводить IP-адрес
         устройства. Работает за счёт того, что отвечает на любой DNS-запрос собственным адресом устройства и
-        перенаправляет любой обычный HTTP-запрос сюда же; никогда не работает в режиме Station, а как только вы уже
+        перенаправляет любой обычный HTTP-запрос сюда же; никогда не работает в режиме Клиент, а как только вы уже
         открыли эту страницу — больше никак не влияет.</p>
 )HTML"
 #endif
@@ -803,6 +803,15 @@ function showApp() {
 
 // ---------- List ----------
 
+// What a list row calls an entry: its URL as a person would write it (no
+// scheme, no leading "www.", no trailing slash), because the login alone
+// is a poor label -- the same login is reused on many sites. Same rule as
+// vault::display_name() on the device; only the display, never the data.
+function entryResource(e) {
+  let u = String(e.url || '').replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
+  return u.replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/+$/, '');
+}
+
 function renderEntryList(list_data, empty_message) {
   entries = list_data;
   const list = document.getElementById('entry-list');
@@ -818,11 +827,17 @@ function renderEntryList(list_data, empty_message) {
     div.className = 'entry-item';
     div.onclick = () => openEntry(e.id);
     const star = e.favorite ? '\u2605 ' : '';
-    const otp = e.has_otp ? ' \u00b7 OTP' : '';
-    const cat = e.category ? ' \u00b7 ' + escapeHtml(e.category) : '';
+    const resource = entryResource(e);
+    const title = resource || e.login || '(no login)';
+    // The login moves down to the second line once the URL takes the first
+    // (when there is no URL it already IS the title, so it isn't repeated).
+    const meta = [];
+    if (resource && e.login) meta.push(escapeHtml(e.login));
+    if (e.category) meta.push(escapeHtml(e.category));
+    if (e.has_otp) meta.push('OTP');
     div.innerHTML =
-      '<div class="login">' + star + escapeHtml(e.login || '(no login)') + '</div>' +
-      '<div class="meta">' + escapeHtml(e.url || '') + cat + otp + '</div>';
+      '<div class="login">' + star + escapeHtml(title) + '</div>' +
+      '<div class="meta">' + meta.join(' \u00b7 ') + '</div>';
     list.appendChild(div);
   });
 }

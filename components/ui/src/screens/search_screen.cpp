@@ -112,6 +112,11 @@ void SearchScreen::update_results()
         // Result text comes from matched entries' own fields
         // (user-entered, could be Cyrillic).
         lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0);
+        // URL + login rows can be longer than the screen. A fixed width is
+        // what lets a long mode apply at all; which mode each row gets
+        // (selected scrolls, the rest clip) is set in the render function.
+        lv_obj_set_width(label, LV_PCT(96));
+        lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
         lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4,
                      RESULTS_Y_START + static_cast<lv_coord_t>(ROW_SPACING * i));
         result_labels_[i] = label;
@@ -134,11 +139,19 @@ void SearchScreen::render_results()
     for (size_t i = 0; i < results_.size(); ++i) {
         const vault::VaultEntry& entry = results_[i];
         const bool is_selected = (mode_ == Mode::Browsing) && (i == selected_result_);
-        const char* login = entry.login.empty() ? "(no login)" : entry.login.c_str();
+        // The resource (URL) first, the login only after it as a tie-breaker --
+        // see vault::display_name(). A list of bare logins can't be told apart
+        // when the same login is used on many sites.
+        const std::string name = vault::display_name(entry);
+        const char* title = name.empty() ? "(no login)" : name.c_str();
 
         lv_obj_set_style_text_color(result_labels_[i], is_selected ? pal.accent : pal.primary_text, 0);
+        // Only the selected row scrolls, so a long URL can be read in full; the
+        // rest are clipped at the edge. LV_LABEL_LONG_SCROLL on every overflowing
+        // row at once would run a scroll animation per row.
+        lv_label_set_long_mode(result_labels_[i], is_selected ? LV_LABEL_LONG_SCROLL : LV_LABEL_LONG_CLIP);
         lv_label_set_text_fmt(result_labels_[i], "%s%s%s",
-                               is_selected ? "> " : "", entry.favorite ? "* " : "", login);
+                               is_selected ? "> " : "", entry.favorite ? "* " : "", title);
     }
 
     if (mode_ == Mode::Browsing && !results_.empty()) {

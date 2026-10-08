@@ -6,6 +6,34 @@
 
 namespace vault {
 
+namespace {
+
+// `prefix` must already be lower-case; only ASCII case is folded (the
+// prefixes compared against are all ASCII).
+bool starts_with_nocase(const std::string& s, const char* prefix)
+{
+    for (size_t i = 0; prefix[i] != '\0'; ++i) {
+        if (i >= s.size()) {
+            return false;
+        }
+        char c = s[i];
+        if (c >= 'A' && c <= 'Z') {
+            c = static_cast<char>(c - 'A' + 'a');
+        }
+        if (c != prefix[i]) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool is_ascii_space(char c)
+{
+    return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
+} // namespace
+
 bool validate(const VaultEntry& entry)
 {
     if (entry.login.size() > MAX_LOGIN_LEN) return false;
@@ -32,6 +60,39 @@ bool validate(const VaultEntry& entry)
     if (!entry.seed_phrase.empty() && !bip39::validate_seed_phrase(entry.seed_phrase)) return false;
 
     return true;
+}
+
+std::string display_name(const VaultEntry& entry)
+{
+    size_t begin = 0;
+    size_t end = entry.url.size();
+    while (begin < end && is_ascii_space(entry.url[begin])) {
+        ++begin;
+    }
+    while (end > begin && is_ascii_space(entry.url[end - 1])) {
+        --end;
+    }
+    std::string url = entry.url.substr(begin, end - begin);
+
+    if (starts_with_nocase(url, "https://")) {
+        url.erase(0, 8);
+    } else if (starts_with_nocase(url, "http://")) {
+        url.erase(0, 7);
+    }
+    if (starts_with_nocase(url, "www.")) {
+        url.erase(0, 4);
+    }
+    while (!url.empty() && url.back() == '/') {
+        url.pop_back();
+    }
+
+    if (url.empty()) {
+        return entry.login;
+    }
+    if (entry.login.empty()) {
+        return url;
+    }
+    return url + " (" + entry.login + ")";
 }
 
 std::vector<RecoveryCode> generate_recovery_codes(size_t count)

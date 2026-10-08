@@ -203,7 +203,12 @@ void CategoriesScreen::reload_entries()
     for (size_t i = 0; i < entries_.size(); ++i) {
         lv_obj_t* label = lv_label_create(content_parent_);
         lv_obj_set_style_text_color(label, pal.primary_text, 0);
-        lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0); // entry login is user-entered
+        lv_obj_set_style_text_font(label, &keykeeper_cyrillic_16, 0); // entry url/login is user-entered
+        // URL + login rows can be longer than the screen. A fixed width is
+        // what lets a long mode apply at all; which mode each row gets
+        // (selected scrolls, the rest clip) is set in the render function.
+        lv_obj_set_width(label, LV_PCT(96));
+        lv_label_set_long_mode(label, LV_LABEL_LONG_CLIP);
         lv_obj_align(label, LV_ALIGN_TOP_LEFT, 4,
                      FIRST_ITEM_Y + static_cast<lv_coord_t>(ITEM_SPACING * i));
         entry_labels_[i] = label;
@@ -219,10 +224,18 @@ void CategoriesScreen::render_entries()
     for (size_t i = 0; i < entries_.size(); ++i) {
         const vault::VaultEntry& entry = entries_[i];
         const bool is_selected = (i == selected_entry_);
-        const char* login = entry.login.empty() ? "(no login)" : entry.login.c_str();
+        // The resource (URL) first, the login only after it as a tie-breaker --
+        // see vault::display_name(). A list of bare logins can't be told apart
+        // when the same login is used on many sites.
+        const std::string name = vault::display_name(entry);
+        const char* title = name.empty() ? "(no login)" : name.c_str();
 
         lv_obj_set_style_text_color(entry_labels_[i], is_selected ? pal.accent : pal.primary_text, 0);
-        lv_label_set_text_fmt(entry_labels_[i], "%s%s", is_selected ? "> " : "", login);
+        // Only the selected row scrolls, so a long URL can be read in full; the
+        // rest are clipped at the edge. LV_LABEL_LONG_SCROLL on every overflowing
+        // row at once would run a scroll animation per row.
+        lv_label_set_long_mode(entry_labels_[i], is_selected ? LV_LABEL_LONG_SCROLL : LV_LABEL_LONG_CLIP);
+        lv_label_set_text_fmt(entry_labels_[i], "%s%s", is_selected ? "> " : "", title);
     }
 
     if (!entries_.empty()) {

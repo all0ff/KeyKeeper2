@@ -150,6 +150,27 @@ struct VaultEntry
  */
 bool validate(const VaultEntry& entry);
 
+/// What a list row (device screens) calls this entry: the RESOURCE it
+/// belongs to first, the login only after it as a tie-breaker. An entry
+/// has no separate title field -- the URL is what identifies the
+/// resource, and the login alone is a poor list label (the same login,
+/// an e-mail address say, is typically reused on many sites, so a list
+/// of bare logins can't be scanned or searched by eye).
+///
+///   url + login  -> "github.com (alice)"
+///   url only     -> "github.com"
+///   login only   -> "alice"          (nothing to put first)
+///   neither      -> ""               (caller shows its own placeholder)
+///
+/// The URL is shown the way a person would write it, not as stored: a
+/// leading "http://"/"https://" and "www." (case-insensitive) and any
+/// trailing "/" are dropped, and surrounding ASCII whitespace trimmed --
+/// on a 320 px screen "https://www." is ~12 characters of nothing. Only
+/// the DISPLAY changes; the stored url is never touched. A url that is
+/// nothing but scheme/www/slashes counts as empty. The Web UI's
+/// entryResource() (web_app_html.hpp) applies the same rule.
+std::string display_name(const VaultEntry& entry);
+
 /**
  * @brief Generates a set of RANDOM, MEANINGLESS "recovery codes".
  *
