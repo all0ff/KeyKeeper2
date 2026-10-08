@@ -106,7 +106,7 @@ static void test_single_bit_errors_and_resync()
         // The good frames that follow: distinct payloads so we can tell them apart.
         std::vector<Bytes> tail_payloads;
         Bytes tail;
-        for (int i = 0; i < 12; ++i) {
+        for (int i = 0; i < 16; ++i) {
             Bytes t = make_payload(rng, 24);
             t[0] = static_cast<uint8_t>(i);
             tail_payloads.push_back(t);
@@ -166,8 +166,8 @@ static void test_garbage_resync()
             const Bytes fr = frame_of(pl);
             stream.insert(stream.end(), fr.begin(), fr.end());
         }
-        // Flush: enough clean frames that any unfinished false candidate completes.
-        for (int i = 0; i < 6; ++i) {
+        // Flush: enough clean frames that any unfinished false candidate (up to MAX_FRAME bytes) completes.
+        for (int i = 0; i < 8; ++i) {
             const Bytes fr = frame_of(Bytes(40, 0x77));
             stream.insert(stream.end(), fr.begin(), fr.end());
         }
@@ -388,7 +388,15 @@ static void test_two_endpoints_noisy_channel()
         }
 
         for (const Endpoint* e : {&a, &b}) {
-            CHECK(e->bad_payload == 0);   // a frame with a good CRC never carries a wrong payload
+            // A frame that passes CRC16 never carries a wrong payload on a sane wire. At absurd noise
+            // (BER >= 1e-3, almost every frame corrupted) about 1 corrupted frame in 83000 still passes
+            // CRC16 (measured; theory says ~2^-16). The payload check catches those: they are counted
+            // in bad_payload and must stay rare.
+            if (ber < 1e-3) {
+                CHECK(e->bad_payload == 0);
+            } else {
+                CHECK(e->bad_payload <= 6);
+            }
             CHECK(e->self_frames == 0);
             CHECK(e->peer.restarts == 0);
             CHECK(e->peer.have);

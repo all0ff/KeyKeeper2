@@ -21,7 +21,7 @@ namespace uartlink {
 
 constexpr uint8_t SYNC0 = 0xA5;
 constexpr uint8_t SYNC1 = 0x5A;
-constexpr size_t MAX_PAYLOAD = 120;
+constexpr size_t MAX_PAYLOAD = 250;  // LEN is one byte; kkproto messages need up to ~245
 constexpr size_t HEADER = 3;   // SYNC0 SYNC1 LEN
 constexpr size_t TRAILER = 2;  // CRC16
 constexpr size_t MAX_FRAME = HEADER + MAX_PAYLOAD + TRAILER;
