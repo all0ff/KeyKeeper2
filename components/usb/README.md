@@ -46,14 +46,32 @@ host's own clipboard).
   comment for exactly what breaks (wrong characters, not just missing
   ones) when that doesn't hold, and `settings::UsbSettings::cyrillic_auto_switch_layout`
   (off by default) for the on-device toggle.
-- **`TypeEngine`** -- turns a UTF-8 string into a sequence of
-  `hid_keyboard::send_key()` calls, routing each character through
-  `keycode_map` or `cyrillic_layout` as appropriate.
+- **`TypeEngine`** -- turns a UTF-8 string into keystrokes, routing each
+  character through `keycode_map` or `cyrillic_layout` as appropriate.
+  It is a thin facade over a **plan / execute split** (see the next
+  bullet), with the same public API as before.
   `type_string()`'s return value is a **character** count, not a byte
   count -- `usb_service.cpp`'s own `count_chars()` helper exists
   specifically because comparing that against `std::string::size()`
   (bytes) directly is wrong for any Cyrillic content (2 bytes/char in
-  UTF-8), and silently was, for a while.
+  UTF-8), and silently was, for a while. Unsupported characters are
+  skipped but still **counted** as sent -- that is what makes
+  `usb_service.cpp` report "Typed OK" for them, and the split keeps it.
+- **Plan / execute split** -- `plan_events()` (`typing_plan.hpp`) is a
+  pure function from text to a list of `HidEvent` steps (key presses,
+  pacing pauses, the optional Alt+Shift layout hotkey); it has no USB,
+  FreeRTOS, settings or logging, so it is unit-tested on a PC.
+  `run_plan()` (`typing_runner.hpp`) plays a plan through a small `KeyIo`
+  interface with the old rules: stop at the first failure, but still send
+  the layout-switch-back of a Cyrillic run that was already opened.
+  An `OutputSink` (`output_sink.hpp`) decides where a plan goes -- today
+  only `UsbCableSink` (the cable); a radio-dongle sink is the next one
+  and needs nothing above this interface to change.
+  Tests: `test_host/run_host_tests.sh` (g++ only, no ESP-IDF). It runs
+  unit tests and a differential test that compares the new code against
+  a verbatim copy of the original `type_engine.cpp` (`test_host/oracle/`,
+  delete it once the refactor is settled on hardware) over tens of
+  thousands of random inputs, including USB failures mid-typing.
 - **`usb::Service`** (`usb_service.hpp`/`.cpp`) -- the public facade
   UI screens actually call: `print_field()` for a vault entry's Login/
   Password/URL/OTP, `type_string()` for a raw string (QuickScreen's

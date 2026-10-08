@@ -1,10 +1,5 @@
 #pragma once
 
-#include "usb/output_sink.hpp"
-#include "usb/typing_plan.hpp"
-
-#include <cstddef>
-#include <cstdint>
 #include <string>
 
 namespace usb {
@@ -12,12 +7,8 @@ namespace usb {
 // =============================================================================
 // TypeEngine -- high-level string-to-keystroke translator
 //
-// Converts a UTF-8 string into keystrokes. Since the plan/execute split it is a
-// thin facade over two pieces:
-//
-//   plan_events()   (typing_plan.hpp)  text -> list of HID events. Pure.
-//   OutputSink      (output_sink.hpp)  plays that list; the default sink is
-//                                      the USB cable.
+// Converts a UTF-8 string into HID keyboard reports and sends them
+// out over USB, one character at a time.
 //
 // ASCII characters type directly via keycode_map.hpp's ascii_to_hid()
 // (US QWERTY layout, matches what widgets::TextEntry can actually
@@ -42,7 +33,18 @@ namespace usb {
 
 class TypeEngine {
 public:
-    using Timing = TypingTiming;
+    struct Timing {
+        uint32_t press_ms;   // Key hold time
+        uint32_t inter_ms;   // Delay between keys
+        uint32_t chunk_ms;    // Pause after 32 characters
+
+        Timing()
+        : press_ms(10),
+          inter_ms(10),
+          chunk_ms(0)
+        {
+        }
+    };
 
     // Send a complete string. Blocking call.
     // Returns number of characters successfully sent.
@@ -52,20 +54,26 @@ public:
     // Returns true on success.
     bool type_char(char c, const Timing& timing = Timing());
 
-    // Check whether the output is usable before typing (USB mounted).
+    // Check whether USB is connected before typing.
     bool can_type() const;
 
     // Last error message (for UI feedback).
     const char* last_error() const;
 
-    // Route typing somewhere other than the USB cable (not owned). nullptr
-    // restores the default.
-    void set_sink(OutputSink* sink) { sink_ = sink; }
-
 private:
-    OutputSink& sink() const { return sink_ != nullptr ? *sink_ : usb_cable_sink(); }
+    /// Sends Alt+Shift (bare modifiers, no regular key) -- the
+    /// classic Windows layout-switch hotkey. See
+    /// usb::cyrillic_layout.hpp's file comment for why this is what's
+    /// sent and its limits.
+    bool switch_layout(const Timing& timing);
 
-    OutputSink* sink_ = nullptr;
+    /// Types one CYRILLIC code point via its ЙЦУКЕН physical-key
+    /// equivalent, run through the ordinary ascii_to_hid() table --
+    /// does NOT itself switch layout (the caller wraps a whole RUN of
+    /// these with one switch_layout() before and after, not one per
+    /// character).
+    bool type_cyrillic_char(uint32_t codepoint, const Timing& timing);
+
     const char* last_error_ = "";
 };
 
