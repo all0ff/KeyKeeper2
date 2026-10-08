@@ -13,7 +13,15 @@ CXX="${CXX:-g++}"
 OUT=$(mktemp -d)
 CORE="$K/src/noise.cpp $K/src/frames.cpp $K/src/messages.cpp $K/src/pairing.cpp $K/src/selftest.cpp"
 BASE="-std=c++17 -Wall -Wextra -Werror -I$K/include -I."
-SAN="-O1 -g -fsanitize=address,undefined -fno-sanitize-recover=undefined"
+# Sanitizers (memory / undefined-behaviour checks) are used when the compiler has them. The g++ that
+# ships with MSYS2/MinGW on Windows does not, so the script quietly runs without them there.
+# Force it off with:  SANITIZE=0 ./run_host_tests.sh
+SANFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined"
+if [ "${SANITIZE:-auto}" = 0 ] || ! echo 'int main(){return 0;}' | $CXX -x c++ $SANFLAGS - -o "$OUT/san_probe" >/dev/null 2>&1; then
+    SANFLAGS=""
+    echo "(sanitizers not available or disabled: running without them)"
+fi
+SAN="-O1 -g $SANFLAGS"
 FAST="-O2"
 
 declare -a PORTS
@@ -22,6 +30,48 @@ if have sodium.h; then PORTS+=(sodium); fi
 if have openssl/evp.h; then PORTS+=(openssl); fi
 if [ -n "${MBEDTLS_DIR:-}" ]; then PORTS+=(psa); fi
 [ ${#PORTS[@]} -gt 0 ] || { echo "no crypto library found (need libsodium-dev and/or libssl-dev)"; exit 1; }
+
+# A tiny file comparer, compiled here, so the script needs neither cmp, diff nor wc
+# (none of them is installed in a minimal MSYS2). Exit 0 same / 1 different / 2 could not compare.
+build_filecmp() {
+    cat > "$OUT/filecmp.cpp" << 'FILECMP_EOF'
+// Tiny file comparer so the test script does not depend on cmp/diff/wc (a minimal MSYS2 has none of them).
+// exit 0: identical (prints the line count)   1: different (prints the first difference)   2: cannot compare
+#include <cstdio>
+#include <fstream>
+#include <string>
+
+int main(int argc, char** argv)
+{
+    if (argc != 3) {
+        std::printf("usage: filecmp <a> <b>\n");
+        return 2;
+    }
+    std::ifstream a(argv[1], std::ios::binary), b(argv[2], std::ios::binary);
+    if (!a || !b) {
+        std::printf("cannot open %s or %s\n", argv[1], argv[2]);
+        return 2;
+    }
+    std::string x, y;
+    long line = 0;
+    for (;;) {
+        const bool ga = static_cast<bool>(std::getline(a, x));
+        const bool gb = static_cast<bool>(std::getline(b, y));
+        if (!ga && !gb) {
+            std::printf("%ld\n", line);
+            return 0;
+        }
+        ++line;
+        if (ga != gb || x != y) {
+            std::printf("first difference at line %ld\n  first : %s\n  second: %s\n", line,
+                        ga ? x.substr(0, 300).c_str() : "(end of file)", gb ? y.substr(0, 300).c_str() : "(end of file)");
+            return 1;
+        }
+    }
+}
+FILECMP_EOF
+    $CXX -O1 "$OUT/filecmp.cpp" -o "$OUT/filecmp"
+}
 
 port_src() { echo "$K/platform/$1/crypto_port_$1.cpp"; }
 port_flags() {
@@ -51,10 +101,17 @@ done
 
 echo "=========== transcripts of all ports must be byte-identical"
 FIRST="${PORTS[0]}"
+build_filecmp
+LINES=""
 for p in "${PORTS[@]}"; do
-    cmp -s "$OUT/tr_$FIRST.txt" "$OUT/tr_$p.txt" || { echo "MISMATCH between $FIRST and $p:"; diff "$OUT/tr_$FIRST.txt" "$OUT/tr_$p.txt"; exit 1; }
+    set +e
+    RESULT=$("$OUT/filecmp" "$OUT/tr_$FIRST.txt" "$OUT/tr_$p.txt"); RC=$?
+    set -e
+    if [ "$RC" = 1 ]; then echo "MISMATCH between $FIRST and $p:"; echo "$RESULT"; exit 1; fi
+    if [ "$RC" != 0 ]; then echo "COULD NOT COMPARE $FIRST and $p: $RESULT"; exit 2; fi
+    LINES="$RESULT"
 done
-echo "OK: ${PORTS[*]} produce the same $(wc -l < "$OUT/tr_$FIRST.txt") transcript lines"
+echo "OK: ${PORTS[*]} produce the same $LINES transcript lines"
 
 if have sodium.h; then
     echo "=========== defences against deliberately broken ports"
