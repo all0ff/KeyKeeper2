@@ -35,6 +35,10 @@ constexpr gpio_num_t RX_PIN = static_cast<gpio_num_t>(CONFIG_PAIRING_TEST_RX_PIN
 constexpr int BAUD = CONFIG_PAIRING_TEST_BAUD;
 constexpr gpio_num_t BOOT_PIN = GPIO_NUM_0;  // the BOOT button, active low
 
+// Wait up to ~5 ms for bytes. At a 100 Hz tick pdMS_TO_TICKS(5) is 0, which would make the read
+// non-blocking and the loop would starve the idle task (task watchdog). So never less than 1 tick.
+constexpr TickType_t POLL_TICKS = (pdMS_TO_TICKS(5) > 0) ? pdMS_TO_TICKS(5) : 1;
+
 constexpr int64_t STATUS_PERIOD_US = 10 * 1000000;
 
 // Static, not on the task stack.
@@ -205,7 +209,7 @@ extern "C" void app_main(void)
 
     int64_t next_status = esp_timer_get_time() + STATUS_PERIOD_US;
     for (;;) {
-        const int n = uart_read_bytes(UART, s_rx, sizeof s_rx, pdMS_TO_TICKS(5));
+        const int n = uart_read_bytes(UART, s_rx, sizeof s_rx, POLL_TICKS);
         const uint32_t now_ms = static_cast<uint32_t>(esp_timer_get_time() / 1000);
         if (n > 0) {
             parser.feed(s_rx, static_cast<size_t>(n), [&](const uint8_t* payload, size_t len) {

@@ -17,4 +17,4 @@ CONFIG_KEYKEEPER_KKPROTO=y
 # these are the switches to look for in `idf.py menuconfig` -> Component config -> mbedTLS.
 CONFIG_MBEDTLS_ECP_DP_CURVE25519_ENABLED=y
 CONFIG_MBEDTLS_CHACHA20_C=y
-CONFIG_MBEDTLS_POLY1305_C=y
+CONFIG_MBEDTLS_CHACHAPOLY_C=y
