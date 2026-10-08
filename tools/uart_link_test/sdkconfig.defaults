@@ -1,0 +1,11 @@
+# Wiring test for the UART link (Waveshare ESP32-S3-LCD-1.47B, both boards run the same firmware).
+
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# Log over the board's USB port (the native USB "serial/JTAG"), NOT over UART0 on GPIO43/44.
+# This test does not use TinyUSB, so the port is free for the console.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=4096

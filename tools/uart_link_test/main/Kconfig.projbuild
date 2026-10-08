@@ -1,0 +1,40 @@
+menu "UART link test"
+
+    config UART_LINK_TEST_UART_NUM
+        int "UART controller (1 or 2; 0 is the console)"
+        range 1 2
+        default 1
+
+    config UART_LINK_TEST_TX_PIN
+        int "TX GPIO"
+        range 0 48
+        default 10
+        help
+            Free header pin on the Waveshare ESP32-S3-LCD-1.47B (see components/bsp/include/bsp/pins.hpp).
+            Wire it to the RX pin of the OTHER board.
+
+    config UART_LINK_TEST_RX_PIN
+        int "RX GPIO"
+        range 0 48
+        default 11
+        help
+            Wire it to the TX pin of the OTHER board.
+
+    config UART_LINK_TEST_BAUD
+        int "Baud rate"
+        range 9600 2000000
+        default 460800
+
+    config UART_LINK_TEST_PAYLOAD_LEN
+        int "Ping payload length in bytes"
+        range 10 120
+        default 24
+        help
+            10 is the minimum. Use 96 to imitate the biggest handshake messages.
+
+    config UART_LINK_TEST_PERIOD_MS
+        int "Send one ping every N milliseconds"
+        range 10 5000
+        default 200
+
+endmenu
