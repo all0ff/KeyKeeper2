@@ -5,6 +5,7 @@
 namespace wireless {
 
 bool init() { return true; }
+void start_radio() {}
 bool supported() { return false; }
 bool enabled() { return false; }
 bool set_enabled(bool) { return false; }

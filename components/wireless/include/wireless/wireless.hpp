@@ -54,6 +54,9 @@ struct Status {
 /// Loads the key / settings and starts the link task. Call once at boot, after storage (NVS) is up.
 /// Returns false only for a real failure (no key could be made); an unsupported build returns true.
 bool init();
+/// Lets the link task bring the radio/port up. Call after the UI is initialised: BLE takes ~60 KB of internal
+/// RAM, which the UI must have first. Until then the switch is only remembered.
+void start_radio();
 bool supported();
 
 bool enabled();

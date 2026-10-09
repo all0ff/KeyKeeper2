@@ -38,7 +38,7 @@ namespace app_system {
 // true. Meant to be flipped back to false again once whatever's being
 // investigated is done -- not a permanent setting, so it's a
 // constexpr here rather than a proper settings::/Kconfig option.
-constexpr bool DIAGNOSTIC_SKIP_USB_HID = true;
+constexpr bool DIAGNOSTIC_SKIP_USB_HID = false;
 
 namespace {
 
@@ -611,6 +611,9 @@ bool init()
     if (!initialize_ui()) {
         return false;
     }
+
+    // Only now: BLE takes ~60 KB of internal RAM, the UI task needs its share first.
+    wireless::start_radio();
 
     /*
      * The device must start locked.

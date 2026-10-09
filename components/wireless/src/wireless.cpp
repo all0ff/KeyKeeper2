@@ -215,6 +215,14 @@ public:
     }
 
     // ---- API (any task)
+    void start_radio()
+    {
+        lock();
+        radio_ok_ = true;
+        cmd_.apply_enabled = true;
+        unlock();
+    }
+
     bool enabled() const { return want_enabled_.load(); }
 
     bool set_enabled(bool on)
@@ -604,7 +612,9 @@ private:
             ESP_LOGI(TAG, "dongle forgotten");
         }
         if (c.apply_enabled || c.forget) {
-            if (on && !port_up_) {
+            if (on && !port_up_ && !radio_ok_.load()) {
+                // the radio is held back until the UI is up (start_radio): BLE needs ~60 KB of internal RAM
+            } else if (on && !port_up_) {
                 if (!port_start()) {
                     ESP_LOGE(TAG, "%s setup failed", BLE ? "BLE" : "UART");
                 } else if (BLE) {
@@ -780,6 +790,7 @@ private:
     Req req_;
     Status status_;
     std::atomic<bool> want_enabled_{false};
+    std::atomic<bool> radio_ok_{false}; ///< set by start_radio(): the port may be brought up
     std::atomic<bool> a_linked_{false};
     std::atomic<bool> a_usb_{false};
 
@@ -816,6 +827,12 @@ bool init()
     return true;
 }
 
+void start_radio()
+{
+    if (g_link != nullptr) {
+        g_link->start_radio();
+    }
+}
 bool supported() { return true; }
 bool enabled() { return g_link != nullptr && g_link->enabled(); }
 bool set_enabled(bool on) { return g_link != nullptr && g_link->set_enabled(on); }
