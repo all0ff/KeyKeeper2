@@ -55,4 +55,17 @@ menu "Dongle"
         range 10 600
         default 60
 
+    config DONGLE_LANGUAGE_RU
+        bool "Screen text in Russian"
+        default y
+        help
+            Off: English. The text is drawn with the project's Cyrillic fonts either way.
+
+    config DONGLE_SCREEN_TIMEOUT_S
+        int "Backlight off after this many seconds without activity (0 = always on)"
+        range 0 3600
+        default 20
+        help
+            Typing, a BOOT press and any change of what the screen says (pairing, connecting) switch it on again.
+
 endmenu

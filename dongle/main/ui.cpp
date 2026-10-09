@@ -1,6 +1,9 @@
 #include "ui.hpp"
 
+#include "display/display.hpp"
+#include "display/fonts.hpp"
 #include "display/lvgl_port.hpp"
+#include "esp_timer.h"
 #include "lvgl.h"
 
 #include <cstring>
@@ -16,6 +19,16 @@ lv_obj_t* s_hint = nullptr;
 Screen s_last;
 bool s_have_last = false;
 
+// Backlight: on for a while after any activity, then off (the dongle sits in a USB port all day).
+bool s_light_on = true;
+uint32_t s_last_activity_ms = 0;
+uint32_t s_timeout_ms = 0; // 0 = never off
+
+uint32_t now_ms()
+{
+    return static_cast<uint32_t>(esp_timer_get_time() / 1000);
+}
+
 lv_color_t tone_color(Tone t)
 {
     switch (t) {
@@ -29,15 +42,17 @@ lv_color_t tone_color(Tone t)
 
 } // namespace
 
-bool init()
+bool init(uint32_t screen_timeout_s)
 {
+    s_timeout_ms = screen_timeout_s * 1000u;
+    s_last_activity_ms = now_ms();
     lvgl_port::lock();
     lv_obj_t* scr = lv_screen_active();
     lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
     s_title = lv_label_create(scr);
-    lv_obj_set_style_text_font(s_title, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(s_title, &keykeeper_cyrillic_18, 0);
     lv_obj_set_style_text_color(s_title, lv_color_hex(0x8090A0), 0);
     lv_obj_align(s_title, LV_ALIGN_TOP_MID, 0, 6);
 
@@ -47,7 +62,7 @@ bool init()
     lv_obj_align(s_big, LV_ALIGN_CENTER, 0, -14);
 
     s_status = lv_label_create(scr);
-    lv_obj_set_style_text_font(s_status, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(s_status, &keykeeper_cyrillic_18, 0);
     lv_obj_set_style_text_align(s_status, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(s_status, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(s_status, 300);
@@ -55,12 +70,29 @@ bool init()
     lv_obj_align(s_status, LV_ALIGN_CENTER, 0, 0);
 
     s_hint = lv_label_create(scr);
-    lv_obj_set_style_text_font(s_hint, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(s_hint, &keykeeper_cyrillic_16, 0);
     lv_obj_set_style_text_color(s_hint, lv_color_hex(0x8090A0), 0);
     lv_label_set_text(s_hint, "");
     lv_obj_align(s_hint, LV_ALIGN_BOTTOM_MID, 0, -6);
     lvgl_port::unlock();
     return s_title != nullptr && s_big != nullptr && s_status != nullptr && s_hint != nullptr;
+}
+
+void wake()
+{
+    s_last_activity_ms = now_ms();
+    if (!s_light_on) {
+        s_light_on = true;
+        display::set_backlight(true);
+    }
+}
+
+void tick()
+{
+    if (s_light_on && s_timeout_ms > 0 && static_cast<uint32_t>(now_ms() - s_last_activity_ms) >= s_timeout_ms) {
+        s_light_on = false;
+        display::set_backlight(false);
+    }
 }
 
 void show(const Screen& screen)
@@ -75,6 +107,7 @@ void show(const Screen& screen)
     }
     s_last = screen;
     s_have_last = true;
+    wake(); // something changed on the screen: whoever looks at it should see it
 
     lvgl_port::lock();
     lv_label_set_text(s_title, screen.title);

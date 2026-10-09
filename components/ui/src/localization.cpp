@@ -263,6 +263,30 @@ struct Strings {
     const char* wrong_current_pin_left_fmt;
     const char* rotate_scroll_ok_print_back_return;
     const char* results_count_fmt;
+    const char* usb_wireless_row_fmt;
+    const char* wireless_title;
+    const char* wireless_footer;
+    const char* wireless_switch_row_fmt;
+    const char* wireless_pair_row;
+    const char* wireless_pair_another_row;
+    const char* wireless_forget_confirm_fmt;
+    const char* wireless_forget_row_fmt;
+    const char* wireless_forget_none_fmt;
+    const char* wireless_st_unsupported;
+    const char* wireless_st_off;
+    const char* wireless_st_not_paired;
+    const char* wireless_st_looking;
+    const char* wireless_st_ready;
+    const char* wireless_st_no_pc;
+    const char* wireless_st_pairing;
+    const char* wireless_out_paired;
+    const char* wireless_out_refused;
+    const char* wireless_out_not_found;
+    const char* wireless_waiting_dongle;
+    const char* wireless_same_code;
+    const char* wireless_press_boot;
+    const char* wireless_pin_header;
+    const char* wireless_could_not_start;
 };
 
 constexpr Strings EN = {
@@ -355,7 +379,31 @@ constexpr Strings EN = {
     "Enable at least one character type",
     "Firmware %s", "Standalone password / TOTP manager",
     "BACK  Unlock   OK  Print URL", "OK  Print URL",
-    "Locked", "Unlocked", "WiFi not connected", "Password Shortcut empty", "Wrong current PIN, %u left", "ROTATE Scroll OK Print BACK Return", "%u result%s"
+    "Locked", "Unlocked", "WiFi not connected", "Password Shortcut empty", "Wrong current PIN, %u left", "ROTATE Scroll OK Print BACK Return", "%u result%s",
+    "%sWireless typing >",
+    "Wireless typing",
+    "OK: select   BACK: return",
+    "%sWireless typing: %s",
+    "Pair dongle...",
+    "Pair another dongle...",
+    "%sForget the dongle? OK = yes",
+    "%sForget dongle (%.8s)",
+    "%sForget dongle (none paired)",
+    "Not in this firmware build",
+    "Off: Print goes to the USB cable",
+    "No dongle paired",
+    "Looking for the dongle...",
+    "Connected, the PC is ready",
+    "Connected, dongle not in a PC",
+    "Pairing...",
+    "Paired!",
+    "Pairing refused",
+    "Dongle not found. Press BOOT on it first.",
+    "Waiting for the dongle...",
+    "Same code on the dongle?",
+    "Looking for the dongle...\nPress BOOT on it now.",
+    "PIN to pair a dongle",
+    "Could not start pairing"
 };
 
 constexpr Strings RU = {
@@ -449,7 +497,31 @@ constexpr Strings RU = {
     "Включите хотя бы один тип символов",
     "Прошивка %s", "Автономный менеджер паролей / TOTP",
     "НАЗАД  Разблокировать   OK  Печать URL", "OK  Печать URL",
-    "Заблокировано", "Разблокировано", "WiFi не подключен", "Пароль для сочетания не задан", "Неверный текущий PIN, осталось %u", "ПОВОРОТ Прокрутка OK Напечатать НАЗАД Возврат", "Результатов: %u"
+    "Заблокировано", "Разблокировано", "WiFi не подключен", "Пароль для сочетания не задан", "Неверный текущий PIN, осталось %u", "ПОВОРОТ Прокрутка OK Напечатать НАЗАД Возврат", "Результатов: %u",
+    "%sПечать по радио >",
+    "Печать по радио",
+    "OK  Выбор    НАЗАД  Возврат",
+    "%sПечать по радио: %s",
+    "Сопрячь донгл...",
+    "Сопрячь другой донгл...",
+    "%sЗабыть донгл? OK = да",
+    "%sЗабыть донгл (%.8s)",
+    "%sЗабыть донгл (нет пары)",
+    "Нет в этой сборке прошивки",
+    "Выкл.: печать идёт по USB-кабелю",
+    "Донгл не сопряжён",
+    "Поиск донгла...",
+    "Подключено, ПК готов",
+    "Подключено, донгл не в ПК",
+    "Сопряжение...",
+    "Сопряжено!",
+    "Сопряжение отклонено",
+    "Донгл не найден. Сначала нажмите на нём BOOT.",
+    "Ждём донгл...",
+    "Код совпадает на донгле?",
+    "Поиск донгла...\nНажмите на нём BOOT.",
+    "PIN для сопряжения донгла",
+    "Не удалось начать сопряжение"
 };
 
 const Strings& strings()
@@ -730,6 +802,30 @@ const char* tr(Key key)
         case Key::WrongCurrentPinLeftFmt: return s.wrong_current_pin_left_fmt;
         case Key::RotateScrollOkPrintBackReturn: return s.rotate_scroll_ok_print_back_return;
         case Key::ResultsCountFmt: return s.results_count_fmt;
+        case Key::UsbWirelessRowFmt: return s.usb_wireless_row_fmt;
+        case Key::WirelessTitle: return s.wireless_title;
+        case Key::WirelessFooter: return s.wireless_footer;
+        case Key::WirelessSwitchRowFmt: return s.wireless_switch_row_fmt;
+        case Key::WirelessPairRow: return s.wireless_pair_row;
+        case Key::WirelessPairAnotherRow: return s.wireless_pair_another_row;
+        case Key::WirelessForgetConfirmFmt: return s.wireless_forget_confirm_fmt;
+        case Key::WirelessForgetRowFmt: return s.wireless_forget_row_fmt;
+        case Key::WirelessForgetNoneFmt: return s.wireless_forget_none_fmt;
+        case Key::WirelessStUnsupported: return s.wireless_st_unsupported;
+        case Key::WirelessStOff: return s.wireless_st_off;
+        case Key::WirelessStNotPaired: return s.wireless_st_not_paired;
+        case Key::WirelessStLooking: return s.wireless_st_looking;
+        case Key::WirelessStReady: return s.wireless_st_ready;
+        case Key::WirelessStNoPc: return s.wireless_st_no_pc;
+        case Key::WirelessStPairing: return s.wireless_st_pairing;
+        case Key::WirelessOutPaired: return s.wireless_out_paired;
+        case Key::WirelessOutRefused: return s.wireless_out_refused;
+        case Key::WirelessOutNotFound: return s.wireless_out_not_found;
+        case Key::WirelessWaitingDongle: return s.wireless_waiting_dongle;
+        case Key::WirelessSameCode: return s.wireless_same_code;
+        case Key::WirelessPressBoot: return s.wireless_press_boot;
+        case Key::WirelessPinHeader: return s.wireless_pin_header;
+        case Key::WirelessCouldNotStart: return s.wireless_could_not_start;
     }
 
     return "";

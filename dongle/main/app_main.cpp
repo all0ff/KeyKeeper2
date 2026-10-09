@@ -56,6 +56,12 @@ constexpr bool BLE = true;
 constexpr bool BLE = false;
 #endif
 
+#if CONFIG_DONGLE_LANGUAGE_RU
+constexpr bool RU = true;
+#else
+constexpr bool RU = false;
+#endif
+
 constexpr uart_port_t UART = static_cast<uart_port_t>(CONFIG_DONGLE_UART_NUM);
 constexpr gpio_num_t TX_PIN = static_cast<gpio_num_t>(CONFIG_DONGLE_TX_PIN);
 constexpr gpio_num_t RX_PIN = static_cast<gpio_num_t>(CONFIG_DONGLE_RX_PIN);
@@ -99,6 +105,7 @@ public:
     bool ready() override { return true; }
     bool send_key(uint8_t keycode, uint8_t modifier, uint32_t hold_ms) override
     {
+        dongle::ui::wake(); // typing keeps the backlight on
         ESP_LOGI(TAG, "KEY mods=%02x usage=%02x hold=%ums", modifier, keycode, static_cast<unsigned>(hold_ms));
         ++keys;
         return true;
@@ -119,6 +126,7 @@ public:
     bool ready() override { return dongle::usbdev::mounted(); }
     bool send_key(uint8_t keycode, uint8_t modifier, uint32_t hold_ms) override
     {
+        dongle::ui::wake(); // typing keeps the backlight on
         ESP_LOGI(TAG, "KEY mods=%02x usage=%02x hold=%ums", modifier, keycode, static_cast<unsigned>(hold_ms));
         if (!dongle::usbdev::send_key(keycode, modifier, hold_ms)) {
             return false;
@@ -146,7 +154,7 @@ public:
     uint32_t notice_until = 0;
     uint32_t window_end = 0;
     bool connect_after_pairing = false;
-    char text[48] = {};   // Notice::Text
+    char text[96] = {};   // Notice::Text
     bool text_ok = true;
 
     // The dongle: executes TypeKeys. The vault simulator: waits for the Result of its last TypeKeys.
@@ -184,7 +192,7 @@ public:
             }
             ESP_LOGI(TAG, "TypeKeys: code %u, %u of the events done, %u keys", static_cast<unsigned>(r.code),
                      static_cast<unsigned>(r.done_events), keys.keys - before);
-            std::snprintf(text, sizeof text, "Typed %u keys", keys.keys - before);
+            std::snprintf(text, sizeof text, RU ? "Напечатано клавиш: %u" : "Typed %u keys", keys.keys - before);
             text_ok = r.code == kk::msg::ResultCode::Ok;
             set_notice(dongle::Notice::Text);
         } else if (ROLE == kk::link::Role::Vault && h.type == kk::msg::Type::Result) {
@@ -343,14 +351,14 @@ extern "C" void app_main(void)
         halt();
     }
     display::set_backlight(true);
-    if (!lvgl_port::init() || !dongle::ui::init()) {
+    if (!lvgl_port::init() || !dongle::ui::init(static_cast<uint32_t>(CONFIG_DONGLE_SCREEN_TIMEOUT_S))) {
         ESP_LOGE(TAG, "LVGL initialisation failed");
         halt();
     }
     {
         dongle::Screen s;
-        std::snprintf(s.title, sizeof s.title, "%s", ROLE == kk::link::Role::Dongle ? "KeyKeeper dongle" : "Vault (simulator)");
-        std::snprintf(s.status, sizeof s.status, "%s", "Starting...");
+        std::snprintf(s.title, sizeof s.title, "%s", ROLE == kk::link::Role::Dongle ? "KeyKeeper dongle" : (RU ? "Хранилище (симулятор)" : "Vault (simulator)"));
+        std::snprintf(s.status, sizeof s.status, "%s", RU ? "Запуск..." : "Starting...");
         dongle::ui::show(s);
     }
 
@@ -502,6 +510,9 @@ extern "C" void app_main(void)
         sit.window_open = ep.pairing_open();
         sit.local_confirmed = ep.local_confirmed();
 
+        if (gpio_get_level(BOOT_PIN) == 0) {
+            dongle::ui::wake(); // any press switches the backlight on
+        }
         switch (dongle::action_for(sit, button.feed(gpio_get_level(BOOT_PIN) == 0, now))) {
         case dongle::Action::None: break;
         case dongle::Action::OpenPairing:
@@ -540,9 +551,10 @@ extern "C" void app_main(void)
             ESP_LOGI(TAG, "test text: %s, %u characters%s%s", rr.ok ? "ok" : "FAILED", static_cast<unsigned>(rr.chars_sent),
                      rr.error != nullptr ? ", note: " : "", rr.error != nullptr ? rr.error : "");
             if (rr.ok) {
-                std::snprintf(app.text, sizeof app.text, "Typed %u characters", static_cast<unsigned>(rr.chars_sent));
+                std::snprintf(app.text, sizeof app.text, RU ? "Напечатано символов: %u" : "Typed %u characters",
+                              static_cast<unsigned>(rr.chars_sent));
             } else {
-                std::snprintf(app.text, sizeof app.text, "%s", rr.error != nullptr ? rr.error : "Typing failed");
+                std::snprintf(app.text, sizeof app.text, "%s", rr.error != nullptr ? rr.error : (RU ? "Печать не удалась" : "Typing failed"));
             }
             app.text_ok = rr.ok;
             app.set_notice(dongle::Notice::Text);
@@ -573,6 +585,7 @@ extern "C" void app_main(void)
         std::snprintf(snap.text, sizeof snap.text, "%s", app.text);
         snap.text_ok = app.text_ok;
         snap.long_s = LONG_PRESS_MS / 1000;
+        snap.ru = RU;
 #if CONFIG_DONGLE_USB_HID
         if (ROLE == kk::link::Role::Dongle) {
             snap.usb = dongle::usbdev::mounted() ? 1 : 0;
@@ -587,6 +600,7 @@ extern "C" void app_main(void)
             }
         }
         dongle::ui::show(dongle::describe(snap));
+        dongle::ui::tick();
 
         if (static_cast<int32_t>(now - last_status_log) >= 10000) {
             last_status_log = now;

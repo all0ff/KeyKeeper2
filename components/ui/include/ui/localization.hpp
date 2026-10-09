@@ -4,7 +4,7 @@
 
 namespace ui::i18n {
 
-enum class Key : uint8_t {
+enum class Key : uint16_t {
     MainMenu,
     Accounts,
     Settings,
@@ -263,6 +263,30 @@ enum class Key : uint8_t {
     WrongCurrentPinLeftFmt,
     RotateScrollOkPrintBackReturn,
     ResultsCountFmt,
+    UsbWirelessRowFmt,
+    WirelessTitle,
+    WirelessFooter,
+    WirelessSwitchRowFmt,
+    WirelessPairRow,
+    WirelessPairAnotherRow,
+    WirelessForgetConfirmFmt,
+    WirelessForgetRowFmt,
+    WirelessForgetNoneFmt,
+    WirelessStUnsupported,
+    WirelessStOff,
+    WirelessStNotPaired,
+    WirelessStLooking,
+    WirelessStReady,
+    WirelessStNoPc,
+    WirelessStPairing,
+    WirelessOutPaired,
+    WirelessOutRefused,
+    WirelessOutNotFound,
+    WirelessWaitingDongle,
+    WirelessSameCode,
+    WirelessPressBoot,
+    WirelessPinHeader,
+    WirelessCouldNotStart,
 };
 
 void set_language(settings::Language language);

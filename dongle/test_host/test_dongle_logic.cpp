@@ -266,11 +266,54 @@ void test_screens()
 
 }  // namespace
 
+// Every state in Russian: fits in the buffers (no cut UTF-8 character), nothing left in English.
+static bool valid_utf8(const char* t)
+{
+    for (const unsigned char* p = reinterpret_cast<const unsigned char*>(t); *p;) {
+        int n = *p < 0x80 ? 1 : (*p & 0xE0) == 0xC0 ? 2 : (*p & 0xF0) == 0xE0 ? 3 : 0;
+        if (n == 0) return false;
+        for (int i = 1; i < n; ++i) if ((p[i] & 0xC0) != 0x80) return false;
+        p += n;
+    }
+    return true;
+}
+
+static void test_russian()
+{
+    using kk::link::State;
+    const State states[] = {State::Idle, State::Pairing, State::Confirming, State::Connecting, State::Linked};
+    const Notice notices[] = {Notice::None, Notice::Paired, Notice::Rejected, Notice::Failed, Notice::WindowClosed, Notice::Forgotten};
+    for (State st : states)
+        for (int paired = 0; paired < 2; ++paired)
+            for (int win = 0; win < 2; ++win)
+                for (int usb = -1; usb <= 1; ++usb)
+                    for (Notice n : notices)
+                        for (int role = 0; role < 2; ++role) {
+                            Snapshot s;
+                            s.role = role ? kk::link::Role::Vault : kk::link::Role::Dongle;
+                            s.state = st; s.paired = paired; s.window_open = win; s.usb = usb; s.notice = n;
+                            s.window_left_s = 42; s.code = "123456"; s.ru = true;
+                            const Screen o = describe(s);
+                            CHECK(valid_utf8(o.title) && valid_utf8(o.status) && valid_utf8(o.hint));
+                            CHECK(std::strlen(o.hint) < sizeof o.hint - 1 && std::strlen(o.status) < sizeof o.status - 1);
+                            s.held_s = 2; s.long_s = 3;
+                            CHECK(valid_utf8(describe(s).hint));
+                        }
+    Snapshot s;
+    s.ru = true;
+    CHECK(std::strcmp(describe(s).status, "Не сопряжено") == 0);
+    s.paired = true; s.state = State::Linked; s.usb = 1;
+    CHECK(std::strcmp(describe(s).status, "Подключено") == 0 && std::strstr(describe(s).hint, "готов") != nullptr);
+    s.ru = false;
+    CHECK(std::strcmp(describe(s).status, "Connected") == 0);
+}
+
 int main()
 {
     test_button();
     test_actions();
     test_screens();
+    test_russian();
     std::printf("dongle logic: %d checks, %d failed\n", g_checks, g_failed);
     return g_failed == 0 ? 0 : 1;
 }

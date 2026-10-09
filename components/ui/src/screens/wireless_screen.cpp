@@ -37,13 +37,13 @@ WirelessScreen::~WirelessScreen()
 
 const char* WirelessScreen::title() const
 {
-    return "Wireless typing";
+    return i18n::tr(i18n::Key::WirelessTitle);
 }
 
 const char* WirelessScreen::footer_hint() const
 {
     // The footer is read when the screen is shown, so it names the keys of the whole screen, not of one state.
-    return "OK: select   BACK: return";
+    return i18n::tr(i18n::Key::WirelessFooter);
 }
 
 void WirelessScreen::initialize(lv_obj_t* content_parent)
@@ -125,18 +125,20 @@ void WirelessScreen::render_rows()
         const char* prefix = selected ? "> " : "";
         switch (static_cast<Row>(i)) {
             case Row::Switch:
-                lv_label_set_text_fmt(row_labels_[i], "%sWireless typing: %s", prefix, s.enabled ? "On" : "Off");
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::WirelessSwitchRowFmt), prefix,
+                                      s.enabled ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
                 break;
             case Row::Pair:
-                lv_label_set_text_fmt(row_labels_[i], "%s%s", prefix, s.paired ? "Pair another dongle..." : "Pair dongle...");
+                lv_label_set_text_fmt(row_labels_[i], "%s%s", prefix,
+                                      i18n::tr(s.paired ? i18n::Key::WirelessPairAnotherRow : i18n::Key::WirelessPairRow));
                 break;
             case Row::Forget:
                 if (confirm_forget_) {
-                    lv_label_set_text_fmt(row_labels_[i], "%sForget the dongle? OK = yes", prefix);
+                    lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::WirelessForgetConfirmFmt), prefix);
                 } else if (s.paired) {
-                    lv_label_set_text_fmt(row_labels_[i], "%sForget dongle (%.8s)", prefix, s.peer);
+                    lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::WirelessForgetRowFmt), prefix, s.peer);
                 } else {
-                    lv_label_set_text_fmt(row_labels_[i], "%sForget dongle (none paired)", prefix);
+                    lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::WirelessForgetNoneFmt), prefix);
                 }
                 break;
         }
@@ -156,15 +158,15 @@ void WirelessScreen::refresh_status()
         }
         const char* text = "";
         switch (s.phase) {
-            case wireless::Phase::Unsupported: text = "Not in this firmware build"; break;
-            case wireless::Phase::Off: text = "Off: Print goes to the USB cable"; break;
-            case wireless::Phase::NotPaired: text = "No dongle paired"; break;
-            case wireless::Phase::Connecting: text = "Looking for the dongle..."; break;
+            case wireless::Phase::Unsupported: text = i18n::tr(i18n::Key::WirelessStUnsupported); break;
+            case wireless::Phase::Off: text = i18n::tr(i18n::Key::WirelessStOff); break;
+            case wireless::Phase::NotPaired: text = i18n::tr(i18n::Key::WirelessStNotPaired); break;
+            case wireless::Phase::Connecting: text = i18n::tr(i18n::Key::WirelessStLooking); break;
             case wireless::Phase::Linked:
-                text = s.dongle_usb_ready ? "Connected, the PC is ready" : "Connected, dongle not in a PC";
+                text = i18n::tr(s.dongle_usb_ready ? i18n::Key::WirelessStReady : i18n::Key::WirelessStNoPc);
                 break;
-            case wireless::Phase::Pairing: text = "Pairing..."; break;
-            case wireless::Phase::Confirming: text = "Pairing..."; break;
+            case wireless::Phase::Pairing: text = i18n::tr(i18n::Key::WirelessStPairing); break;
+            case wireless::Phase::Confirming: text = i18n::tr(i18n::Key::WirelessStPairing); break;
         }
         lv_label_set_text(status_label_, text);
         // Keep the switch row's value current if something else changed it.
@@ -183,9 +185,9 @@ void WirelessScreen::refresh_status()
         const char* text = "";
         lv_color_t color = pal.primary_text;
         switch (s.outcome) {
-            case wireless::Outcome::Paired: text = "Paired!"; color = pal.success; break;
-            case wireless::Outcome::Rejected: text = "Pairing refused"; color = pal.error; break;
-            case wireless::Outcome::Failed: text = "Dongle not found. Press BOOT on it first."; color = pal.error; break;
+            case wireless::Outcome::Paired: text = i18n::tr(i18n::Key::WirelessOutPaired); color = pal.success; break;
+            case wireless::Outcome::Rejected: text = i18n::tr(i18n::Key::WirelessOutRefused); color = pal.error; break;
+            case wireless::Outcome::Failed: text = i18n::tr(i18n::Key::WirelessOutNotFound); color = pal.error; break;
             case wireless::Outcome::None: break;
         }
         lv_label_set_text(code_label_, "");
@@ -203,14 +205,14 @@ void WirelessScreen::refresh_status()
             char code[10];
             std::snprintf(code, sizeof code, "%.3s %.3s", s.code, s.code + 3);
             lv_label_set_text(code_label_, code);
-            lv_label_set_text(info_label_, s.local_confirmed ? "Waiting for the dongle..." : "Same code on the dongle?");
+            lv_label_set_text(info_label_, i18n::tr(s.local_confirmed ? i18n::Key::WirelessWaitingDongle : i18n::Key::WirelessSameCode));
             lv_obj_set_style_text_color(info_label_, pal.primary_text, 0);
             break;
         }
         case wireless::Phase::Pairing:
             idle_ticks_ = 0;
             lv_label_set_text(code_label_, "");
-            lv_label_set_text(info_label_, "Looking for the dongle...\nPress BOOT on it now.");
+            lv_label_set_text(info_label_, i18n::tr(i18n::Key::WirelessPressBoot));
             lv_obj_set_style_text_color(info_label_, pal.primary_text, 0);
             break;
         default:
@@ -346,7 +348,7 @@ void WirelessScreen::build_pin_entry(const char* error)
     const theme::Palette& pal = theme::current();
     lv_obj_t* header = lv_label_create(content_parent_);
     lv_obj_set_style_text_color(header, pal.secondary_text, 0);
-    lv_label_set_text(header, "PIN to pair a dongle");
+    lv_label_set_text(header, i18n::tr(i18n::Key::WirelessPinHeader));
     lv_obj_align(header, LV_ALIGN_TOP_MID, 0, 4);
 
     if (error != nullptr) {
@@ -398,7 +400,7 @@ void WirelessScreen::handle_pin_result(security::pin::VerifyResult result)
         } else {
             build_browse();
             if (status_label_ != nullptr) {
-                lv_label_set_text(status_label_, "Could not start pairing");
+                lv_label_set_text(status_label_, i18n::tr(i18n::Key::WirelessCouldNotStart));
             }
         }
         return;
@@ -441,7 +443,7 @@ void WirelessScreen::build_pairing()
     lv_label_set_long_mode(info_label_, LV_LABEL_LONG_WRAP);
     lv_obj_set_style_text_align(info_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(info_label_, LV_ALIGN_CENTER, 0, 24);
-    lv_label_set_text(info_label_, "Looking for the dongle...");
+    lv_label_set_text(info_label_, i18n::tr(i18n::Key::WirelessStLooking));
 }
 
 void WirelessScreen::leave_pairing()

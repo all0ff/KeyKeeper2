@@ -143,7 +143,7 @@ void UsbSettingsScreen::render_rows()
                                        cyrillic_auto_switch_layout_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
                 break;
             case Row::Wireless:
-                lv_label_set_text_fmt(row_labels_[i], "%sWireless typing >", prefix);
+                lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::UsbWirelessRowFmt), prefix);
                 break;
             case Row::Save:
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SaveRowFmt), prefix);
