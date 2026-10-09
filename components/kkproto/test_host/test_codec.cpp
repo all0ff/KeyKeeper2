@@ -97,7 +97,7 @@ static void test_messages()
     CHECK(msg::parse(m, n - 1, &h, &body) == msg::ParseStatus::BadLength);
     m[n] = 0;
     CHECK(msg::parse(m, n + 1, &h, &body) == msg::ParseStatus::BadLength);
-    for (uint8_t t : {0, 11, 255}) { uint8_t c[6] = {t, 0, 0, 0, 0, 0}; CHECK(msg::parse(c, 6, &h, &body) == msg::ParseStatus::UnknownType); }
+    for (uint8_t t : {0, 12, 255}) { uint8_t c[6] = {t, 0, 0, 0, 0, 0}; CHECK(msg::parse(c, 6, &h, &body) == msg::ParseStatus::UnknownType); }
     uint8_t big[6 + 221] = {3, 0, 0, 0, 221, 0};
     CHECK(msg::parse(big, sizeof big, &h, &body) == msg::ParseStatus::BadLength);
     CHECK(msg::parse(nullptr, 0, &h, &body) == msg::ParseStatus::Truncated);

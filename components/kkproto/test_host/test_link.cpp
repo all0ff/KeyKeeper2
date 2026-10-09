@@ -248,6 +248,12 @@ void test_pairing_and_link()
     r.run(5);
     CHECK(!r.vault.ep->peer_usb_mounted());
     r.vault.msgs.clear();
+    // The vault tells the dongle its menu language.
+    const uint8_t lang = msg::kLangRussian;
+    CHECK(r.vault.ep->send_message(msg::Type::Language, 0, &lang, 1));
+    r.run(5);
+    CHECK(r.dongle.msgs.size() == 2 && r.dongle.msgs[1].type == msg::Type::Language && r.dongle.msgs[1].body == Bytes{lang});
+    // (the earlier TypeKeys stays in dongle.msgs: the big one below is then number 2)
     // Internal messages are not the application's to send; and the largest body still fits a frame.
     CHECK(!r.vault.ep->send_message(msg::Type::Hello, 0, nullptr, 0));
     CHECK(!r.vault.ep->send_message(msg::Type::PairConfirm, 0, nullptr, 0));
@@ -256,7 +262,7 @@ void test_pairing_and_link()
     CHECK(r.vault.ep->send_message(msg::Type::TypeKeys, 0, big.data(), big.size()));
     for (const Bytes& f : r.vd.seen) CHECK(f.size() <= link::Endpoint::kBufLen);
     r.run(5);
-    CHECK(r.dongle.msgs.size() == 2 && r.dongle.msgs[1].body == big);
+    CHECK(r.dongle.msgs.size() == 3 && r.dongle.msgs[2].body == big);
     big.push_back(0);
     CHECK(!r.vault.ep->send_message(msg::Type::TypeKeys, 0, big.data(), big.size()));
 

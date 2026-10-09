@@ -191,6 +191,7 @@ bool Endpoint::send_message(msg::Type type, uint8_t flags, const uint8_t* body, 
     case msg::Type::Result:
     case msg::Type::State:
     case msg::Type::Abort:
+    case msg::Type::Language:
         break;
     default:
         return false; // protocol-internal messages are not the application's to send
@@ -517,7 +518,14 @@ bool Endpoint::try_transport(const uint8_t* d, size_t n, uint32_t now_ms)
     }
     msg::Header h;
     const uint8_t* body = nullptr;
-    if (msg::parse(rx_plain_, pn, &h, &body) != msg::ParseStatus::Ok) {
+    const msg::ParseStatus ps = msg::parse(rx_plain_, pn, &h, &body);
+    if (ps == msg::ParseStatus::UnknownType) {
+        // Authentic, but a message type this firmware does not know (the peer is newer): ignore it instead of
+        // ending the session, so that an old and a new firmware still work together.
+        last_rx_ = now_ms;
+        return true;
+    }
+    if (ps != msg::ParseStatus::Ok) {
         // Authentic but malformed: the peer is broken. The counters are now out of step anyway.
         fail(Fail::Handshake);
         end_session(true);

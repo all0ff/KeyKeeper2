@@ -215,6 +215,8 @@ public:
     }
 
     // ---- API (any task)
+    void set_peer_language(uint8_t lang) { lang_ = lang; }
+
     void start_radio()
     {
         lock();
@@ -728,6 +730,20 @@ private:
         unlock();
     }
 
+    // The vault's menu language goes to the dongle (its screen speaks the same language): once per link, and
+    // again whenever the setting changes.
+    void send_language()
+    {
+        if (ep_->state() != kk::link::State::Linked) {
+            lang_sent_ = 0xFF;
+            return;
+        }
+        const uint8_t want = lang_.load();
+        if (want != 0xFF && want != lang_sent_ && ep_->send_message(kk::msg::Type::Language, 0, &want, 1)) {
+            lang_sent_ = want;
+        }
+    }
+
     void run()
     {
         for (;;) {
@@ -770,6 +786,7 @@ private:
                 ep_->connect(now_ms());
             }
             refresh_atomics();
+            send_language();
             send_pending_request();
             publish();
         }
@@ -790,6 +807,8 @@ private:
     Req req_;
     Status status_;
     std::atomic<bool> want_enabled_{false};
+    std::atomic<uint8_t> lang_{0xFF}; ///< menu language to tell the dongle (0xFF: not known yet)
+    uint8_t lang_sent_ = 0xFF;
     std::atomic<bool> radio_ok_{false}; ///< set by start_radio(): the port may be brought up
     std::atomic<bool> a_linked_{false};
     std::atomic<bool> a_usb_{false};
@@ -827,6 +846,12 @@ bool init()
     return true;
 }
 
+void set_peer_language(uint8_t lang)
+{
+    if (g_link != nullptr) {
+        g_link->set_peer_language(lang);
+    }
+}
 void start_radio()
 {
     if (g_link != nullptr) {

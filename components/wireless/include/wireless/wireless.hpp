@@ -57,6 +57,9 @@ bool init();
 /// Lets the link task bring the radio/port up. Call after the UI is initialised: BLE takes ~60 KB of internal
 /// RAM, which the UI must have first. Until then the switch is only remembered.
 void start_radio();
+/// The vault's menu language (kk::msg::kLangEnglish / kLangRussian) for the dongle's screen; sent once the link is
+/// up and again whenever it changes. Safe to call before init() (then ignored; call again after).
+void set_peer_language(uint8_t lang);
 bool supported();
 
 bool enabled();

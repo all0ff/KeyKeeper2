@@ -6,6 +6,7 @@ namespace wireless {
 
 bool init() { return true; }
 void start_radio() {}
+void set_peer_language(uint8_t) {}
 bool supported() { return false; }
 bool enabled() { return false; }
 bool set_enabled(bool) { return false; }

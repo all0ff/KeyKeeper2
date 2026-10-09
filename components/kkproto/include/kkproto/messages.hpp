@@ -29,7 +29,8 @@ enum class Type : uint8_t {
     Ping = 7,
     Pong = 8,
     Bye = 9,
-    PairConfirm = 10 ///< vault -> dongle during pairing: the user accepted the code
+    PairConfirm = 10, ///< vault -> dongle during pairing: the user accepted the code
+    Language = 11     ///< vault -> dongle: 1 byte, the vault's menu language (kLangEnglish / kLangRussian)
 };
 
 struct Header {
@@ -90,6 +91,9 @@ struct HelloAck {
     uint8_t fw_minor = 0;
     bool usb_mounted = false;
 };
+
+constexpr uint8_t kLangEnglish = 0;
+constexpr uint8_t kLangRussian = 1;
 
 constexpr uint8_t kStateUsbMounted = 0x01;
 constexpr uint8_t kStateHidReady = 0x02;

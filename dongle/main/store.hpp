@@ -17,4 +17,8 @@ bool load_peer(uint8_t pk[32]);
 bool save_peer(const uint8_t pk[32]);
 bool erase_peer();
 
+/// The vault's menu language (kk::msg::kLangEnglish / kLangRussian), as last told by the vault.
+bool load_language(uint8_t* lang);
+bool save_language(uint8_t lang);
+
 } // namespace dongle::store

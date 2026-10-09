@@ -1,5 +1,7 @@
 #include "ui/localization.hpp"
 
+#include "wireless/wireless.hpp"
+
 namespace ui::i18n {
 
 namespace {
@@ -534,6 +536,8 @@ const Strings& strings()
 void set_language(settings::Language language)
 {
     current_language = language;
+    // The wireless dongle's screen speaks the vault's language.
+    wireless::set_peer_language(language == settings::Language::Russian ? 1 : 0);
 }
 
 settings::Language language()

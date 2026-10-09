@@ -7,7 +7,7 @@ namespace kk::msg {
 namespace {
 bool known_type(uint8_t t)
 {
-    return t >= static_cast<uint8_t>(Type::Hello) && t <= static_cast<uint8_t>(Type::PairConfirm);
+    return t >= static_cast<uint8_t>(Type::Hello) && t <= static_cast<uint8_t>(Type::Language);
 }
 void put_le16(uint8_t* p, uint16_t v)
 {

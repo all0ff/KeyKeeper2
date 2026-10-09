@@ -56,10 +56,11 @@ constexpr bool BLE = true;
 constexpr bool BLE = false;
 #endif
 
+// Screen language: what the vault last told us (stored), until the first time: the build's default.
 #if CONFIG_DONGLE_LANGUAGE_RU
-constexpr bool RU = true;
+bool RU = true;
 #else
-constexpr bool RU = false;
+bool RU = false;
 #endif
 
 constexpr uart_port_t UART = static_cast<uart_port_t>(CONFIG_DONGLE_UART_NUM);
@@ -195,6 +196,15 @@ public:
             std::snprintf(text, sizeof text, RU ? "Напечатано клавиш: %u" : "Typed %u keys", keys.keys - before);
             text_ok = r.code == kk::msg::ResultCode::Ok;
             set_notice(dongle::Notice::Text);
+        } else if (ROLE == kk::link::Role::Dongle && h.type == kk::msg::Type::Language) {
+            if (h.len == 1 && body[0] <= kk::msg::kLangRussian) {
+                const bool ru = body[0] == kk::msg::kLangRussian;
+                if (ru != RU) {
+                    RU = ru;
+                    dongle::store::save_language(body[0]);
+                    ESP_LOGI(TAG, "screen language: %s (from the vault)", ru ? "Russian" : "English");
+                }
+            }
         } else if (ROLE == kk::link::Role::Vault && h.type == kk::msg::Type::Result) {
             kk::msg::Result r;
             if (kk::msg::decode_result(body, h.len, &r)) {
@@ -375,6 +385,12 @@ extern "C" void app_main(void)
         ESP_LOGE(TAG, "NVS initialisation failed");
         show_fatal("Storage failed", "NVS init");
         halt();
+    }
+    {
+        uint8_t lang = 0;
+        if (dongle::store::load_language(&lang) && lang <= kk::msg::kLangRussian) {
+            RU = lang == kk::msg::kLangRussian;
+        }
     }
     static kk::noise::KeyPair key;
     bool have_key = dongle::store::load_secret(key.sk) && kk::crypto::x25519_public(key.sk, key.pk);

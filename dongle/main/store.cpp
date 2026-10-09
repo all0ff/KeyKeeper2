@@ -68,6 +68,36 @@ bool save_secret(const uint8_t sk[32]) { return save_blob(KEY_SECRET, sk); }
 bool load_peer(uint8_t pk[32]) { return load_blob(KEY_PEER, pk); }
 bool save_peer(const uint8_t pk[32]) { return save_blob(KEY_PEER, pk); }
 
+bool load_language(uint8_t* lang)
+{
+    nvs_handle_t h;
+    if (nvs_open(NS, NVS_READONLY, &h) != ESP_OK) {
+        return false;
+    }
+    uint8_t v = 0;
+    const esp_err_t e = nvs_get_u8(h, "lang", &v);
+    nvs_close(h);
+    if (e != ESP_OK) {
+        return false;
+    }
+    *lang = v;
+    return true;
+}
+
+bool save_language(uint8_t lang)
+{
+    nvs_handle_t h;
+    if (nvs_open(NS, NVS_READWRITE, &h) != ESP_OK) {
+        return false;
+    }
+    esp_err_t e = nvs_set_u8(h, "lang", lang);
+    if (e == ESP_OK) {
+        e = nvs_commit(h);
+    }
+    nvs_close(h);
+    return e == ESP_OK;
+}
+
 bool erase_peer()
 {
     nvs_handle_t h;
