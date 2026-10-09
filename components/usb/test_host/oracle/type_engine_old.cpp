@@ -17,7 +17,7 @@ constexpr char TAG[] = "usb.type";
 // Held slightly longer than a normal character press -- OS
 // layout-switch hotkey handlers are sometimes picky about very brief
 // modifier-only taps being recognized at all.
-constexpr uint32_t LAYOUT_SWITCH_HOLD_MS = 50;
+constexpr uint32_t LAYOUT_SWITCH_HOLD_MS = 100;
 // Gives the host a moment to fully process the PREVIOUS keystroke's
 // release before the modifier-only hotkey report goes out -- a real,
 // confirmed failure mode was the switch-back after a Cyrillic run not
@@ -25,10 +25,10 @@ constexpr uint32_t LAYOUT_SWITCH_HOLD_MS = 50;
 // ones), which looked consistent with the hotkey arriving too soon
 // after the last regular key's release for the host to treat it as a
 // distinct event.
-constexpr uint32_t LAYOUT_SWITCH_PRE_DELAY_MS = 60;
+constexpr uint32_t LAYOUT_SWITCH_PRE_DELAY_MS = 120;
 // Give the host a moment to actually apply the new layout before the
 // first character of the run goes out.
-constexpr uint32_t LAYOUT_SWITCH_SETTLE_MS = 80;
+constexpr uint32_t LAYOUT_SWITCH_SETTLE_MS = 250;
 
 /**
  * @brief Decode ONE UTF-8 code point starting at text[pos].

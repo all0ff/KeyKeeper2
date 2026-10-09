@@ -88,9 +88,9 @@ struct TypingPlan {
 
 /// Layout-switch hotkey timing -- see the comments in typing_plan.cpp for the
 /// real failure each value was introduced for.
-constexpr uint32_t LAYOUT_SWITCH_HOLD_MS = 50;
-constexpr uint32_t LAYOUT_SWITCH_PRE_DELAY_MS = 60;
-constexpr uint32_t LAYOUT_SWITCH_SETTLE_MS = 80;
+constexpr uint32_t LAYOUT_SWITCH_HOLD_MS = 100;
+constexpr uint32_t LAYOUT_SWITCH_PRE_DELAY_MS = 120;
+constexpr uint32_t LAYOUT_SWITCH_SETTLE_MS = 250;
 
 /// Pure: builds the plan for |text|. Never fails; characters it cannot type
 /// become Skip events so that the executor's character count matches what

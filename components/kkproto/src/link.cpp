@@ -181,7 +181,7 @@ void Endpoint::reset()
     end_session(false);
 }
 
-bool Endpoint::send_message(msg::Type type, uint8_t flags, const uint8_t* body, size_t body_len)
+bool Endpoint::send_message(msg::Type type, uint8_t flags, const uint8_t* body, size_t body_len, uint16_t* seq_out)
 {
     if (state_ != State::Linked || !have_tr_) {
         return false;
@@ -196,12 +196,16 @@ bool Endpoint::send_message(msg::Type type, uint8_t flags, const uint8_t* body, 
         return false; // protocol-internal messages are not the application's to send
     }
     size_t n = 0;
-    if (!msg::encode(type, flags, seq_++, body, body_len, tx_plain_, sizeof tx_plain_, &n)) {
+    const uint16_t seq = seq_++;
+    if (!msg::encode(type, flags, seq, body, body_len, tx_plain_, sizeof tx_plain_, &n)) {
         return false;
     }
     size_t m = 0;
     if (tr_.seal(tx_plain_, n, buf_, sizeof buf_, &m) != noise::Status::Ok) {
         return false;
+    }
+    if (seq_out != nullptr) {
+        *seq_out = seq;
     }
     io_.send(buf_, m);
     return true;
@@ -241,6 +245,7 @@ void Endpoint::end_session(bool notify)
     local_ok_ = false;
     remote_ok_ = false;
     ping_out_ = false;
+    peer_state_ = 0;
     state_ = State::Idle;
     if (notify && was_linked) {
         io_.event(Event::LinkLost);
@@ -574,6 +579,7 @@ void Endpoint::handle_message(const msg::Header& h, const uint8_t* body, uint32_
                 return;
             }
             state_ = State::Linked;
+            peer_state_ = v.usb_mounted ? msg::kStateUsbMounted : 0;
             last_ping_ = now_ms;
             last_rx_ = now_ms;
             fail_ = Fail::None;
@@ -589,6 +595,14 @@ void Endpoint::handle_message(const msg::Header& h, const uint8_t* body, uint32_
         if (state_ == State::Linked && ping_out_ && h.seq == ping_seq_) {
             ping_out_ = false;
             rtt_ms_ = now_ms - ping_sent_at_;
+        }
+        return;
+    case msg::Type::State:
+        if (role_ == Role::Vault && state_ == State::Linked && h.len == 1) {
+            peer_state_ = body[0];
+        }
+        if (state_ == State::Linked) {
+            io_.message(h, body);
         }
         return;
     default:

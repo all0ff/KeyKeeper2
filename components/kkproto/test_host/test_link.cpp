@@ -39,6 +39,7 @@ struct Wire {
 struct Msg {
     msg::Type type;
     Bytes body;
+    uint16_t seq = 0;
 };
 
 struct Node : link::Io {
@@ -77,7 +78,7 @@ struct Node : link::Io {
     }
     void message(const msg::Header& h, const uint8_t* body) override
     {
-        msgs.push_back({h.type, Bytes(body, body + h.len)});
+        msgs.push_back({h.type, Bytes(body, body + h.len), h.seq});
     }
     int count(Event e) const
     {
@@ -221,10 +222,15 @@ void test_pairing_and_link()
     CHECK(r.vault.count(Event::LinkLost) == 0 && r.dongle.count(Event::LinkLost) == 0);
     CHECK(r.vault.ep->last_rtt_ms() <= 1);
 
-    // Application messages both ways.
+    // The dongle's USB state reached the vault with the HelloAck (this dongle never said "mounted").
+    CHECK(!r.vault.ep->peer_usb_mounted() && r.vault.ep->peer_state() == 0);
+
+    // Application messages both ways. send_message reports the seq it used: that is what a Result answers.
     const uint8_t body[] = {1, 2, 3, 4, 5, 6, 7};
-    CHECK(r.vault.ep->send_message(msg::Type::TypeKeys, 0, body, sizeof body));
+    uint16_t used_seq = 0xFFFF;
+    CHECK(r.vault.ep->send_message(msg::Type::TypeKeys, 0, body, sizeof body, &used_seq));
     r.run(5);
+    CHECK(r.dongle.msgs.size() == 1 && r.dongle.msgs[0].seq == used_seq);
     CHECK(r.dongle.msgs.size() == 1 && r.dongle.msgs[0].type == msg::Type::TypeKeys &&
           r.dongle.msgs[0].body == Bytes(body, body + sizeof body));
     const uint8_t res[] = {0, 0, 0, 0};
@@ -232,6 +238,16 @@ void test_pairing_and_link()
     r.run(5);
     CHECK(r.vault.msgs.size() == 1 && r.vault.msgs[0].type == msg::Type::Result);
     CHECK(r.vault.msgs[0].body == Bytes(res, res + sizeof res));
+    // A State message updates the vault's picture of the dongle (and a vault cannot be told by a dongle-only message).
+    const uint8_t st = msg::kStateUsbMounted | msg::kStateHidReady;
+    CHECK(r.dongle.ep->send_message(msg::Type::State, 0, &st, 1));
+    r.run(5);
+    CHECK(r.vault.ep->peer_usb_mounted() && r.vault.ep->peer_state() == st);
+    const uint8_t st0 = 0;
+    CHECK(r.dongle.ep->send_message(msg::Type::State, 0, &st0, 1));
+    r.run(5);
+    CHECK(!r.vault.ep->peer_usb_mounted());
+    r.vault.msgs.clear();
     // Internal messages are not the application's to send; and the largest body still fits a frame.
     CHECK(!r.vault.ep->send_message(msg::Type::Hello, 0, nullptr, 0));
     CHECK(!r.vault.ep->send_message(msg::Type::PairConfirm, 0, nullptr, 0));
@@ -430,6 +446,20 @@ void test_forgotten_dongle_and_repair()
     CHECK(r.dongle.ep->has_trusted_peer());
     CHECK(r.vault.ep->connect(r.now));
     CHECK(r.run_to_link(3000));
+}
+
+void test_usb_state_in_hello_ack()
+{
+    Rig r;
+    CHECK(r.pair());
+    r.dongle.ep->set_usb_mounted(true);
+    CHECK(r.vault.ep->connect(r.now));
+    CHECK(r.run_to_link(3000));
+    CHECK(r.vault.ep->peer_usb_mounted());
+    // the picture is dropped with the session
+    r.dongle.ep->forget_peer();
+    r.run(12000); // the vault notices the silence
+    CHECK(!r.vault.ep->peer_usb_mounted() && r.vault.ep->peer_state() == 0);
 }
 
 void test_dongle_reboots()
@@ -837,6 +867,7 @@ int main()
     test_link_needs_the_right_key();
     test_unpaired_dongle_ignores_sessions();
     test_forgotten_dongle_and_repair();
+    test_usb_state_in_hello_ack();
     test_dongle_reboots();
     test_vault_reboots();
     test_dongle_boots_late();

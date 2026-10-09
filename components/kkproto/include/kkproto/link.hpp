@@ -132,8 +132,9 @@ public:
     /// Drop everything in progress, back to Idle (the trusted peer stays).
     void reset();
 
-    /// Seals and sends an application message. Only while Linked.
-    bool send_message(msg::Type type, uint8_t flags, const uint8_t* body, size_t body_len);
+    /// Seals and sends an application message. Only while Linked. seq_out (optional) receives the
+    /// sequence number put in the header: a Result carries the seq of the TypeKeys it answers.
+    bool send_message(msg::Type type, uint8_t flags, const uint8_t* body, size_t body_len, uint16_t* seq_out = nullptr);
 
     // ---- the wire
     void on_frame(const uint8_t* data, size_t n, uint32_t now_ms);
@@ -152,6 +153,9 @@ public:
     uint8_t attempts() const { return attempts_; }
     /// Ping round trip of the last answered Ping (vault), milliseconds; 0 if none yet.
     uint32_t last_rtt_ms() const { return rtt_ms_; }
+    /// Vault: the dongle's USB state flags (msg::kState*), from HelloAck and State messages; 0 until Linked.
+    uint8_t peer_state() const { return peer_state_; }
+    bool peer_usb_mounted() const { return (peer_state_ & msg::kStateUsbMounted) != 0; }
 
 private:
     Io& io_;
@@ -192,6 +196,7 @@ private:
     uint16_t ping_seq_ = 0;
     bool ping_out_ = false;
     uint32_t rtt_ms_ = 0;
+    uint8_t peer_state_ = 0;
 
     uint8_t buf_[kBufLen] = {};      ///< outgoing frame
     uint8_t rx_plain_[kBufLen] = {}; ///< decrypted incoming message (body pointers point in here)
