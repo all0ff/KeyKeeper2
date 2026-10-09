@@ -21,6 +21,8 @@ bool s_have_last = false;
 
 // Backlight: on for a while after any activity, then off (the dongle sits in a USB port all day).
 bool s_light_on = true;
+bool s_dimmed = false;
+constexpr uint32_t DIM_BEFORE_OFF_MS = 5000; // half brightness for this long, then off (like a phone)
 uint32_t s_last_activity_ms = 0;
 uint32_t s_timeout_ms = 0; // 0 = never off
 
@@ -48,24 +50,31 @@ bool init(uint32_t screen_timeout_s)
     s_last_activity_ms = now_ms();
     lvgl_port::lock();
     lv_obj_t* scr = lv_screen_active();
+    constexpr lv_coord_t W = 320; // the labels get the full screen width and centre their text themselves: a label
+                                  // that sizes itself to its text is positioned from its OLD (empty) size, and a
+                                  // long text (the pairing code) then sticks out of the right edge of the screen
     lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
     s_title = lv_label_create(scr);
     lv_obj_set_style_text_font(s_title, &keykeeper_cyrillic_18, 0);
     lv_obj_set_style_text_color(s_title, lv_color_hex(0x8090A0), 0);
+    lv_obj_set_width(s_title, W);
+    lv_obj_set_style_text_align(s_title, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(s_title, LV_ALIGN_TOP_MID, 0, 6);
 
     s_big = lv_label_create(scr);
     lv_obj_set_style_text_font(s_big, &lv_font_montserrat_48, 0);
     lv_label_set_text(s_big, "");
+    lv_obj_set_width(s_big, W);
+    lv_obj_set_style_text_align(s_big, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(s_big, LV_ALIGN_CENTER, 0, -14);
 
     s_status = lv_label_create(scr);
     lv_obj_set_style_text_font(s_status, &keykeeper_cyrillic_18, 0);
     lv_obj_set_style_text_align(s_status, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_long_mode(s_status, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(s_status, 300);
+    lv_obj_set_width(s_status, W - 20);
     lv_label_set_text(s_status, "");
     lv_obj_align(s_status, LV_ALIGN_CENTER, 0, 0);
 
@@ -73,6 +82,8 @@ bool init(uint32_t screen_timeout_s)
     lv_obj_set_style_text_font(s_hint, &keykeeper_cyrillic_16, 0);
     lv_obj_set_style_text_color(s_hint, lv_color_hex(0x8090A0), 0);
     lv_label_set_text(s_hint, "");
+    lv_obj_set_width(s_hint, W);
+    lv_obj_set_style_text_align(s_hint, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(s_hint, LV_ALIGN_BOTTOM_MID, 0, -6);
     lvgl_port::unlock();
     return s_title != nullptr && s_big != nullptr && s_status != nullptr && s_hint != nullptr;
@@ -81,6 +92,10 @@ bool init(uint32_t screen_timeout_s)
 void wake()
 {
     s_last_activity_ms = now_ms();
+    if (s_dimmed) {
+        s_dimmed = false;
+        display::set_dimmed(false);
+    }
     if (!s_light_on) {
         s_light_on = true;
         display::set_backlight(true);
@@ -89,9 +104,18 @@ void wake()
 
 void tick()
 {
-    if (s_light_on && s_timeout_ms > 0 && static_cast<uint32_t>(now_ms() - s_last_activity_ms) >= s_timeout_ms) {
+    if (!s_light_on || s_timeout_ms == 0) {
+        return;
+    }
+    const uint32_t idle = static_cast<uint32_t>(now_ms() - s_last_activity_ms);
+    if (idle >= s_timeout_ms + DIM_BEFORE_OFF_MS) {
         s_light_on = false;
+        s_dimmed = false;
         display::set_backlight(false);
+        display::set_dimmed(false);
+    } else if (idle >= s_timeout_ms && !s_dimmed) {
+        s_dimmed = true;
+        display::set_dimmed(true);
     }
 }
 

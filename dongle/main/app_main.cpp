@@ -602,6 +602,7 @@ extern "C" void app_main(void)
         snap.text_ok = app.text_ok;
         snap.long_s = LONG_PRESS_MS / 1000;
         snap.ru = RU;
+        hex8(key.pk, snap.id);
 #if CONFIG_DONGLE_USB_HID
         if (ROLE == kk::link::Role::Dongle) {
             snap.usb = dongle::usbdev::mounted() ? 1 : 0;

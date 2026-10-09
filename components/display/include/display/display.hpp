@@ -107,6 +107,16 @@ void set_asleep(bool asleep);
 bool is_asleep();
 
 /**
+ * @brief Dim the backlight to half of brightness() (the first idle step, like a phone) or restore it.
+ *
+ * Does not change the stored brightness(). Cleared by set_asleep(false). Has no visible effect while the
+ * backlight is off.
+ */
+void set_dimmed(bool dimmed);
+
+bool is_dimmed();
+
+/**
  * @brief Set LCD backlight brightness.
  *
  * @param percent Brightness from 0 to 100. Values above 100 are clamped.

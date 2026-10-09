@@ -21,6 +21,8 @@ bool backlight_enabled = false;
 // see set_asleep()'s own comment for why the two must not be
 // conflated.
 bool asleep = false;
+// Idle step 1: backlight at half of current_brightness (the stored value is not touched).
+bool dimmed = false;
 
 /*
  * Logical (post-rotation) config exposed to the rest of the firmware.
@@ -138,7 +140,8 @@ bool init()
              static_cast<unsigned>(bsp::board::info().lcd.width),
              static_cast<unsigned>(bsp::board::info().lcd.height),
              static_cast<unsigned>(LOGICAL_CONFIG.width),
-             static_cast<unsigned>(LOGICAL_CONFIG.height));
+             static_cast<unsigned>(LOGICAL_CONFIG.height),
+             static_cast<unsigned>(LOGICAL_CONFIG.rotation));
 
     if (!internal::lcd().init()) {
         ESP_LOGE(TAG, "LovyanGFX panel init() failed");
@@ -204,7 +207,26 @@ void set_asleep(bool value)
         return;
     }
     asleep = value;
+    if (!value) {
+        dimmed = false; // waking up always means full brightness
+    }
     set_backlight(!value);
+}
+
+void set_dimmed(bool value)
+{
+    if (dimmed == value) {
+        return;
+    }
+    dimmed = value;
+    if (initialized && !asleep && backlight_enabled) {
+        set_brightness(current_brightness);
+    }
+}
+
+bool is_dimmed()
+{
+    return dimmed;
 }
 
 bool is_asleep()
@@ -225,7 +247,8 @@ void set_brightness(uint8_t percent)
     }
 
     // LovyanGFX Light_PWM expects 0-255.
-    const uint8_t duty = static_cast<uint8_t>((static_cast<uint16_t>(percent) * 255) / 100);
+    const uint16_t shown = dimmed ? percent / 2 : percent;
+    const uint8_t duty = static_cast<uint8_t>((shown * 255) / 100);
     internal::lcd().setBrightness(duty);
     backlight_enabled = (percent > 0);
 }

@@ -35,6 +35,7 @@ struct Snapshot {
     uint32_t held_s = 0;          ///< how long the button has been held (shown while it is)
     uint32_t long_s = 3;          ///< hold time that counts as a long press
     bool ru = false;              ///< show Russian text
+    char id[17] = {};             ///< this device's key prefix in hex, as the vault lists it under "Forget dongle"
 };
 
 struct Screen {
@@ -62,7 +63,11 @@ inline Screen describe(const Snapshot& s)
     using kk::link::State;
     Screen o;
     const bool dongle = s.role == Role::Dongle;
-    put(o.title, sizeof o.title, dongle ? "KeyKeeper dongle" : pick(s, "Vault (simulator)", "Хранилище (симулятор)"));
+    if (dongle && s.id[0] != '\0') {
+        std::snprintf(o.title, sizeof o.title, "KeyKeeper %s", s.id);
+    } else {
+        put(o.title, sizeof o.title, dongle ? "KeyKeeper dongle" : pick(s, "Vault (simulator)", "Хранилище (симулятор)"));
+    }
     auto say = [&](char* dst, size_t cap, const char* en, const char* ru) { put(dst, cap, pick(s, en, ru)); };
 
     if (s.state == State::Confirming && s.code != nullptr && std::strlen(s.code) == 6) {

@@ -131,11 +131,19 @@ void Manager::task()
             ESP_LOGI(TAG, "Activity while asleep -- waking display");
             display::set_asleep(false);
         } else if (!display::is_asleep() && display_off_timeout_s > 0) {
-            if (idle_for >= display_off_timeout_s * 1000u) {
+            // Two steps, like a phone: at the timeout the backlight drops to half, DIM_BEFORE_OFF_MS later
+            // it goes off. Any activity before that restores full brightness.
+            constexpr uint32_t DIM_BEFORE_OFF_MS = 5000;
+            const uint32_t timeout_ms = display_off_timeout_s * 1000u;
+            if (idle_for >= timeout_ms + DIM_BEFORE_OFF_MS) {
                 ESP_LOGI(TAG, "Idle for %lums >= %lums threshold -- putting display to sleep",
                          static_cast<unsigned long>(idle_for),
-                         static_cast<unsigned long>(display_off_timeout_s) * 1000UL);
+                         static_cast<unsigned long>(timeout_ms + DIM_BEFORE_OFF_MS));
                 display::set_asleep(true);
+            } else if (idle_for >= timeout_ms) {
+                display::set_dimmed(true);
+            } else {
+                display::set_dimmed(false);
             }
         }
     }
@@ -144,6 +152,7 @@ void Manager::task()
 void Manager::notify_activity()
 {
     last_activity_ms_ = now_ms();
+    display::set_dimmed(false);
 
     if (display::is_asleep()) {
         display::set_asleep(false);
