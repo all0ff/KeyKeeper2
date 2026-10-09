@@ -12,6 +12,7 @@
 #include "freertos/FreeRTOS.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace wifi {
@@ -108,6 +109,47 @@ const char* describe_disconnect_reason(uint8_t reason)
     }
 }
 
+// Set when a "network not found" scan was started for the log, so only that scan's result gets printed.
+bool diag_scan_pending = false;
+
+const char* auth_name(wifi_auth_mode_t a)
+{
+    switch (a) {
+        case WIFI_AUTH_OPEN: return "open";
+        case WIFI_AUTH_WEP: return "WEP";
+        case WIFI_AUTH_WPA_PSK: return "WPA";
+        case WIFI_AUTH_WPA2_PSK: return "WPA2";
+        case WIFI_AUTH_WPA_WPA2_PSK: return "WPA/WPA2";
+        case WIFI_AUTH_WPA3_PSK: return "WPA3";
+        case WIFI_AUTH_WPA2_WPA3_PSK: return "WPA2/WPA3";
+        default: return "other";
+    }
+}
+
+/// Logs the networks this radio can see (2.4 GHz only) -- the answer to "network not found".
+void log_scan_results()
+{
+    uint16_t count = 0;
+    esp_wifi_scan_get_ap_num(&count);
+    if (count > 16) {
+        count = 16;
+    }
+    wifi_ap_record_t* recs = static_cast<wifi_ap_record_t*>(std::calloc(count > 0 ? count : 1, sizeof(wifi_ap_record_t)));
+    if (recs == nullptr) {
+        esp_wifi_clear_ap_list();
+        return;
+    }
+    uint16_t n = count;
+    if (esp_wifi_scan_get_ap_records(&n, recs) == ESP_OK) {
+        ESP_LOGI(TAG, "scan: %u network(s) visible on 2.4 GHz", static_cast<unsigned>(n));
+        for (uint16_t i = 0; i < n; ++i) {
+            ESP_LOGI(TAG, "scan:  \"%s\"  ch %u  %d dBm  %s", reinterpret_cast<const char*>(recs[i].ssid),
+                     static_cast<unsigned>(recs[i].primary), static_cast<int>(recs[i].rssi), auth_name(recs[i].authmode));
+        }
+    }
+    std::free(recs);
+}
+
 void handle_wifi_event(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     (void)arg;
@@ -149,6 +191,21 @@ void handle_wifi_event(void* arg, esp_event_base_t event_base, int32_t event_id,
             } else {
                 ESP_LOGE(TAG, "STA connection failed: %s", last_error_buf);
                 publish(WifiEventId::ConnectionFailed);
+                if (reason == WIFI_REASON_NO_AP_FOUND) {
+                    // Show what IS visible, so a wrong name / a 5 GHz-only network can be told apart.
+                    diag_scan_pending = true;
+                    if (esp_wifi_scan_start(nullptr, false) != ESP_OK) {
+                        diag_scan_pending = false;
+                    }
+                }
+            }
+            break;
+        }
+
+        case WIFI_EVENT_SCAN_DONE: {
+            if (diag_scan_pending) {
+                diag_scan_pending = false;
+                log_scan_results();
             }
             break;
         }
@@ -203,6 +260,11 @@ bool start_station(const settings::WifiSettings& cfg)
 {
     wifi_config_t wifi_config{};
     std::strncpy(reinterpret_cast<char*>(wifi_config.sta.ssid), cfg.sta_ssid, sizeof(wifi_config.sta.ssid) - 1);
+    wifi_config.sta.scan_method = WIFI_ALL_CHANNEL_SCAN;
+    wifi_config.sta.sort_method = WIFI_CONNECT_AP_BY_SIGNAL;
+    wifi_config.sta.pmf_cfg.capable = true;
+    wifi_config.sta.pmf_cfg.required = false;
+    ESP_LOGI(TAG, "Connecting to \"%s\" (%u characters)", cfg.sta_ssid, static_cast<unsigned>(std::strlen(cfg.sta_ssid)));
     std::strncpy(reinterpret_cast<char*>(wifi_config.sta.password), cfg.sta_password,
                  sizeof(wifi_config.sta.password) - 1);
 
@@ -333,6 +395,12 @@ bool init()
     if (esp_wifi_init(&wifi_init_cfg) != ESP_OK) {
         ESP_LOGE(TAG, "esp_wifi_init() failed");
         return false;
+    }
+
+    // The default "world" regulatory domain only scans channels 1-11 actively; routers on 12-13 (common in
+    // Russia/Europe) then look "not found". Auto policy: an access point's own country info may still override.
+    if (esp_wifi_set_country_code("RU", true) != ESP_OK) {
+        ESP_LOGW(TAG, "could not set the Wi-Fi country code");
     }
 
     if (esp_event_handler_instance_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &handle_wifi_event, nullptr,

@@ -80,10 +80,15 @@ private:
     void show_active();
     void hide_active();
     void refresh_chrome();
+    /// Header status icons (dongle link, Wi-Fi): colour = state. Called by a 1 s LVGL timer (LVGL lock held).
+    void update_status_icons();
 
     lv_obj_t* lv_screen_ = nullptr;
     lv_obj_t* header_ = nullptr;
     lv_obj_t* header_label_ = nullptr;
+    lv_obj_t* radio_icon_ = nullptr; ///< wireless typing through the dongle
+    lv_obj_t* wifi_icon_ = nullptr;
+    lv_timer_t* status_timer_ = nullptr;
     lv_obj_t* content_ = nullptr;
     lv_obj_t* footer_ = nullptr;
     lv_obj_t* footer_label_ = nullptr;

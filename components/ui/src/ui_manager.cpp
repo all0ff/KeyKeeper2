@@ -7,6 +7,8 @@
 #include "display/fonts.hpp"
 
 #include "esp_log.h"
+#include "wifi/wifi_service.hpp"
+#include "wireless/wireless.hpp"
 
 namespace ui {
 
@@ -50,6 +52,20 @@ bool UiManager::init(lv_obj_t* lv_screen)
     lv_obj_set_style_text_color(header_label_, pal.primary_text, 0);
     lv_obj_set_style_text_font(header_label_, &keykeeper_cyrillic_16, 0);
     lv_obj_center(header_label_);
+
+    // Status icons at the right end of the header. The built-in Montserrat font carries the LV_SYMBOL glyphs
+    // (the project's Cyrillic font does not); colour carries the state, a hidden icon means "not in use".
+    wifi_icon_ = lv_label_create(header_);
+    lv_obj_set_style_text_font(wifi_icon_, &lv_font_montserrat_16, 0);
+    lv_label_set_text(wifi_icon_, LV_SYMBOL_WIFI);
+    lv_obj_align(wifi_icon_, LV_ALIGN_RIGHT_MID, -4, 0);
+    lv_obj_add_flag(wifi_icon_, LV_OBJ_FLAG_HIDDEN);
+
+    radio_icon_ = lv_label_create(header_);
+    lv_obj_set_style_text_font(radio_icon_, &lv_font_montserrat_16, 0);
+    lv_label_set_text(radio_icon_, LV_SYMBOL_BLUETOOTH);
+    lv_obj_align(radio_icon_, LV_ALIGN_RIGHT_MID, -28, 0);
+    lv_obj_add_flag(radio_icon_, LV_OBJ_FLAG_HIDDEN);
 
     // -------------------------------------------------------------------
     // Footer (docs/GUI.md section 6)
@@ -96,8 +112,52 @@ bool UiManager::init(lv_obj_t* lv_screen)
     lv_obj_set_style_bg_color(content_, pal.background, 0);
     lv_obj_set_style_bg_opa(content_, LV_OPA_COVER, 0);
 
+    status_timer_ = lv_timer_create([](lv_timer_t* t) { static_cast<UiManager*>(lv_timer_get_user_data(t))->update_status_icons(); },
+                                    1000, this);
+    update_status_icons();
+
     initialized_ = true;
     return true;
+}
+
+void UiManager::update_status_icons()
+{
+    const theme::Palette& pal = theme::current();
+
+    // Dongle: hidden while wireless typing is off or unsupported; grey = on but no link; yellow = linked, no
+    // PC behind the dongle; green = linked and ready to type.
+    const wireless::Status w = wireless::status();
+    if (!w.enabled || w.phase == wireless::Phase::Unsupported || w.phase == wireless::Phase::Off) {
+        lv_obj_add_flag(radio_icon_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_color_t c = pal.secondary_text;
+        if (w.phase == wireless::Phase::Linked) {
+            c = w.dongle_usb_ready ? pal.success : pal.warning;
+        } else if (w.phase == wireless::Phase::Pairing || w.phase == wireless::Phase::Confirming) {
+            c = pal.accent;
+        }
+        lv_obj_set_style_text_color(radio_icon_, c, 0);
+        lv_obj_clear_flag(radio_icon_, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // Wi-Fi: hidden while off; green = connected to the network (Station); blue = own access point is up;
+    // yellow = connecting; grey = lost the network; red = gave up.
+    lv_color_t wc = pal.secondary_text;
+    bool show = true;
+    switch (wifi::state()) {
+        case wifi::ConnectionState::Idle: show = false; break;
+        case wifi::ConnectionState::Connecting: wc = pal.warning; break;
+        case wifi::ConnectionState::Connected: wc = pal.success; break;
+        case wifi::ConnectionState::Disconnected: wc = pal.secondary_text; break;
+        case wifi::ConnectionState::ApRunning: wc = pal.accent; break;
+        case wifi::ConnectionState::Failed: wc = pal.error; break;
+    }
+    if (show) {
+        lv_obj_set_style_text_color(wifi_icon_, wc, 0);
+        lv_obj_clear_flag(wifi_icon_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(wifi_icon_, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 void UiManager::push(std::unique_ptr<Screen> screen)
