@@ -4,9 +4,11 @@ cmake_minimum_required(VERSION 3.16)
 # The same project also builds the "vault simulator" (see sdkconfig.vaultsim and README.md): a stand-in
 # for the vault, used to test the dongle until the real vault firmware speaks the link.
 #
-# Shared with the vault firmware, taken from ../components: kkproto (protocol), bsp (pins), display (LCD).
+# Shared with the vault firmware, taken from ../components: kkproto (protocol), blelink (BLE transport),
+# bsp (pins), display (LCD).
 set(EXTRA_COMPONENT_DIRS
     "${CMAKE_CURRENT_LIST_DIR}/../components/kkproto"
+    "${CMAKE_CURRENT_LIST_DIR}/../components/blelink"
     "${CMAKE_CURRENT_LIST_DIR}/../components/bsp"
     "${CMAKE_CURRENT_LIST_DIR}/../components/display")
 

@@ -6,8 +6,9 @@
 // wireless -- typing through the radio dongle (the vault's side of the link)
 //
 // The vault talks to its own USB dongle over an encrypted link (kkproto: Noise XX pairing, Noise IK
-// sessions). Today the transport is a UART cable between the two boards (GPIO10 TX / GPIO11 RX, common
-// GND, 460800 baud); BLE comes later behind the same API.
+// sessions). The transport is BLE (CONFIG_WIRELESS_TRANSPORT_BLE, component blelink: the vault scans and
+// connects to the dongle by itself) or, by default, a UART cable between the two boards (GPIO10 TX /
+// GPIO11 RX, common GND, 460800 baud). The API is the same for both.
 //
 // What this component owns:
 //   - this device's long-term link key and the one paired dongle (NVS namespace "kklink");
@@ -18,7 +19,7 @@
 //
 // While wireless typing is ON, every "Print ..." action goes to the dongle (and fails with "Dongle not
 // connected" when it is not linked); the vault's own USB cable is not used. While it is OFF the UART is not
-// even initialised and the pins stay free.
+// even initialised and the pins stay free (BLE: the radio is not scanning).
 //
 // All calls are thread-safe. Without CONFIG_KEYKEEPER_KKPROTO the component is a stub: supported() is
 // false and everything else does nothing.

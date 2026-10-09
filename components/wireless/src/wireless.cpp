@@ -10,6 +10,13 @@
 #include "freertos/task.h"
 #include "nvs.h"
 
+#include "sdkconfig.h"
+
+#if CONFIG_WIRELESS_TRANSPORT_BLE && !CONFIG_BT_NIMBLE_ENABLED
+#error "CONFIG_WIRELESS_TRANSPORT_BLE needs NimBLE: set CONFIG_BT_ENABLED=y and CONFIG_BT_NIMBLE_ENABLED=y (see components/blelink/README.md)"
+#endif
+
+#include "blelink/blelink.hpp"
 #include "kkproto/crypto_port.hpp"
 #include "kkproto/link.hpp"
 #include "kkproto/messages.hpp"
@@ -28,11 +35,19 @@ namespace {
 
 constexpr char TAG[] = "wireless";
 
-// ---- transport: a UART cable between two boards (BLE comes later)
+// ---- transport: BLE (CONFIG_WIRELESS_TRANSPORT_BLE) or a UART cable between two boards
+#if CONFIG_WIRELESS_TRANSPORT_BLE
+constexpr bool BLE = true;
+#else
+constexpr bool BLE = false;
+#endif
 constexpr uart_port_t UART = UART_NUM_1;
 constexpr int BAUD = 460800;
 constexpr size_t UART_RX_BUFFER = 1024;
 constexpr TickType_t POLL_TICKS = 2; // ~20 ms at HZ=100, 2 ms at HZ=1000: the UART read blocks for it
+
+// BLE: how long a pairing may look for a dongle with an open window before it gives up.
+constexpr uint32_t PAIRING_SEARCH_MS = 60000;
 
 constexpr uint8_t FW_MAJOR = 0;
 constexpr uint8_t FW_MINOR = 1;
@@ -44,32 +59,37 @@ constexpr UBaseType_t TASK_PRIO = 4;
 constexpr char NS[] = "kklink";
 constexpr char KEY_SECRET[] = "sk";
 constexpr char KEY_PEER[] = "peer";
+constexpr char KEY_BADDR[] = "baddr"; // BLE address of the paired dongle (type + 6 bytes)
 constexpr char KEY_ENABLED[] = "en";
 
-bool nvs_load_blob(const char* key, uint8_t out[32])
+bool nvs_load_blob(const char* key, uint8_t* out, size_t len = 32)
 {
     nvs_handle_t h;
     if (nvs_open(NS, NVS_READONLY, &h) != ESP_OK) {
         return false;
     }
     uint8_t tmp[32];
-    size_t n = sizeof tmp;
-    const esp_err_t e = nvs_get_blob(h, key, tmp, &n);
-    nvs_close(h);
-    if (e != ESP_OK || n != sizeof tmp) {
+    size_t n = len;
+    if (len > sizeof tmp) {
+        nvs_close(h);
         return false;
     }
-    std::memcpy(out, tmp, sizeof tmp);
+    const esp_err_t e = nvs_get_blob(h, key, tmp, &n);
+    nvs_close(h);
+    if (e != ESP_OK || n != len) {
+        return false;
+    }
+    std::memcpy(out, tmp, len);
     return true;
 }
 
-bool nvs_save_blob(const char* key, const uint8_t in[32])
+bool nvs_save_blob(const char* key, const uint8_t* in, size_t len = 32)
 {
     nvs_handle_t h;
     if (nvs_open(NS, NVS_READWRITE, &h) != ESP_OK) {
         return false;
     }
-    esp_err_t e = nvs_set_blob(h, key, in, 32);
+    esp_err_t e = nvs_set_blob(h, key, in, len);
     if (e == ESP_OK) {
         e = nvs_commit(h);
     }
@@ -299,7 +319,11 @@ public:
     // ---- kk::link::Io (link task)
     void send(const uint8_t* data, size_t n) override
     {
-        if (!uart_up_) {
+        if (!port_up_) {
+            return;
+        }
+        if (BLE) {
+            blelink::send(data, n); // BLE keeps message boundaries itself: no framing, no CRC
             return;
         }
         const size_t m = uartlink::encode(data, n, tx_frame_, sizeof tx_frame_);
@@ -344,6 +368,8 @@ public:
                 hex8(pk, k);
                 std::memcpy(peer_hex_, k, sizeof k);
                 ESP_LOGI(TAG, "paired; dongle key %s... stored", k);
+                pairing_wanted_ = false;
+                remember_dongle_address();
                 set_outcome(Outcome::Paired);
                 connect_after_pairing_ = true;
             } else {
@@ -353,8 +379,17 @@ public:
             }
             break;
         }
-        case Event::PairingRejected: set_outcome(Outcome::Rejected); break;
-        case Event::PairingFailed: set_outcome(Outcome::Failed); break;
+        case Event::PairingRejected:
+            set_outcome(Outcome::Rejected);
+            end_ble_pairing();
+            break;
+        case Event::PairingFailed:
+            set_outcome(Outcome::Failed);
+            end_ble_pairing();
+            break;
+        case Event::Linked:
+            remember_dongle_address(); // a dongle paired before addresses were stored: learn it now
+            break;
         case Event::LinkLost: fail_request(); break;
         default: break;
         }
@@ -411,6 +446,112 @@ private:
         }
     }
 
+    // ---- BLE: which dongle the radio looks for
+    // Points the radio at what the current situation needs: a dongle with an open pairing window, the paired
+    // dongle (by its stored address, or any dongle for a pairing made before addresses were stored), or nothing.
+    void ble_aim()
+    {
+        if (!BLE) {
+            return;
+        }
+        if (pairing_wanted_) {
+            blelink::scan_pairing();
+        } else if (!ep_->has_trusted_peer()) {
+            blelink::stop();
+        } else {
+            uint8_t raw[7];
+            if (nvs_load_blob(KEY_BADDR, raw, sizeof raw)) {
+                blelink::Addr a;
+                a.type = raw[0];
+                std::memcpy(a.val, raw + 1, 6);
+                blelink::scan_addr(a);
+            } else {
+                blelink::scan_any();
+            }
+        }
+    }
+
+    // Remembers the BLE address of the dongle we are connected to as THE paired dongle's address.
+    void remember_dongle_address()
+    {
+        if (!BLE || !ep_->has_trusted_peer()) {
+            return;
+        }
+        blelink::Addr a;
+        if (!blelink::peer_addr(&a)) {
+            return;
+        }
+        uint8_t raw[7];
+        raw[0] = a.type;
+        std::memcpy(raw + 1, a.val, 6);
+        uint8_t old[7];
+        if (nvs_load_blob(KEY_BADDR, old, sizeof old) && std::memcmp(old, raw, sizeof raw) == 0) {
+            return;
+        }
+        if (nvs_save_blob(KEY_BADDR, raw, sizeof raw)) {
+            ESP_LOGI(TAG, "dongle BLE address stored");
+            blelink::scan_addr(a);
+        }
+    }
+
+    // A pairing ended without success: stop looking for a dongle in pairing mode and go back to the paired one.
+    void end_ble_pairing()
+    {
+        pairing_wanted_ = false;
+        if (BLE && port_up_) {
+            blelink::disconnect();
+            ble_aim();
+        }
+    }
+
+    // The BLE link came up or went away: the session over it is dead; start the one the situation needs.
+    void ble_link_changed()
+    {
+        fail_request();
+        const kk::link::State before = ep_->state();
+        ep_->reset();
+        refresh_atomics(); // the screen and the typing task must not see "Linked" while the new handshake computes
+        publish();
+        const uint32_t now = now_ms();
+        if (!blelink::connected()) {
+            if (pairing_wanted_ && before == kk::link::State::Confirming) {
+                ESP_LOGW(TAG, "BLE link lost while the pairing code was showing");
+                set_outcome(Outcome::Failed);
+                end_ble_pairing();
+            }
+            return;
+        }
+        if (pairing_wanted_) {
+            ep_->start_pairing(now);
+        } else if (ep_->has_trusted_peer()) {
+            ep_->connect(now);
+        }
+    }
+
+    bool port_start()
+    {
+        if (BLE) {
+            if (!blelink::start(blelink::Role::Central, "KeyKeeper vault")) {
+                return false;
+            }
+            ble_epoch_ = blelink::epoch();
+            port_up_ = true;
+            return true;
+        }
+        return uart_start();
+    }
+
+    void port_stop()
+    {
+        if (BLE) {
+            vTaskDelay(pdMS_TO_TICKS(60)); // let a Bye out
+            blelink::stop();
+            port_up_ = false;
+            return;
+        }
+        uart_stop();
+    }
+
     bool uart_start()
     {
         uart_config_t cfg = {};
@@ -430,18 +571,18 @@ private:
             return false;
         }
         gpio_set_pull_mode(bsp::pins::HEADER_GPIO11, GPIO_PULLUP_ONLY);
-        uart_up_ = true;
+        port_up_ = true;
         parser_ = uartlink::Parser();
         return true;
     }
 
     void uart_stop()
     {
-        if (!uart_up_) {
+        if (!port_up_) {
             return;
         }
         uart_wait_tx_done(UART, pdMS_TO_TICKS(100));
-        uart_up_ = false;
+        port_up_ = false;
         uart_driver_delete(UART);
     }
 
@@ -458,36 +599,52 @@ private:
         if (c.forget) {
             ep_->forget_peer(); // ends a session, drops the key
             peer_hex_[0] = '\0';
+            pairing_wanted_ = false;
+            nvs_forget_key(KEY_BADDR);
             ESP_LOGI(TAG, "dongle forgotten");
         }
         if (c.apply_enabled || c.forget) {
-            if (on && !uart_up_) {
-                if (!uart_start()) {
-                    ESP_LOGE(TAG, "UART setup failed");
+            if (on && !port_up_) {
+                if (!port_start()) {
+                    ESP_LOGE(TAG, "%s setup failed", BLE ? "BLE" : "UART");
+                } else if (BLE) {
+                    ble_aim(); // the session starts when the BLE link comes up (ble_link_changed)
                 } else if (ep_->has_trusted_peer()) {
                     ep_->connect(now);
                 }
-            } else if (!on && uart_up_) {
+            } else if (!on && port_up_) {
                 ep_->disconnect();
                 ep_->tick(now); // let the Bye out
                 fail_request();
-                uart_stop();
+                pairing_wanted_ = false;
+                port_stop();
                 ep_->reset();
+            } else if (BLE && on && c.forget) {
+                ble_aim(); // forgotten: drop the link and stop looking
             }
         }
-        if (!on || !uart_up_) {
+        if (!on || !port_up_) {
             return;
         }
         const kk::link::State st = ep_->state();
-        if (c.cancel && (st == kk::link::State::Pairing || st == kk::link::State::Confirming)) {
+        if (c.cancel && (st == kk::link::State::Pairing || st == kk::link::State::Confirming || pairing_wanted_)) {
             ep_->reject_pairing();
             ep_->reset();
-            if (ep_->has_trusted_peer()) {
+            if (BLE) {
+                end_ble_pairing();
+            } else if (ep_->has_trusted_peer()) {
                 ep_->connect(now);
             }
         }
         if (c.pair) {
-            ep_->start_pairing(now);
+            if (BLE) {
+                pairing_wanted_ = true;
+                pairing_deadline_ = now + PAIRING_SEARCH_MS;
+                ep_->reset();
+                blelink::scan_pairing(); // the pairing starts when the BLE link to the dongle is up
+            } else {
+                ep_->start_pairing(now);
+            }
         }
         if (c.confirm == 1) {
             ep_->confirm_pairing(now);
@@ -511,7 +668,11 @@ private:
             case kk::link::State::Linked: s.phase = Phase::Linked; break;
             case kk::link::State::Connecting: s.phase = Phase::Connecting; break;
             case kk::link::State::Idle:
-                s.phase = (s.paired || ep_->wants_link()) ? Phase::Connecting : Phase::NotPaired;
+                if (pairing_wanted_) {
+                    s.phase = Phase::Pairing; // BLE: still looking for a dongle with an open pairing window
+                } else {
+                    s.phase = (s.paired || ep_->wants_link()) ? Phase::Connecting : Phase::NotPaired;
+                }
                 break;
             }
         }
@@ -562,18 +723,35 @@ private:
         for (;;) {
             apply_commands();
 
-            if (!uart_up_) {
+            if (!port_up_) {
                 publish();
                 vTaskDelay(pdMS_TO_TICKS(100));
                 continue;
             }
 
-            const int n = uart_read_bytes(UART, rx_, sizeof rx_, POLL_TICKS);
-            if (n > 0) {
-                const uint32_t now = now_ms();
-                parser_.feed(rx_, static_cast<size_t>(n), [&](const uint8_t* payload, size_t len) {
-                    ep_->on_frame(payload, len, now);
-                });
+            if (BLE) {
+                if (blelink::epoch() != ble_epoch_) {
+                    ble_epoch_ = blelink::epoch();
+                    ble_link_changed();
+                }
+                const int len = blelink::recv(rx_, sizeof rx_, POLL_TICKS);
+                if (len > 0) {
+                    ep_->on_frame(rx_, static_cast<size_t>(len), now_ms());
+                }
+                if (pairing_wanted_ && !blelink::connected() && ep_->state() == kk::link::State::Idle &&
+                    static_cast<int32_t>(now_ms() - pairing_deadline_) > 0) {
+                    ESP_LOGW(TAG, "no dongle with an open pairing window found");
+                    set_outcome(Outcome::Failed);
+                    end_ble_pairing();
+                }
+            } else {
+                const int n = uart_read_bytes(UART, rx_, sizeof rx_, POLL_TICKS);
+                if (n > 0) {
+                    const uint32_t now = now_ms();
+                    parser_.feed(rx_, static_cast<size_t>(n), [&](const uint8_t* payload, size_t len) {
+                        ep_->on_frame(payload, len, now);
+                    });
+                }
             }
             ep_->tick(now_ms());
 
@@ -606,12 +784,15 @@ private:
     std::atomic<bool> a_usb_{false};
 
     // used by the link task only
-    bool uart_up_ = false;
+    bool port_up_ = false;
     bool paired_ = false;
     bool connect_after_pairing_ = false;
     char peer_hex_[17] = {};
     uartlink::Parser parser_;
-    uint8_t rx_[128];
+    uint8_t rx_[256]; // one UART read chunk, or one BLE message
+    bool pairing_wanted_ = false; // BLE: a pairing was started and has not ended yet
+    uint32_t pairing_deadline_ = 0;
+    uint32_t ble_epoch_ = 0;
     uint8_t tx_frame_[uartlink::MAX_FRAME];
 };
 

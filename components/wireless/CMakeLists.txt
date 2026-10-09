@@ -14,5 +14,5 @@ idf_component_register(
     # link_frame.hpp (the UART framing) is shared with the dongle project and the wiring test.
     PRIV_INCLUDE_DIRS "../../tools/uart_link_test/main"
     REQUIRES usb
-    PRIV_REQUIRES kkproto bsp nvs_flash esp_driver_uart esp_driver_gpio esp_timer log
+    PRIV_REQUIRES kkproto blelink bsp nvs_flash esp_driver_uart esp_driver_gpio esp_timer log
 )

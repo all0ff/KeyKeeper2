@@ -20,6 +20,14 @@ menu "Dongle"
             On (use sdkconfig.hid): the USB port belongs to TinyUSB. The PC sees a keyboard and a serial port;
             the log is written to that serial port (and to UART0).
 
+    config DONGLE_TRANSPORT_BLE
+        bool "Dongle: talk to the vault over BLE instead of the UART cable"
+        depends on DONGLE_ROLE_DONGLE
+        default n
+        help
+            On (use sdkconfig.ble, which also switches NimBLE on): the dongle advertises and the vault connects
+            to it by itself; the UART is not used. Off: the UART cable of stage 3.
+
     config DONGLE_UART_NUM
         int "UART controller for the link (1 or 2; 0 is the console)"
         range 1 2

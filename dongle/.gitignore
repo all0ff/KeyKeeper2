@@ -8,3 +8,6 @@ sdkconfig_vault.old
 sdkconfig_hid
 sdkconfig_hid.old
 managed_components/
+build_ble/
+sdkconfig_ble
+sdkconfig_ble.old

@@ -20,6 +20,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+#include "blelink/blelink.hpp"
 #include "bsp/bsp.hpp"
 #include "display/display.hpp"
 #include "display/lvgl_port.hpp"
@@ -49,6 +50,12 @@ constexpr kk::link::Role ROLE = kk::link::Role::Vault;
 constexpr kk::link::Role ROLE = kk::link::Role::Dongle;
 #endif
 
+#if CONFIG_DONGLE_TRANSPORT_BLE
+constexpr bool BLE = true;
+#else
+constexpr bool BLE = false;
+#endif
+
 constexpr uart_port_t UART = static_cast<uart_port_t>(CONFIG_DONGLE_UART_NUM);
 constexpr gpio_num_t TX_PIN = static_cast<gpio_num_t>(CONFIG_DONGLE_TX_PIN);
 constexpr gpio_num_t RX_PIN = static_cast<gpio_num_t>(CONFIG_DONGLE_RX_PIN);
@@ -65,7 +72,7 @@ constexpr uint8_t FW_MINOR = 1;
 constexpr TickType_t POLL_TICKS = (pdMS_TO_TICKS(5) > 0) ? pdMS_TO_TICKS(5) : 1;
 
 // Static, not on the task stack.
-uint8_t s_rx[128];
+uint8_t s_rx[256];  // also holds one BLE message (kk::link::Endpoint::kBufLen)
 uint8_t s_frame[uartlink::MAX_FRAME];
 
 uint32_t now_ms()
@@ -153,10 +160,14 @@ public:
     // kk::link::Io
     void send(const uint8_t* data, size_t n) override
     {
-        const size_t m = uartlink::encode(data, n, s_frame, sizeof s_frame);
         if (ep->state() != kk::link::State::Linked) {
             ESP_LOGI(TAG, "tx %u B (state %s)", static_cast<unsigned>(n), kk::link::state_name(ep->state()));
         }
+        if (BLE) {
+            blelink::send(data, n);  // BLE keeps message boundaries itself: no framing, no CRC
+            return;
+        }
+        const size_t m = uartlink::encode(data, n, s_frame, sizeof s_frame);
         if (m != 0) {
             uart_write_bytes(UART, s_frame, m);
         }
@@ -264,6 +275,14 @@ App* s_app = nullptr;
 void service_link(TickType_t wait)
 {
     kk::link::Endpoint& ep = *s_app->ep;
+    if (BLE) {
+        const int len = blelink::recv(s_rx, sizeof s_rx, wait);
+        if (len > 0) {
+            ep.on_frame(s_rx, static_cast<size_t>(len), now_ms());
+        }
+        ep.tick(now_ms());
+        return;
+    }
     const int n = uart_read_bytes(UART, s_rx, sizeof s_rx, wait);
     const uint32_t now = now_ms();
     if (n > 0) {
@@ -368,7 +387,13 @@ extern "C" void app_main(void)
     const bool have_peer = dongle::store::load_peer(peer);
 
     // 4. The link.
-    if (!init_uart()) {
+    if (BLE) {
+        if (!blelink::start(blelink::Role::Peripheral, "KeyKeeper dongle")) {
+            ESP_LOGE(TAG, "BLE start failed");
+            show_fatal("BLE start failed", "see the log");
+            halt();
+        }
+    } else if (!init_uart()) {
         ESP_LOGE(TAG, "UART setup failed: check the pin numbers in menuconfig");
         show_fatal("UART setup failed", "check menuconfig pins");
         halt();
@@ -418,9 +443,32 @@ extern "C" void app_main(void)
 #if CONFIG_DONGLE_USB_HID
     bool usb_was_mounted = false;
 #endif
+    uint32_t ble_epoch = blelink::epoch();
+    uint32_t ble_up_since = 0;
     for (;;) {
         service_link(POLL_TICKS);
         const uint32_t now = now_ms();
+        if (BLE) {
+            if (blelink::epoch() != ble_epoch) {
+                // A BLE link came up or went away: whatever session ran over the old one is dead.
+                ble_epoch = blelink::epoch();
+                ESP_LOGI(TAG, "BLE link %s", blelink::connected() ? "up" : "down");
+                if (ROLE == kk::link::Role::Dongle && ep.state() == kk::link::State::Linked && app.exec.close_run(app.keys)) {
+                    ESP_LOGW(TAG, "link lost while a Cyrillic run was open: layout switched back");
+                }
+                ep.reset();
+                ble_up_since = now;
+            }
+            // The vault in pairing mode looks for a dongle that advertises an open window.
+            blelink::set_pairing_open(ep.pairing_open());
+            // Somebody connected but never started a handshake: do not let them hold the only connection.
+            if (blelink::connected() && ep.state() == kk::link::State::Idle &&
+                static_cast<int32_t>(now - ble_up_since) > 15000) {
+                ESP_LOGW(TAG, "BLE peer did not start a handshake: dropping it");
+                blelink::disconnect();
+                ble_up_since = now;
+            }
+        }
 #if CONFIG_DONGLE_USB_HID
         if (ROLE == kk::link::Role::Dongle) {
             dongle::usbdev::pump();

@@ -19,6 +19,7 @@ idf_component_register(
         "../../components/usb/include"
     REQUIRES
         kkproto
+        blelink
         bsp
         display
         lvgl

@@ -55,3 +55,16 @@ idf.py -B build_hid -D SDKCONFIG=sdkconfig_hid -D "SDKCONFIG_DEFAULTS=sdkconfig.
 Прошивка по USB дальше: зажать BOOT, воткнуть USB (режим загрузчика), прошить, переткнуть.
 Обычная сборка (без `sdkconfig.hid`) остаётся прежней: клавиши только пишутся в лог.
 На экране донгла в состоянии «Connected»: `USB: ready` (ПК увидел) или `USB: no PC`.
+
+
+## BLE instead of the UART cable (stage 5b)
+
+Build with the extra overlay `sdkconfig.ble` (it switches `CONFIG_DONGLE_TRANSPORT_BLE` and NimBLE on). With the USB
+keyboard build:
+
+    idf.py -B build_ble -D SDKCONFIG=sdkconfig_ble -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hid;sdkconfig.ble" set-target esp32s3
+    idf.py -B build_ble -D SDKCONFIG=sdkconfig_ble -D "SDKCONFIG_DEFAULTS=sdkconfig.defaults;sdkconfig.hid;sdkconfig.ble" -p COMx flash
+
+The dongle advertises by itself; BOOT opens the pairing window as before (the window flag is part of the advertising,
+so the vault in pairing mode finds exactly this dongle). The UART pins are not used. The vault simulator
+(`sdkconfig.vaultsim`) still talks UART only.
