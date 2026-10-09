@@ -137,7 +137,7 @@ void SecuritySettingsScreen::render_rows()
 
         const char* prefix = is_selected ? "> " : "";
 
-        switch (static_cast<Row>(i)) {
+        switch (row_at(i)) {
             case Row::ChangePin:
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::ChangePinRowFmt), prefix);
                 break;
@@ -192,9 +192,8 @@ void SecuritySettingsScreen::render_rows()
 #else
             case Row::PinEntryStyle:
             case Row::DialLastDigit:
-                // Unreachable in a Lite build -- ROW_COUNT is 6, so
-                // selected_row_ (clamped in move_selection()) can
-                // never equal either enumerator's ordinal (6, 7).
+                // Unreachable in a Lite build -- row_at() never maps a
+                // visible row to either of these.
                 // Both cases kept, not omitted, so this switch stays
                 // exhaustive over Row either way -- same reasoning as
                 // SettingsScreen::activate()'s own Item::PasswordGen
@@ -234,7 +233,7 @@ void SecuritySettingsScreen::move_selection(int32_t delta)
 
 void SecuritySettingsScreen::adjust_value(int32_t delta)
 {
-    switch (static_cast<Row>(selected_row_)) {
+    switch (row_at(selected_row_)) {
         
         case Row::AutoLock: {
             const size_t idx = find_closest_auto_lock_index(auto_lock_timeout_s_);
@@ -315,7 +314,7 @@ void SecuritySettingsScreen::end_adjust(bool commit)
 
 void SecuritySettingsScreen::activate()
 {
-    const auto row = static_cast<Row>(selected_row_);
+    const auto row = row_at(selected_row_);
 
     if (row == Row::ChangePin) {
         begin_change_pin();

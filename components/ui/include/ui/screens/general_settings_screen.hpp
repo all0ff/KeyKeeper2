@@ -52,26 +52,34 @@ public:
     bool on_input(InputAction action) override;
 
 private:
-    // Orientation moved after Save (Lite strips it -- see ROW_COUNT
-    // below, same reasoning/pattern as SecuritySettingsScreen's own
-    // PinEntryStyle/DialLastDigit reordering): stays a real
-    // enumerator either way, never behind #if itself, just
-    // unreachable in a Lite build since ROW_COUNT clamps
-    // selected_row_ below its ordinal.
+    // Row order as the user sees it: Orientation sits BEFORE Save, and Save is always the last row.
+    // Lite has no Orientation row at all, so the visible rows are mapped to these enumerators by
+    // row_at() instead of using the visible index as the enumerator value. Orientation stays a real
+    // enumerator in both builds (never behind #if itself), it is just never mapped to in Lite.
     enum class Row : uint8_t
     {
         Language,
         Theme,
         Brightness,
         ScreenTimeout,
-        Save,
         Orientation,
+        Save,
     };
 #if CONFIG_KEYKEEPER_LITE
     static constexpr size_t ROW_COUNT = 5;
 #else
     static constexpr size_t ROW_COUNT = 6;
 #endif
+
+    // Visible row index -> row. Lite skips Orientation, so its last visible row (4) is Save.
+    static constexpr Row row_at(size_t index)
+    {
+#if CONFIG_KEYKEEPER_LITE
+        return index >= static_cast<size_t>(Row::Orientation) ? Row::Save : static_cast<Row>(index);
+#else
+        return static_cast<Row>(index);
+#endif
+    }
 
     enum class Mode : uint8_t
     {

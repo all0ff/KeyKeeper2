@@ -1,0 +1,20 @@
+# Pairing test over the UART link (Waveshare ESP32-S3-LCD-1.47B, both boards run the same firmware).
+
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# Log over the board's USB port (native USB "serial/JTAG"), not over UART0 on GPIO43/44.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# X25519 and the PSA calls need more stack than the 3.5 KB default.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# The library under test (off by default in the main project).
+CONFIG_KEYKEEPER_KKPROTO=y
+
+# kkproto needs these in mbedTLS. kk::crypto::selftest() names the first one that is missing; if it does,
+# these are the switches to look for in `idf.py menuconfig` -> Component config -> mbedTLS.
+CONFIG_MBEDTLS_ECP_DP_CURVE25519_ENABLED=y
+CONFIG_MBEDTLS_CHACHA20_C=y
+CONFIG_MBEDTLS_CHACHAPOLY_C=y

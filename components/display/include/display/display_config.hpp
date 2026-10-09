@@ -81,7 +81,7 @@ struct Lvgl
      * size are allocated for double buffering. Tunable without any other
      * code change.
      */
-    static constexpr uint16_t draw_buffer_lines = 40;
+    static constexpr uint16_t draw_buffer_lines = 20;
 
     static constexpr uint32_t tick_period_ms = 2;
 

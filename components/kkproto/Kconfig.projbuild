@@ -1,0 +1,17 @@
+menu "KeyKeeper2 secure radio link (kkproto)"
+
+    config KEYKEEPER_KKPROTO
+        bool "Build the kkproto library (Noise XX/IK link to a radio dongle)"
+        default n
+        help
+            Builds components/kkproto: the portable protocol library for the encrypted link
+            between the vault and a radio dongle (Noise XX pairing, Noise IK sessions, framing,
+            messages, pairing code). It has no effect on the device until something calls it.
+
+            Needs an mbedTLS configuration with X25519 (Curve25519), ChaCha20-Poly1305,
+            SHA-256 and HMAC. kk::crypto::selftest() reports at run time if one is missing --
+            call it once at boot of anything that uses the link.
+
+            Off by default: nothing in the firmware depends on it yet.
+
+endmenu

@@ -1,0 +1,13 @@
+build/
+build_vault/
+build_hid/
+sdkconfig
+sdkconfig.old
+sdkconfig_vault
+sdkconfig_vault.old
+sdkconfig_hid
+sdkconfig_hid.old
+managed_components/
+build_ble/
+sdkconfig_ble
+sdkconfig_ble.old

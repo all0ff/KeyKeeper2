@@ -106,7 +106,7 @@ void GeneralSettingsScreen::render()
 
         const char* prefix = is_selected ? "> " : "";
 
-        switch (static_cast<Row>(i)) {
+        switch (row_at(i)) {
             case Row::Language:
                 lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix,
                                       i18n::tr(i18n::Key::Language),
@@ -150,9 +150,8 @@ void GeneralSettingsScreen::render()
             }
 #else
             case Row::Orientation:
-                // Unreachable in a Lite build -- ROW_COUNT is 5, so
-                // selected_row_ (clamped in move_selection()) can
-                // never equal this enumerator's ordinal (5). Kept,
+                // Unreachable in a Lite build -- row_at() never maps a
+                // visible row to Orientation there. Kept,
                 // not omitted, so this switch stays exhaustive over
                 // Row either way -- same reasoning as
                 // SecuritySettingsScreen's own PinEntryStyle/
@@ -187,7 +186,7 @@ void GeneralSettingsScreen::move_selection(int32_t delta)
 
 void GeneralSettingsScreen::adjust_value(int32_t delta)
 {
-    switch (static_cast<Row>(selected_row_)) {
+    switch (row_at(selected_row_)) {
         case Row::Language:
             language_ = (language_ == settings::Language::English) ? settings::Language::Russian
                                                                      : settings::Language::English;
@@ -266,7 +265,7 @@ void GeneralSettingsScreen::end_adjust(bool commit)
 
 void GeneralSettingsScreen::activate()
 {
-    if (static_cast<Row>(selected_row_) == Row::Save) {
+    if (row_at(selected_row_) == Row::Save) {
         save();
         return;
     }

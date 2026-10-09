@@ -272,6 +272,49 @@ bool is_connected()
 
 bool send_key(uint8_t keycode, uint8_t modifier, uint32_t press_ms)
 {
+    // A bare modifier combination (the layout hotkey Alt+Shift) is pressed and released the way a person
+    // does it on a real keyboard: one modifier after another, released in reverse order. All modifiers in a
+    // single report make the host see them in an arbitrary order, and Windows then ignores the hotkey
+    // now and then (the dongle does the same, and switches reliably).
+    if (keycode == 0 && (modifier & (modifier - 1)) != 0) {
+        constexpr uint32_t MODIFIER_STEP_MS = 20;
+        static const uint8_t ORDER[] = {0x01, 0x10, 0x04, 0x40, 0x02, 0x20, 0x08, 0x80}; // Ctrl, Alt, Shift, Gui
+        uint8_t steps[8];
+        uint8_t levels[8];
+        size_t n = 0;
+        uint8_t acc = 0;
+        for (uint8_t bit : ORDER) {
+            if ((modifier & bit) != 0) {
+                acc = static_cast<uint8_t>(acc | bit);
+                steps[n] = bit;
+                levels[n] = acc;
+                ++n;
+            }
+        }
+        for (size_t i = 0; i < n; ++i) {
+            if (!send_report(levels[i], NO_KEYS)) {
+                send_report(0, NO_KEYS);
+                return false;
+            }
+            vTaskDelay(pdMS_TO_TICKS(MODIFIER_STEP_MS));
+        }
+        if (press_ms > 0) {
+            vTaskDelay(pdMS_TO_TICKS(press_ms));
+        }
+        for (size_t i = n; i-- > 0;) {
+            const uint8_t level = static_cast<uint8_t>(levels[i] & ~steps[i]);
+            if (!send_report(level, NO_KEYS)) {
+                send_report(0, NO_KEYS);
+                return false;
+            }
+            if (i > 0) {
+                vTaskDelay(pdMS_TO_TICKS(MODIFIER_STEP_MS));
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(REPORT_GAP_MS));
+        return true;
+    }
+
     const uint8_t pressed[6] = { keycode, 0, 0, 0, 0, 0 };
 
     // A key is always a complete HID transaction: press -> release.

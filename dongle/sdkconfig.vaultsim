@@ -1,0 +1,2 @@
+# Added on top of sdkconfig.defaults to build the VAULT SIMULATOR instead of the dongle.
+CONFIG_DONGLE_ROLE_VAULT_SIM=y

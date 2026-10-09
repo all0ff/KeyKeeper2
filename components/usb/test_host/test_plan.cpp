@@ -59,9 +59,9 @@ static void test_cyrillic_switch_runs()
     CHECK(p.events[0].kind == Kind::Key);
     CHECK(p.events[1].kind == Kind::LayoutOn);
     CHECK(p.events[1].modifier == (usb::modifier::LEFT_ALT | usb::modifier::LEFT_SHIFT) && p.events[1].keycode == 0);
-    CHECK(p.events[1].pre_ms == 60 && p.events[1].hold_ms == 50 && p.events[1].gap_ms == 80);
+    CHECK(p.events[1].pre_ms == 120 && p.events[1].hold_ms == 100 && p.events[1].gap_ms == 250);
     CHECK(p.events[2].kind == Kind::Key && p.events[3].kind == Kind::Key);
-    CHECK(p.events[4].kind == Kind::LayoutOff && p.events[4].pre_ms == 60 && p.events[4].gap_ms == 80);
+    CHECK(p.events[4].kind == Kind::LayoutOff && p.events[4].pre_ms == 120 && p.events[4].gap_ms == 250);
     CHECK(p.events[5].kind == Kind::Key);
     // two separate runs
     const auto q = plan("\xD0\xB6" "a\xD0\xB6", true);
@@ -141,13 +141,13 @@ static void test_runner()
         CHECK(!r.ok && r.chars_sent == 1);
         CHECK(std::string(r.error) == "io failure");
         // ...LayoutOn, ж ok, ж FAILS, LayoutOff (+ its delays), nothing for the 3rd ж or 'a'
-        CHECK(io.trace == "D60;K0/6/50;D80;K51/0/10;D10;K51/0/10;D60;K0/6/50;D80;");
+        CHECK(io.trace == "D120;K0/6/100;D250;K51/0/10;D10;K51/0/10;D120;K0/6/100;D250;");
     }
     { // LayoutOn itself fails: no switch back
         RecIo io; io.fail_at = 0;
         const auto r = usb::run_plan(plan("\xD0\xB6", true), io);
         CHECK(!r.ok && r.chars_sent == 0);
-        CHECK(io.trace == "D60;K0/6/50;");
+        CHECK(io.trace == "D120;K0/6/100;");
     }
     { // unplugged: "USB not connected"
         RecIo io; io.is_ready = false;

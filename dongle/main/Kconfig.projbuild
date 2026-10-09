@@ -1,0 +1,58 @@
+menu "Dongle"
+
+    choice DONGLE_ROLE
+        prompt "What this firmware is"
+        default DONGLE_ROLE_DONGLE
+
+        config DONGLE_ROLE_DONGLE
+            bool "Dongle (waits for the vault)"
+
+        config DONGLE_ROLE_VAULT_SIM
+            bool "Vault simulator (for testing the dongle; starts pairings and connects)"
+    endchoice
+
+    config DONGLE_USB_HID
+        bool "Dongle: act as a real USB keyboard (USB composite: keyboard + serial port for logs)"
+        depends on DONGLE_ROLE_DONGLE
+        default n
+        help
+            Off: the dongle only logs the keys it would press (and the board's USB port stays the console).
+            On (use sdkconfig.hid): the USB port belongs to TinyUSB. The PC sees a keyboard and a serial port;
+            the log is written to that serial port (and to UART0).
+
+    config DONGLE_TRANSPORT_BLE
+        bool "Dongle: talk to the vault over BLE instead of the UART cable"
+        depends on DONGLE_ROLE_DONGLE
+        default n
+        help
+            On (use sdkconfig.ble, which also switches NimBLE on): the dongle advertises and the vault connects
+            to it by itself; the UART is not used. Off: the UART cable of stage 3.
+
+    config DONGLE_UART_NUM
+        int "UART controller for the link (1 or 2; 0 is the console)"
+        range 1 2
+        default 1
+
+    config DONGLE_TX_PIN
+        int "TX GPIO"
+        range 0 48
+        default 10
+        help
+            Same pins as the wiring test (tools/uart_link_test): TX of one board goes to RX of the other.
+
+    config DONGLE_RX_PIN
+        int "RX GPIO"
+        range 0 48
+        default 11
+
+    config DONGLE_BAUD
+        int "Baud rate"
+        range 9600 2000000
+        default 460800
+
+    config DONGLE_PAIRING_WINDOW_S
+        int "Dongle: how long a pairing stays open after BOOT (seconds)"
+        range 10 600
+        default 60
+
+endmenu

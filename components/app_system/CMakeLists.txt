@@ -19,6 +19,7 @@ idf_component_register(
         security
         vault
         usb
+        wireless
         wifi
         rtc_time
         imu

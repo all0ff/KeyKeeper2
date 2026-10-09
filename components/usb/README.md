@@ -10,6 +10,23 @@ device as a hardware password manager (nothing the host OS could
 keylog or clipboard-snoop, since nothing is ever copied through the
 host's own clipboard).
 
+## Radio dongle path (stage 4a; not yet used by the vault firmware)
+
+The same `TypingPlan` can be played by a radio dongle instead of the USB cable:
+
+- **`plan_wire`** -- `plan_to_wire()` turns a plan into `kk::msg::Event`s (waits above 255 ms are split,
+  holds are clamped, characters without a key are only counted); `wire_to_plan()` is the way back.
+- **`wire_executor`** -- the dongle's side: runs a `TypeKeys` batch with the rules of `run_plan()`
+  (stop at the first failure, still close an open Cyrillic run), answers with a `Result`.
+- **`dongle_sink`** -- `DongleSink : OutputSink`: batches (<= 32 events, <= 2.5 s), waits for each
+  `Result`, maps it back to a `RunResult`, closes a Cyrillic run left open by a failure.
+
+All three are pure C++ (they need only `kkproto/messages.hpp` / `messages.cpp`) and are covered by
+`test_host/test_wire.cpp`, which compares them with `run_plan()` on random plans with injected failures
+(`MUTATION=1 ./run_host_tests.sh` also runs `mutation_check_wire.py`). They are not in this
+component's `CMakeLists.txt` yet: they need `CONFIG_KEYKEEPER_KKPROTO`, and the vault firmware will
+get them together with the link service. The dongle project (`dongle/`) compiles them directly.
+
 ## Structure, bottom to top
 
 - **`hid_keyboard`** -- the actual TinyUSB HID keyboard device: USB

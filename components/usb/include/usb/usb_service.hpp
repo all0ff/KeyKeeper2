@@ -1,5 +1,6 @@
 #pragma once
 
+#include "usb/output_sink.hpp"
 #include "usb/type_engine.hpp"
 #include "vault/vault.hpp"
 
@@ -26,6 +27,11 @@ enum class Field {
 };
 
 bool init();
+
+// Where printed text goes. nullptr (the default) is the USB cable. With a sink set (the radio dongle),
+// is_connected() asks that sink and the typing goes through it; `unavailable_text` is the status shown
+// when it cannot take text (e.g. "Dongle not connected"). The sink is not owned and must outlive its use.
+void set_output(OutputSink* sink, const char* unavailable_text = nullptr);
 
 // Print a raw string (non-blocking).
 void type_string(const std::string& text);

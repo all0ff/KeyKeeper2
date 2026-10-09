@@ -68,6 +68,13 @@ echo "== unit tests"
 $CXX $FLAGS -Werror $SHIM -I. test_plan.cpp $USB/src/typing_plan.cpp $USB/src/typing_runner.cpp $REAL -o "$OUT/unit"
 "$OUT/unit"
 
+echo "== wire path (radio dongle): plan -> wire -> executor must behave like the local executor, failures included"
+KK=$USB/../kkproto
+$CXX $FLAGS -Werror $SHIM -I$KK/include -I. test_wire.cpp $USB/src/typing_plan.cpp $USB/src/typing_runner.cpp $USB/src/plan_wire.cpp \
+     $USB/src/wire_executor.cpp $USB/src/dongle_sink.cpp $USB/src/keycode_map.cpp $USB/src/cyrillic_layout.cpp $KK/src/messages.cpp -o "$OUT/wire"
+"$OUT/wire" "$CASES"
+if command -v python3 >/dev/null 2>&1 && [ "${MUTATION:-0}" = 1 ]; then python3 mutation_check_wire.py; fi
+
 echo "== Russian-layout punctuation: plan played through an independent host model"
 $CXX $FLAGS -Werror $SHIM -I. test_ru_punct.cpp $USB/src/typing_plan.cpp $USB/src/keycode_map.cpp $USB/src/cyrillic_layout.cpp -o "$OUT/ru_punct"
 "$OUT/ru_punct"

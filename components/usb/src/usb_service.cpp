@@ -52,6 +52,11 @@ std::atomic<const char*> status_msg{""};
 // and cleared from another (the typing task itself).
 std::atomic<bool> typing_in_progress{false};
 
+// Where the text goes: nullptr = the USB cable (the TypeEngine default). Set from the UI task, read from
+// the typing task, hence atomic. unavailable_msg is a string literal (or otherwise static).
+std::atomic<OutputSink*> output_sink{nullptr};
+std::atomic<const char*> unavailable_msg{"USB not connected"};
+
 void set_status(const char* msg)
 {
     status_msg = msg;
@@ -97,6 +102,8 @@ void type_task(void* arg)
     // doing the same thing *here* without the explicit reset() would
     // silently leak every single successful typing task).
     std::unique_ptr<TypeTaskParams> params(static_cast<TypeTaskParams*>(arg));
+    // The output is chosen per run: the person can switch wireless typing on or off at any time.
+    engine.set_sink(output_sink.load());
     const size_t sent = engine.type_string(params->text, params->timing);
     // Accept either unit -- see count_chars()'s own comment.
     const bool text_complete = (sent == count_chars(params->text)) || (sent == params->text.size());
@@ -168,9 +175,16 @@ bool init()
     return true;
 }
 
+void set_output(OutputSink* sink, const char* unavailable_text)
+{
+    unavailable_msg = unavailable_text != nullptr ? unavailable_text : "USB not connected";
+    output_sink = sink;
+}
+
 bool is_connected()
 {
-    return hid::is_connected();
+    OutputSink* sink = output_sink.load();
+    return sink != nullptr ? sink->available() : hid::is_connected();
 }
 
 const char* last_status()
@@ -181,7 +195,7 @@ const char* last_status()
 void type_string(const std::string& text)
 {
     if (!is_connected()) {
-        set_status("USB not connected");
+        set_status(unavailable_msg.load());
         return;
     }
     spawn_type_task(text);
@@ -205,7 +219,7 @@ void print_field(const vault::VaultEntry& entry, Field field)
     }
 
     if (!is_connected()) {
-        set_status("USB not connected");
+        set_status(unavailable_msg.load());
         return;
     }
 
