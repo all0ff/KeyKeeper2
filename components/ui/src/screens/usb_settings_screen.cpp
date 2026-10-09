@@ -2,6 +2,7 @@
 
 #include "display/fonts.hpp"
 #include "ui/localization.hpp"
+#include "ui/screens/wireless_screen.hpp"
 #include "ui/theme.hpp"
 #include "ui/ui_manager.hpp"
 
@@ -10,6 +11,7 @@
 #include "esp_log.h"
 
 #include <cstring>
+#include <memory>
 
 namespace ui::screens {
 
@@ -140,6 +142,9 @@ void UsbSettingsScreen::render_rows()
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::AutoSwitchLayoutRowFmt), prefix,
                                        cyrillic_auto_switch_layout_ ? i18n::tr(i18n::Key::OnValue) : i18n::tr(i18n::Key::Off));
                 break;
+            case Row::Wireless:
+                lv_label_set_text_fmt(row_labels_[i], "%sWireless typing >", prefix);
+                break;
             case Row::Save:
                 lv_label_set_text_fmt(row_labels_[i], i18n::tr(i18n::Key::SaveRowFmt), prefix);
                 break;
@@ -250,6 +255,11 @@ void UsbSettingsScreen::activate()
 
     if (row == Row::PasswordShortcut) {
         enter_edit_password();
+        return;
+    }
+    if (row == Row::Wireless) {
+        // Not a setting of this screen: it has its own screen (switch, pairing, forget), which saves by itself.
+        manager().push(std::make_unique<WirelessScreen>());
         return;
     }
     if (row == Row::Save) {

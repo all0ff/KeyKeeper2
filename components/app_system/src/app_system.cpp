@@ -19,6 +19,7 @@
 #include "rtc_time/rtc_time.hpp"
 #include "wifi/wifi_service.hpp"
 #include "web/web_service.hpp"
+#include "wireless/wireless.hpp"
 
 #include "esp_log.h"
 
@@ -387,6 +388,12 @@ bool initialize_usb()
 {
     state::set_boot_stage(state::BootStage::Usb);
     logger::boot_stage("USB");
+
+    // Typing through the radio dongle. Not fatal: without it the device simply types over its own USB cable.
+    // Independent of the HID setting below -- it needs NVS (up since storage) and nothing from usb::init().
+    if (!wireless::init()) {
+        logger::error("wireless::init() failed -- typing through the dongle is unavailable");
+    }
 
     if (DIAGNOSTIC_SKIP_USB_HID) {
         ESP_LOGW(TAG, "DIAGNOSTIC_SKIP_USB_HID is true -- usb::init() skipped, "

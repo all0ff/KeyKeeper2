@@ -20,6 +20,7 @@ set(ui_srcs
     "src/screens/general_settings_screen.cpp"
     "src/screens/security_settings_screen.cpp"
     "src/screens/usb_settings_screen.cpp"
+    "src/screens/wireless_screen.cpp"
     "src/screens/system_info_screen.cpp"
     "src/screens/wifi_settings_screen.cpp"
     "src/widgets/keyboard.cpp"
@@ -36,6 +37,7 @@ set(ui_requires
     storage
     vault
     usb
+    wireless
     wifi
     rtc_time
     totp

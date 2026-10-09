@@ -140,3 +140,7 @@ CONFIG_ESP_TASK_WDT_EN=y
 
 # Application-specific configuration belongs to components,
 # not to sdkconfig.defaults, unless it is an ESP-IDF Kconfig option.
+CONFIG_KEYKEEPER_KKPROTO=y
+CONFIG_MBEDTLS_ECP_DP_CURVE25519_ENABLED=y
+CONFIG_MBEDTLS_CHACHA20_C=y
+CONFIG_MBEDTLS_CHACHAPOLY_C=y

@@ -57,9 +57,10 @@ private:
         DelayBetweenFields,
         PrintSequence,
         CyrillicAutoSwitch,
+        Wireless, ///< opens WirelessScreen (typing through the radio dongle)
         Save,
     };
-    static constexpr size_t ROW_COUNT = 7;
+    static constexpr size_t ROW_COUNT = 8;
 
     enum class Mode : uint8_t
     {

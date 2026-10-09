@@ -1,0 +1,29 @@
+menu "BLE link test"
+
+    choice BLE_TEST_ROLE
+        prompt "Role of this board"
+        default BLE_TEST_ROLE_PERIPHERAL
+
+        config BLE_TEST_ROLE_PERIPHERAL
+            bool "Peripheral (advertises, echoes messages back) - plays the dongle"
+
+        config BLE_TEST_ROLE_CENTRAL
+            bool "Central (scans, connects, sends test messages) - plays the vault"
+    endchoice
+
+    config BLE_TEST_PERIOD_MS
+        int "Central: pause between test messages, ms"
+        range 0 5000
+        default 100
+
+    config BLE_TEST_CONN_ITVL_MIN
+        int "Central: connection interval min (units of 1.25 ms)"
+        range 6 3200
+        default 12
+
+    config BLE_TEST_CONN_ITVL_MAX
+        int "Central: connection interval max (units of 1.25 ms)"
+        range 6 3200
+        default 24
+
+endmenu
