@@ -86,6 +86,8 @@ private:
     lv_obj_t* lv_screen_ = nullptr;
     lv_obj_t* header_ = nullptr;
     lv_obj_t* header_label_ = nullptr;
+    lv_obj_t* icons_ = nullptr;      ///< right-aligned row holding the three below
+    lv_obj_t* web_icon_ = nullptr;   ///< the web interface is running
     lv_obj_t* radio_icon_ = nullptr; ///< wireless typing through the dongle
     lv_obj_t* wifi_icon_ = nullptr;
     lv_timer_t* status_timer_ = nullptr;

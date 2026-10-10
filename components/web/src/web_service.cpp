@@ -270,6 +270,15 @@ bool start()
     // current exact count.
     config.max_uri_handlers = 32;
     config.stack_size = 8192;
+    // Sockets: lwIP has 10 in total (default). httpd itself keeps 3 of them back (listen + control sockets), and
+    // in access-point mode the captive-portal DNS, SNTP and others use some too. With the default of 7 open client
+    // sockets the pool ran dry ("httpd_accept_conn: error in accept (23)") as soon as a phone opened its
+    // captive-portal probes plus the page's parallel requests -- the page then hung forever. Fewer simultaneous
+    // clients, the least recently used one is closed when a new one arrives, and stalled ones time out.
+    config.max_open_sockets = 4;
+    config.lru_purge_enable = true;
+    config.recv_wait_timeout = 8;
+    config.send_wait_timeout = 8;
     // Needed for the wildcard "/*" catch-all registered below --
     // without this, httpd only ever matches a request's exact literal
     // path, and an unmatched one just gets its own bare 404.

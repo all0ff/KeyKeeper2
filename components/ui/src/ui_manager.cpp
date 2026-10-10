@@ -7,7 +7,9 @@
 #include "display/fonts.hpp"
 
 #include "esp_log.h"
+#include "wifi/captive_dns.hpp"
 #include "wifi/wifi_service.hpp"
+#include "web/web_service.hpp"
 #include "wireless/wireless.hpp"
 
 namespace ui {
@@ -55,17 +57,31 @@ bool UiManager::init(lv_obj_t* lv_screen)
 
     // Status icons at the right end of the header. The built-in Montserrat font carries the LV_SYMBOL glyphs
     // (the project's Cyrillic font does not); colour carries the state, a hidden icon means "not in use".
-    wifi_icon_ = lv_label_create(header_);
-    lv_obj_set_style_text_font(wifi_icon_, &lv_font_montserrat_16, 0);
-    lv_label_set_text(wifi_icon_, LV_SYMBOL_WIFI);
-    lv_obj_align(wifi_icon_, LV_ALIGN_RIGHT_MID, -4, 0);
-    lv_obj_add_flag(wifi_icon_, LV_OBJ_FLAG_HIDDEN);
+    // Fixed-size row, children packed to the right: a hidden icon takes no room, and nothing depends on a
+    // content-sized object's old size.
+    icons_ = lv_obj_create(header_);
+    lv_obj_remove_style_all(icons_);
+    lv_obj_set_size(icons_, 110, HEADER_HEIGHT);
+    lv_obj_align(icons_, LV_ALIGN_RIGHT_MID, -4, 0);
+    lv_obj_set_flex_flow(icons_, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(icons_, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(icons_, 6, 0);
+    lv_obj_clear_flag(icons_, LV_OBJ_FLAG_SCROLLABLE);
 
-    radio_icon_ = lv_label_create(header_);
+    radio_icon_ = lv_label_create(icons_);
     lv_obj_set_style_text_font(radio_icon_, &lv_font_montserrat_16, 0);
     lv_label_set_text(radio_icon_, LV_SYMBOL_BLUETOOTH);
-    lv_obj_align(radio_icon_, LV_ALIGN_RIGHT_MID, -28, 0);
     lv_obj_add_flag(radio_icon_, LV_OBJ_FLAG_HIDDEN);
+
+    web_icon_ = lv_label_create(icons_);
+    lv_obj_set_style_text_font(web_icon_, &keykeeper_cyrillic_16, 0);
+    lv_label_set_text(web_icon_, "WEB");
+    lv_obj_add_flag(web_icon_, LV_OBJ_FLAG_HIDDEN);
+
+    wifi_icon_ = lv_label_create(icons_);
+    lv_obj_set_style_text_font(wifi_icon_, &lv_font_montserrat_16, 0);
+    lv_label_set_text(wifi_icon_, LV_SYMBOL_WIFI);
+    lv_obj_add_flag(wifi_icon_, LV_OBJ_FLAG_HIDDEN);
 
     // -------------------------------------------------------------------
     // Footer (docs/GUI.md section 6)
@@ -140,6 +156,27 @@ void UiManager::update_status_icons()
         lv_obj_clear_flag(radio_icon_, LV_OBJ_FLAG_HIDDEN);
     }
 
+    {
+        // One log line whenever the picture changes, so a missing icon can be told from a wrong state.
+        static int last = -1;
+        const int now = (w.enabled ? 1 : 0) | (web::is_running() ? 2 : 0) | (wifi::captive_dns::is_running() ? 4 : 0) |
+                        (static_cast<int>(wifi::state()) << 4) | (static_cast<int>(w.phase) << 8);
+        if (now != last) {
+            last = now;
+            ESP_LOGI(TAG, "header icons: radio_enabled=%d web=%d captive=%d wifi_state=%d radio_phase=%d", w.enabled ? 1 : 0,
+                     web::is_running() ? 1 : 0, wifi::captive_dns::is_running() ? 1 : 0, static_cast<int>(wifi::state()),
+                     static_cast<int>(w.phase));
+        }
+    }
+
+    // WEB: the web interface is up (green).
+    if (web::is_running()) {
+        lv_obj_set_style_text_color(web_icon_, pal.success, 0);
+        lv_obj_clear_flag(web_icon_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(web_icon_, LV_OBJ_FLAG_HIDDEN);
+    }
+
     // Wi-Fi: hidden while off; green = connected to the network (Station); blue = own access point is up;
     // yellow = connecting; grey = lost the network; red = gave up.
     lv_color_t wc = pal.secondary_text;
@@ -153,6 +190,8 @@ void UiManager::update_status_icons()
         case wifi::ConnectionState::Failed: wc = pal.error; break;
     }
     if (show) {
+        // "+" after the Wi-Fi symbol: the captive portal (DNS hijack) is running.
+        lv_label_set_text(wifi_icon_, wifi::captive_dns::is_running() ? LV_SYMBOL_WIFI "+" : LV_SYMBOL_WIFI);
         lv_obj_set_style_text_color(wifi_icon_, wc, 0);
         lv_obj_clear_flag(wifi_icon_, LV_OBJ_FLAG_HIDDEN);
     } else {
