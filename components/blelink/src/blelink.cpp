@@ -296,7 +296,7 @@ bool want_device(const ble_gap_disc_desc& d)
 void connect_to(const ble_addr_t* addr)
 {
     ble_gap_conn_params cp = {};
-    cp.scan_itvl = 0x60;
+    cp.scan_itvl = 0x140;  // 200 ms (connecting is short; see start_scan() for why the duty is kept low)
     cp.scan_window = 0x30;
     cp.itvl_min = kConnItvlMin;
     cp.itvl_max = kConnItvlMax;
@@ -326,7 +326,10 @@ void start_scan()
     ble_gap_disc_params dp = {};
     dp.passive = 1;
     dp.filter_duplicates = 0;
-    dp.itvl = 0x60;    // 60 ms
+    // Wi-Fi and BLE share ONE radio. A 50 % scan duty (30 ms of every 60) starved the Wi-Fi access point and the
+    // web page crawled. The dongle advertises every 30..40 ms, so a 30 ms window every 500 ms (6 %) still finds it
+    // within about half a second.
+    dp.itvl = 0x320;   // 500 ms
     dp.window = 0x30;  // 30 ms
     const int rc = ble_gap_disc(g_own_addr_type, BLE_HS_FOREVER, &dp, gap_event, nullptr);
     if (rc != 0) {
