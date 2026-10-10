@@ -122,7 +122,13 @@ void dns_task(void* /*arg*/)
         response[4] = 0x00;
         response[5] = 0x01; // QDCOUNT=1 -- echoing the one question back
         response[6] = 0x00;
-        response[7] = 0x01; // ANCOUNT=1 -- the one answer we're giving
+        // Only an A (IPv4) question gets the address. AAAA (IPv6), HTTPS/SVCB and the rest get an EMPTY NOERROR
+        // answer: answering them with an A record is a malformed reply, and resolvers (Android, Windows,
+        // browsers send AAAA and type-65 queries next to every A query) then stall and retry -- the page took
+        // forever to load.
+        const uint16_t qtype = static_cast<uint16_t>((buf[DNS_HEADER_LEN + q_len - 4] << 8) | buf[DNS_HEADER_LEN + q_len - 3]);
+        const bool want_a = (qtype == 1);
+        response[7] = want_a ? 0x01 : 0x00; // ANCOUNT
         response[8] = 0x00;
         response[9] = 0x00; // NSCOUNT=0
         response[10] = 0x00;
@@ -131,6 +137,11 @@ void dns_task(void* /*arg*/)
         // Echo the question section verbatim.
         std::memcpy(response + DNS_HEADER_LEN, buf + DNS_HEADER_LEN, q_len);
         size_t pos = DNS_HEADER_LEN + q_len;
+
+        if (!want_a) {
+            sendto(sock_fd, response, pos, 0, reinterpret_cast<struct sockaddr*>(&client_addr), addr_len);
+            continue;
+        }
 
         if (pos + 16 > sizeof(response)) {
             continue; // shouldn't happen given MAX_PACKET headroom, but don't overrun if it somehow does

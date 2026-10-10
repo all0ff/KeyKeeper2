@@ -75,7 +75,7 @@ bool UiManager::init(lv_obj_t* lv_screen)
 
     web_icon_ = lv_label_create(icons_);
     lv_obj_set_style_text_font(web_icon_, &keykeeper_cyrillic_16, 0);
-    lv_label_set_text(web_icon_, "WEB");
+    lv_label_set_text(web_icon_, "W");
     lv_obj_add_flag(web_icon_, LV_OBJ_FLAG_HIDDEN);
 
     wifi_icon_ = lv_label_create(icons_);
