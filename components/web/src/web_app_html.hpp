@@ -468,6 +468,43 @@ R"HTML(    <div class="help-section">
 )HTML"
 #endif
 R"HTML(    <div class="help-section">
+      <h3>Wireless typing (USB dongle)</h3>
+      <p>Instead of the USB cable, the device can type through a small separate USB dongle plugged into the computer.
+        The two talk over Bluetooth LE, fully encrypted end to end. Settings &rarr; USB &rarr; <strong>Wireless typing</strong>:</p>
+      <ul>
+        <li><strong>Pair dongle...</strong> &mdash; enter the PIN, press BOOT on the dongle to open its pairing window,
+          then confirm that <strong>the same 6-digit code</strong> is shown on both screens. A mismatch means someone
+          is in between: refuse. "Pair another dongle..." replaces the current one.</li>
+        <li>The switch turns wireless typing on or off. When it is off, Print goes to the USB cable as before.</li>
+        <li><strong>Forget dongle (xxxxxxxx)</strong> &mdash; removes the pairing; the number is the start of the dongle's ID,
+          the same 8 characters the dongle shows in its screen title, so you can tell several dongles apart.</li>
+        <li>Status line: <em>Connected, the PC is ready</em> &mdash; typing will work; <em>Connected, dongle not in a PC</em> &mdash; the dongle
+          is powered but not yet recognised by the computer as a keyboard.</li>
+      </ul>
+      <p>The dongle's own screen shows the link (Bluetooth symbol) and USB state (USB symbol) as colored icons:
+        green = OK, yellow = in progress / pairing window open, red = no USB host, grey = idle. For Cyrillic the
+        dongle sends Alt+Shift just like the cable version (see "USB typing").</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Header status icons and screen dimming</h3>
+      <p>The top-right corner of the device screens shows what is currently active:</p>
+      <ul>
+        <li><strong>Bluetooth symbol</strong> &mdash; the dongle link: green = linked and the PC is ready, yellow = linked but
+          the dongle is not in a PC / connecting, blue = pairing, grey = paired but not in range. Hidden if wireless
+          typing is off.</li>
+        <li><strong>W</strong> &mdash; this web page is running (green).</li>
+        <li><strong>WiFi symbol</strong> &mdash; yellow = connecting, green = connected, blue = Access Point running,
+          grey = disconnected, red = failed. A <strong>+</strong> next to it means the Captive Portal is on.</li>
+      </ul>
+      <p>The screen dims in two steps, like on a phone: at the Screen Timeout it first drops to half brightness,
+        about 5 seconds later it turns off. Any knob/button action restores full brightness. The dongle's screen
+        does the same.</p>
+      <div class="note">With both Bluetooth (dongle) and WiFi active the device shares one radio and its memory between
+        them, so the web page can be a little slower than with wireless typing off.</div>
+    </div>
+
+    <div class="help-section">
       <h3>Security</h3>
       <ul>
         <li>Repeated wrong PIN attempts escalate: a temporary lockout, then eventually a full wipe of the vault
@@ -642,6 +679,42 @@ R"HTML(    <div class="help-section">
 )HTML"
 #endif
 R"HTML(    <div class="help-section">
+      <h3>Печать по радио (USB-донгл)</h3>
+      <p>Вместо USB-кабеля устройство может печатать через маленький отдельный USB-донгл, воткнутый в компьютер.
+        Связь идёт по Bluetooth LE, полностью зашифрована. Настройки &rarr; USB &rarr; <strong>Печать по радио</strong>:</p>
+      <ul>
+        <li><strong>Сопрячь донгл...</strong> &mdash; введите PIN, нажмите BOOT на донгле (откроется окно сопряжения) и
+          убедитесь, что на обоих экранах показан <strong>одинаковый 6-значный код</strong>. Несовпадение значит, что
+          кто-то вклинился между ними: откажитесь. "Сопрячь другой донгл..." заменяет текущий.</li>
+        <li>Переключатель включает и выключает печать по радио. Когда выключено, "Напечатать" идёт в USB-кабель, как раньше.</li>
+        <li><strong>Забыть донгл (хххххххх)</strong> &mdash; удаляет пару; число &mdash; начало ID донгла, те же 8 символов
+          показаны в заголовке экрана донгла, так что несколько донглов можно различить.</li>
+        <li>Строка состояния: <em>Подключено, ПК готов</em> &mdash; печать сработает; <em>Подключено, донгл не в ПК</em> &mdash; донгл
+          запитан, но компьютер ещё не определил его как клавиатуру.</li>
+      </ul>
+      <p>Экран донгла показывает связь (значок Bluetooth) и состояние USB (значок USB) цветом: зелёный &mdash; всё в порядке,
+        жёлтый &mdash; в процессе / окно сопряжения открыто, красный &mdash; нет USB-хоста, серый &mdash; ожидание. Для кириллицы
+        донгл посылает Alt+Shift так же, как в проводном варианте (см. "Печать через USB").</p>
+    </div>
+
+    <div class="help-section">
+      <h3>Значки состояния в шапке и затухание экрана</h3>
+      <p>В правом верхнем углу экранов устройства показано, что сейчас активно:</p>
+      <ul>
+        <li><strong>Значок Bluetooth</strong> &mdash; связь с донглом: зелёный &mdash; связь есть и ПК готов, жёлтый &mdash; связь есть, но
+          донгл не в ПК / идёт подключение, синий &mdash; сопряжение, серый &mdash; пара есть, но донгл не на связи. Скрыт,
+          если печать по радио выключена.</li>
+        <li><strong>W</strong> &mdash; работает эта веб-страница (зелёный).</li>
+        <li><strong>Значок WiFi</strong> &mdash; жёлтый &mdash; подключение, зелёный &mdash; подключено, синий &mdash; работает точка доступа,
+          серый &mdash; нет связи, красный &mdash; ошибка. <strong>+</strong> рядом означает включённый Captive Portal.</li>
+      </ul>
+      <p>Экран гаснет в два шага, как на смартфоне: по таймауту экрана яркость сначала падает вдвое, примерно через
+        5 секунд экран выключается. Любое действие ручкой/кнопкой возвращает полную яркость. Экран донгла работает так же.</p>
+      <div class="note">Когда одновременно работают Bluetooth (донгл) и WiFi, устройство делит между ними одно радио и
+        память, поэтому веб-страница может отвечать чуть медленнее, чем при выключенной печати по радио.</div>
+    </div>
+
+    <div class="help-section">
       <h3>Безопасность</h3>
       <ul>
         <li>Повторные неверные попытки PIN усиливают реакцию: временная блокировка, затем полное стирание хранилища

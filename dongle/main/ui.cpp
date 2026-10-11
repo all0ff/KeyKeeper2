@@ -16,6 +16,8 @@ lv_obj_t* s_title = nullptr;
 lv_obj_t* s_big = nullptr;
 lv_obj_t* s_status = nullptr;
 lv_obj_t* s_hint = nullptr;
+lv_obj_t* s_link_icon = nullptr; // corner icons (top right): radio link to the vault, USB / PC
+lv_obj_t* s_usb_icon = nullptr;
 Screen s_last;
 bool s_have_last = false;
 
@@ -40,6 +42,27 @@ lv_color_t tone_color(Tone t)
     case Tone::Normal: break;
     }
     return lv_color_hex(0xE0E0E0);
+}
+
+void apply_light(lv_obj_t* icon, Light l)
+{
+    if (icon == nullptr) {
+        return;
+    }
+    if (l == Light::Off) {
+        lv_obj_add_flag(icon, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    lv_color_t c = lv_color_hex(0x707880); // grey
+    switch (l) {
+    case Light::Good: c = lv_color_hex(0x40D060); break;
+    case Light::Warn: c = lv_color_hex(0xFFC040); break;
+    case Light::Bad: c = lv_color_hex(0xFF6060); break;
+    case Light::Grey:
+    case Light::Off: break;
+    }
+    lv_obj_set_style_text_color(icon, c, 0);
+    lv_obj_clear_flag(icon, LV_OBJ_FLAG_HIDDEN);
 }
 
 } // namespace
@@ -85,6 +108,24 @@ bool init(uint32_t screen_timeout_s)
     lv_obj_set_width(s_hint, W);
     lv_obj_set_style_text_align(s_hint, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(s_hint, LV_ALIGN_BOTTOM_MID, 0, -6);
+
+    // Icons in a fixed-size row packed to the right (a hidden icon takes no room).
+    lv_obj_t* row = lv_obj_create(scr);
+    lv_obj_remove_style_all(row);
+    lv_obj_set_size(row, 56, 24);
+    lv_obj_align(row, LV_ALIGN_TOP_RIGHT, -4, 4);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(row, 8, 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    s_link_icon = lv_label_create(row);
+    lv_obj_set_style_text_font(s_link_icon, &lv_font_montserrat_18, 0);
+    lv_label_set_text(s_link_icon, LV_SYMBOL_BLUETOOTH);
+    lv_obj_add_flag(s_link_icon, LV_OBJ_FLAG_HIDDEN);
+    s_usb_icon = lv_label_create(row);
+    lv_obj_set_style_text_font(s_usb_icon, &lv_font_montserrat_18, 0);
+    lv_label_set_text(s_usb_icon, LV_SYMBOL_USB);
+    lv_obj_add_flag(s_usb_icon, LV_OBJ_FLAG_HIDDEN);
     lvgl_port::unlock();
     return s_title != nullptr && s_big != nullptr && s_status != nullptr && s_hint != nullptr;
 }
@@ -126,7 +167,7 @@ void show(const Screen& screen)
     }
     if (s_have_last && std::strcmp(s_last.title, screen.title) == 0 && std::strcmp(s_last.big, screen.big) == 0 &&
         std::strcmp(s_last.status, screen.status) == 0 && std::strcmp(s_last.hint, screen.hint) == 0 &&
-        s_last.tone == screen.tone) {
+        s_last.tone == screen.tone && s_last.link == screen.link && s_last.usb == screen.usb) {
         return;
     }
     s_last = screen;
@@ -141,6 +182,8 @@ void show(const Screen& screen)
     const lv_color_t c = tone_color(screen.tone);
     lv_obj_set_style_text_color(s_big, c, 0);
     lv_obj_set_style_text_color(s_status, c, 0);
+    apply_light(s_link_icon, screen.link);
+    apply_light(s_usb_icon, screen.usb);
     if (screen.big[0] != '\0') {
         lv_obj_align(s_big, LV_ALIGN_CENTER, 0, -18);
         lv_obj_align(s_status, LV_ALIGN_CENTER, 0, 36);

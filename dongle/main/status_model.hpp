@@ -18,6 +18,8 @@ namespace dongle {
 
 enum class Notice : uint8_t { None, Paired, Rejected, Failed, WindowClosed, Forgotten, Text };
 enum class Tone : uint8_t { Normal, Good, Warn, Bad };
+/// A status icon in the corner: hidden, or lit in a colour (grey = idle / not there yet).
+enum class Light : uint8_t { Off, Grey, Warn, Good, Bad };
 
 struct Snapshot {
     kk::link::Role role = kk::link::Role::Dongle;
@@ -44,6 +46,8 @@ struct Screen {
     char status[96] = {};
     char hint[96] = {};
     Tone tone = Tone::Normal;
+    Light link = Light::Off; ///< the radio link to the vault
+    Light usb = Light::Off;  ///< the USB side: is there a PC behind the dongle
 };
 
 inline void put(char* dst, size_t cap, const char* src)
@@ -64,10 +68,22 @@ inline Screen describe(const Snapshot& s)
     Screen o;
     const bool dongle = s.role == Role::Dongle;
     if (dongle && s.id[0] != '\0') {
-        std::snprintf(o.title, sizeof o.title, "KeyKeeper %s", s.id);
+        std::snprintf(o.title, sizeof o.title, "KeyKeeper %.8s", s.id); // the corner icons need the room
     } else {
         put(o.title, sizeof o.title, dongle ? "KeyKeeper dongle" : pick(s, "Vault (simulator)", "Хранилище (симулятор)"));
     }
+    // Corner icons.
+    switch (s.state) {
+    case State::Linked: o.link = Light::Good; break;
+    case State::Connecting:
+    case State::Pairing:
+    case State::Confirming: o.link = Light::Warn; break;
+    case State::Idle: o.link = (dongle && s.window_open) ? Light::Warn : Light::Grey; break;
+    }
+    if (dongle && s.usb >= 0) {
+        o.usb = s.usb > 0 ? Light::Good : Light::Bad;
+    }
+
     auto say = [&](char* dst, size_t cap, const char* en, const char* ru) { put(dst, cap, pick(s, en, ru)); };
 
     if (s.state == State::Confirming && s.code != nullptr && std::strlen(s.code) == 6) {

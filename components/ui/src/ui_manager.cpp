@@ -9,6 +9,8 @@
 #include "esp_log.h"
 #include "wifi/captive_dns.hpp"
 #include "wifi/wifi_service.hpp"
+
+#include <cstdio>
 #include "web/web_service.hpp"
 #include "wireless/wireless.hpp"
 
@@ -191,7 +193,13 @@ void UiManager::update_status_icons()
     }
     if (show) {
         // "+" after the Wi-Fi symbol: the captive portal (DNS hijack) is running.
-        lv_label_set_text(wifi_icon_, wifi::captive_dns::is_running() ? LV_SYMBOL_WIFI "+" : LV_SYMBOL_WIFI);
+        // A number after it: how many clients joined our access point (only meaningful in AP mode).
+        char txt[24];
+        const unsigned clients = (wifi::state() == wifi::ConnectionState::ApRunning) ? wifi::ap_client_count() : 0;
+        const char* plus = wifi::captive_dns::is_running() ? "+" : "";
+        if (clients > 0) std::snprintf(txt, sizeof txt, LV_SYMBOL_WIFI "%s %u", plus, clients);
+        else             std::snprintf(txt, sizeof txt, LV_SYMBOL_WIFI "%s", plus);
+        lv_label_set_text(wifi_icon_, txt);
         lv_obj_set_style_text_color(wifi_icon_, wc, 0);
         lv_obj_clear_flag(wifi_icon_, LV_OBJ_FLAG_HIDDEN);
     } else {

@@ -308,8 +308,34 @@ static void test_russian()
     CHECK(std::strcmp(describe(s).status, "Connected") == 0);
 }
 
+void test_icons()
+{
+    Snapshot s;
+    Screen o = describe(s);
+    CHECK(o.link == Light::Grey && o.usb == Light::Off); // idle, USB state not known yet
+    s.window_open = true;
+    CHECK(describe(s).link == Light::Warn);
+    s.window_open = false;
+    s.state = State::Connecting;
+    CHECK(describe(s).link == Light::Warn);
+    s.state = State::Linked;
+    s.usb = 0;
+    o = describe(s);
+    CHECK(o.link == Light::Good && o.usb == Light::Bad);
+    s.usb = 1;
+    CHECK(describe(s).usb == Light::Good);
+    // the vault side has no USB icon
+    s.role = kk::link::Role::Vault;
+    CHECK(describe(s).usb == Light::Off);
+    // the id in the title: first 8 characters
+    s = Snapshot();
+    std::snprintf(s.id, sizeof s.id, "%s", "b9c066e83b577cf8");
+    CHECK(std::strcmp(describe(s).title, "KeyKeeper b9c066e8") == 0);
+}
+
 int main()
 {
+    test_icons();
     test_button();
     test_actions();
     test_screens();
