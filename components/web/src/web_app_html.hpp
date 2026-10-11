@@ -497,11 +497,34 @@ R"HTML(    <div class="help-section">
         <li><strong>WiFi symbol</strong> &mdash; yellow = connecting, green = connected, blue = Access Point running,
           grey = disconnected, red = failed. A <strong>+</strong> next to it means the Captive Portal is on.</li>
       </ul>
+      <p>The <strong>battery symbol</strong> (far right) shows the charge of a connected battery: green = fine, yellow = below
+        30%, red = below 15%, blue with a bolt = charging. It can show just the symbol or the percentage too
+        (Settings &rarr; Energy saving &rarr; Battery) and is hidden when no battery is connected. The percentage is an estimate
+        from the cell voltage; it jumps a little under load and while charging. A grey Bluetooth symbol also means
+        &ldquo;paired, link paused to save power&rdquo; (see Energy saving).</p>
       <p>The screen dims in two steps, like on a phone: at the Screen Timeout it first drops to half brightness,
         about 5 seconds later it turns off. Any knob/button action restores full brightness. The dongle's screen
         does the same.</p>
       <div class="note">With both Bluetooth (dongle) and WiFi active the device shares one radio and its memory between
         them, so the web page can be a little slower than with wireless typing off.</div>
+    </div>
+
+    <div class="help-section">
+      <h3>Energy saving</h3>
+      <p>Settings &rarr; <strong>Energy saving</strong> (on the device). Nothing is switched off by itself until you set a time:</p>
+      <ul>
+        <li><strong>Wi-Fi off after</strong> &mdash; if no web page was opened or used and the device was not touched for this long,
+          the Wi-Fi mode is set to Disabled (the same as switching it off in the Wi-Fi menu; to use the web page again,
+          choose the mode there). Phones merely staying connected to the access point do not count as use.</li>
+        <li><strong>Dongle off after</strong> &mdash; after this long without touching the device the Bluetooth link to the dongle is paused
+          (grey Bluetooth symbol). Pressing a Print action wakes it up by itself: expect a wait of one to a few seconds
+          before the text starts to type. Pairing is not affected.</li>
+        <li><strong>CPU at idle</strong> &mdash; 80 MHz: when the screen is off and the web page is quiet the processor runs slower and
+          draws less current; the first key press brings 240 MHz back. (Needs a firmware built with power management enabled.)</li>
+        <li><strong>Battery</strong> &mdash; off / symbol / percentage in the header.</li>
+      </ul>
+      <p>With a battery, the largest consumer is the backlight: a lower brightness and a short Screen Timeout (General settings) save
+        more than anything else.</p>
     </div>
 
     <div class="help-section">
@@ -708,10 +731,33 @@ R"HTML(    <div class="help-section">
         <li><strong>Значок WiFi</strong> &mdash; жёлтый &mdash; подключение, зелёный &mdash; подключено, синий &mdash; работает точка доступа,
           серый &mdash; нет связи, красный &mdash; ошибка. <strong>+</strong> рядом означает включённый Captive Portal.</li>
       </ul>
+      <p><strong>Значок батареи</strong> (справа) показывает заряд подключённого аккумулятора: зелёный &mdash; норма, жёлтый &mdash;
+        меньше 30%, красный &mdash; меньше 15%, синий с молнией &mdash; идёт зарядка. Можно показывать только значок или ещё и
+        проценты (Настройки &rarr; Экономия энергии &rarr; Заряд); если батарея не подключена, значок скрыт. Проценты
+        &mdash; оценка по напряжению элемента, под нагрузкой и во время зарядки они немного скачут. Серый значок Bluetooth
+        ещё означает &laquo;пара есть, связь приостановлена для экономии энергии&raquo; (см. Экономию энергии).</p>
       <p>Экран гаснет в два шага, как на смартфоне: по таймауту экрана яркость сначала падает вдвое, примерно через
         5 секунд экран выключается. Любое действие ручкой/кнопкой возвращает полную яркость. Экран донгла работает так же.</p>
       <div class="note">Когда одновременно работают Bluetooth (донгл) и WiFi, устройство делит между ними одно радио и
         память, поэтому веб-страница может отвечать чуть медленнее, чем при выключенной печати по радио.</div>
+    </div>
+
+    <div class="help-section">
+      <h3>Экономия энергии</h3>
+      <p>Настройки &rarr; <strong>Экономия энергии</strong> (на устройстве). Пока вы не задали время, ничего само не выключается:</p>
+      <ul>
+        <li><strong>Wi-Fi выкл. через</strong> &mdash; если веб-страницу не открывали и устройством не пользовались столько времени,
+          режим Wi-Fi переключается в &laquo;Отключено&raquo; (как выключение в меню Wi-Fi; чтобы снова пользоваться веб-страницей,
+          выберите режим там). Телефоны, которые просто остались подключены к точке доступа, использованием не считаются.</li>
+        <li><strong>Донгл выкл. через</strong> &mdash; после такого бездействия связь Bluetooth с донглом приостанавливается
+          (серый значок Bluetooth). Нажатие &laquo;Напечатать&raquo; будит её само: подождите от одной до нескольких секунд, пока
+          начнётся ввод. Сопряжение не затрагивается.</li>
+        <li><strong>CPU в простое</strong> &mdash; 80 МГц: когда экран погашен и веб-страница не используется, процессор работает
+          медленнее и потребляет меньше; первое нажатие возвращает 240 МГц. (Нужна прошивка, собранная с включённым управлением питанием.)</li>
+        <li><strong>Заряд</strong> &mdash; в шапке: выкл. / значок / проценты.</li>
+      </ul>
+      <p>При работе от батареи больше всего потребляет подсветка: меньшая яркость и короткий таймаут экрана (Общие настройки)
+        экономят больше всего остального.</p>
     </div>
 
     <div class="help-section">

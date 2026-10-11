@@ -23,6 +23,7 @@ set(ui_srcs
     "src/screens/wireless_screen.cpp"
     "src/screens/system_info_screen.cpp"
     "src/screens/wifi_settings_screen.cpp"
+    "src/screens/power_settings_screen.cpp"
     "src/widgets/keyboard.cpp"
     "src/widgets/text_entry.cpp"
     "src/async_pin_check.cpp"
@@ -44,6 +45,7 @@ set(ui_requires
     imu
     web
     power
+    energy
     esp_app_format
     efuse
     lvgl

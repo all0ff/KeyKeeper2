@@ -5,6 +5,8 @@
 
 #include "display/display.hpp"
 #include "display/fonts.hpp"
+#include "energy/energy.hpp"
+#include "settings/settings.hpp"
 
 #include "esp_log.h"
 #include "wifi/captive_dns.hpp"
@@ -63,7 +65,7 @@ bool UiManager::init(lv_obj_t* lv_screen)
     // content-sized object's old size.
     icons_ = lv_obj_create(header_);
     lv_obj_remove_style_all(icons_);
-    lv_obj_set_size(icons_, 110, HEADER_HEIGHT);
+    lv_obj_set_size(icons_, 150, HEADER_HEIGHT);
     lv_obj_align(icons_, LV_ALIGN_RIGHT_MID, -4, 0);
     lv_obj_set_flex_flow(icons_, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(icons_, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
@@ -84,6 +86,11 @@ bool UiManager::init(lv_obj_t* lv_screen)
     lv_obj_set_style_text_font(wifi_icon_, &lv_font_montserrat_16, 0);
     lv_label_set_text(wifi_icon_, LV_SYMBOL_WIFI);
     lv_obj_add_flag(wifi_icon_, LV_OBJ_FLAG_HIDDEN);
+
+    battery_icon_ = lv_label_create(icons_);
+    lv_obj_set_style_text_font(battery_icon_, &lv_font_montserrat_16, 0);
+    lv_label_set_text(battery_icon_, LV_SYMBOL_BATTERY_FULL);
+    lv_obj_add_flag(battery_icon_, LV_OBJ_FLAG_HIDDEN);
 
     // -------------------------------------------------------------------
     // Footer (docs/GUI.md section 6)
@@ -149,7 +156,9 @@ void UiManager::update_status_icons()
         lv_obj_add_flag(radio_icon_, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_color_t c = pal.secondary_text;
-        if (w.phase == wireless::Phase::Linked) {
+        if (w.idle_paused) {
+            c = pal.secondary_text; // link paused to save power: "Print" brings it back
+        } else if (w.phase == wireless::Phase::Linked) {
             c = w.dongle_usb_ready ? pal.success : pal.warning;
         } else if (w.phase == wireless::Phase::Pairing || w.phase == wireless::Phase::Confirming) {
             c = pal.accent;
@@ -204,6 +213,34 @@ void UiManager::update_status_icons()
         lv_obj_clear_flag(wifi_icon_, LV_OBJ_FLAG_HIDDEN);
     } else {
         lv_obj_add_flag(wifi_icon_, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    // Battery: symbol by level (and a charge bolt while the charger's CHRG pin is low), optionally with the
+    // percentage. Hidden when switched off in Energy saving, or when no battery voltage is measured.
+    const energy::BatteryStatus b = energy::battery();
+    const settings::BatteryDisplay mode = settings::all().power.battery_display;
+    if (mode == settings::BatteryDisplay::Off || !b.present) {
+        lv_obj_add_flag(battery_icon_, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        const char* sym = LV_SYMBOL_BATTERY_FULL;
+        if (b.percent < 88) sym = LV_SYMBOL_BATTERY_3;
+        if (b.percent < 63) sym = LV_SYMBOL_BATTERY_2;
+        if (b.percent < 38) sym = LV_SYMBOL_BATTERY_1;
+        if (b.percent < 13) sym = LV_SYMBOL_BATTERY_EMPTY;
+        char txt[24];
+        const char* bolt = b.charging ? LV_SYMBOL_CHARGE : "";
+        if (mode == settings::BatteryDisplay::Percent) {
+            std::snprintf(txt, sizeof txt, "%s%u%% %s", bolt, static_cast<unsigned>(b.percent), sym);
+        } else {
+            std::snprintf(txt, sizeof txt, "%s%s", bolt, sym);
+        }
+        lv_label_set_text(battery_icon_, txt);
+        lv_color_t c = pal.success;
+        if (b.percent < 30) c = pal.warning;
+        if (b.percent < 15) c = pal.error;
+        if (b.charging) c = pal.accent;
+        lv_obj_set_style_text_color(battery_icon_, c, 0);
+        lv_obj_clear_flag(battery_icon_, LV_OBJ_FLAG_HIDDEN);
     }
 }
 

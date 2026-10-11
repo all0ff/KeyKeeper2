@@ -35,6 +35,7 @@ const char* TypeEngine::last_error() const
 bool TypeEngine::type_char(char c, const Timing& timing)
 {
     OutputSink& out = sink();
+    out.prepare();
     if (!out.available()) {
         last_error_ = ERR_NOT_CONNECTED;
         return false;
@@ -53,6 +54,7 @@ bool TypeEngine::type_char(char c, const Timing& timing)
 size_t TypeEngine::type_string(const std::string& text, const Timing& timing)
 {
     OutputSink& out = sink();
+    out.prepare();
     if (!out.available()) {
         last_error_ = ERR_NOT_CONNECTED;
         ESP_LOGW(TAG, "type_string: USB not connected");

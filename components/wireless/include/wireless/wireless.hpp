@@ -46,6 +46,7 @@ struct Status {
     bool paired = false;
     bool dongle_usb_ready = false; ///< Linked, and the dongle reports a PC behind its USB port
     bool local_confirmed = false;  ///< Confirming: this side already said yes
+    bool idle_paused = false;      ///< the link was paused to save power; "Print" wakes it (see set_idle_pause)
     char code[8] = {};             ///< "123456" while Confirming, else ""
     char peer[17] = {};            ///< first 8 bytes of the paired dongle's key in hex, "" if none
     Outcome outcome = Outcome::None;
@@ -68,6 +69,12 @@ bool enabled();
 bool set_enabled(bool on);
 
 Status status();
+
+/// Power saving: pauses (true) or resumes (false) the BLE link without touching the persisted switch. While
+/// paused the radio neither scans nor stays connected; the next "Print" action resumes it by itself and waits a
+/// few seconds for the link. Ignored while a pairing is in progress, with wireless typing off, and on the UART
+/// transport.
+void set_idle_pause(bool pause);
 
 /// Starts a pairing with a dongle whose pairing window is open. Switches wireless typing on. The user must
 /// confirm() the code shown by status().code; the dongle's user confirms theirs.

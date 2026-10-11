@@ -181,10 +181,22 @@ void set_output(OutputSink* sink, const char* unavailable_text)
     output_sink = sink;
 }
 
+// The sink was put to sleep on purpose (power saving): the print goes ahead and wakes it in the typing task.
+static bool output_paused()
+{
+    OutputSink* sink = output_sink.load();
+    return sink != nullptr && sink->paused();
+}
+
 bool is_connected()
 {
     OutputSink* sink = output_sink.load();
     return sink != nullptr ? sink->available() : hid::is_connected();
+}
+
+bool cable_connected()
+{
+    return hid::is_connected();
 }
 
 const char* last_status()
@@ -194,7 +206,7 @@ const char* last_status()
 
 void type_string(const std::string& text)
 {
-    if (!is_connected()) {
+    if (!is_connected() && !output_paused()) {
         set_status(unavailable_msg.load());
         return;
     }
@@ -218,7 +230,7 @@ void print_field(const vault::VaultEntry& entry, Field field)
         return;
     }
 
-    if (!is_connected()) {
+    if (!is_connected() && !output_paused()) {
         set_status(unavailable_msg.load());
         return;
     }

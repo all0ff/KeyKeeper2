@@ -42,6 +42,10 @@ void print_field(const vault::VaultEntry& entry, Field field);
 // Check whether USB cable is connected.
 bool is_connected();
 
+/// The vault's own USB cable is mounted by a host computer (independent of the dongle sink). False when the USB
+/// stack is not running. Used by energy:: to tell "powered from a computer" from "on battery".
+bool cable_connected();
+
 // Last status message for UI feedback.
 const char* last_status();
 

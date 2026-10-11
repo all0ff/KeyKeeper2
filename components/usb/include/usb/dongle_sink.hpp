@@ -29,6 +29,10 @@ public:
     virtual bool linked() = 0;
     /// The dongle reports its USB port mounted by the host.
     virtual bool usb_ready() = 0;
+    /// Power saving: the link was paused on purpose (not lost).
+    virtual bool paused() { return false; }
+    /// Resumes a paused link and waits up to wait_ms for the session and the dongle's USB. Blocking.
+    virtual void wake(uint32_t wait_ms) { (void)wait_ms; }
     /// Sends `body` as a TypeKeys message and waits up to timeout_ms for the matching Result.
     /// false: the link was lost or nothing came back in time (the batch may or may not have run).
     virtual bool type_keys(const uint8_t* body, size_t n, kk::msg::Result* result, uint32_t timeout_ms) = 0;
@@ -40,10 +44,14 @@ public:
     static constexpr uint32_t kMaxBatchMs = 2500;
     /// Added to a batch's typing time to get the wait for its Result.
     static constexpr uint32_t kResultSlackMs = 3000;
+    /// How long a print waits for a paused link to come back.
+    static constexpr uint32_t kWakeWaitMs = 6000;
 
     explicit DongleSink(DongleChannel& channel) : channel_(channel) {}
 
     bool available() override { return channel_.linked() && channel_.usb_ready(); }
+    bool paused() override { return channel_.paused(); }
+    void prepare() override { channel_.wake(kWakeWaitMs); }
     RunResult play(const TypingPlan& plan) override;
 
 private:

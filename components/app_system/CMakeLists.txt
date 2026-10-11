@@ -20,6 +20,7 @@ idf_component_register(
         vault
         usb
         wireless
+        energy
         wifi
         rtc_time
         imu

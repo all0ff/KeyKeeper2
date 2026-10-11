@@ -119,6 +119,13 @@ bool init()
         ESP_LOGI(TAG, "Using default password generator settings");
     }
 
+    if (!load_section("power", current.power)) {
+        current.power = PowerSettings{};
+        ESP_LOGI(TAG, "Using default power settings");
+    } else if (static_cast<uint8_t>(current.power.battery_display) > static_cast<uint8_t>(BatteryDisplay::Percent)) {
+        current.power = PowerSettings{};
+    }
+
     initialized = true;
     ESP_LOGI(TAG, "Settings initialized (brightness=%u%%, pin_length=%u, language=%d)",
              static_cast<unsigned>(current.general.display_brightness),
@@ -222,6 +229,20 @@ bool set_password_gen(const PasswordGenSettings& value)
     return true;
 }
 
+bool set_power(const PowerSettings& value)
+{
+    if (!initialized) {
+        return false;
+    }
+    if (!save_section("power", value)) {
+        ESP_LOGE(TAG, "Failed to persist power settings");
+        return false;
+    }
+    current.power = value;
+    publish_changed(Section::Power);
+    return true;
+}
+
 bool reset_to_defaults()
 {
     if (!initialized) {
@@ -235,6 +256,7 @@ bool reset_to_defaults()
     if (!set_gui(GuiSettings{})) ok = false;
     if (!set_wifi(WifiSettings{})) ok = false;
     if (!set_password_gen(PasswordGenSettings{})) ok = false;
+    if (!set_power(PowerSettings{})) ok = false;
 
     return ok;
 }

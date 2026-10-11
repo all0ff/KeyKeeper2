@@ -4,6 +4,7 @@
 #include "display/display.hpp"
 #include "display/lvgl_port.hpp"
 #include "imu/imu.hpp"
+#include "energy/energy.hpp"
 #include "event_bus/event_bus.hpp"
 #include "input/input.hpp"
 #include "interfaces/status/system_status.hpp"
@@ -614,6 +615,9 @@ bool init()
 
     // Only now: BLE takes ~60 KB of internal RAM, the UI task needs its share first.
     wireless::start_radio();
+
+    // Power saving (Wi-Fi / BLE / CPU timeouts) and the battery gauge.
+    energy::init();
 
     /*
      * The device must start locked.

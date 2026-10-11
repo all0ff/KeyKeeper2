@@ -50,12 +50,15 @@ private:
         Security,
         System,
         Wifi,
+        Power,
         PasswordGen,
     };
+    // Power ("Energy saving") is in both builds and sits BEFORE the Full-only Password Gen, so the visible
+    // row index equals the enumerator value in both: Lite shows 6 rows (General..Power), Full 7.
 #if CONFIG_KEYKEEPER_LITE
-    static constexpr size_t ITEM_COUNT = 5;
-#else
     static constexpr size_t ITEM_COUNT = 6;
+#else
+    static constexpr size_t ITEM_COUNT = 7;
 #endif
 
     void render();

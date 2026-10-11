@@ -93,6 +93,7 @@ enum class Section : uint8_t
     Gui,
     Wifi,
     PasswordGen,
+    Power,
 };
 
 struct GeneralSettings
@@ -232,6 +233,23 @@ struct PasswordGenSettings
     bool include_symbols = true;
 };
 
+// Power saving ("Energy saving" menu). Every timeout is in minutes, 0 = never. Defaults keep the
+// behaviour that existed before this section: nothing is switched off by itself.
+enum class BatteryDisplay : uint8_t
+{
+    Off,     ///< no battery icon in the header
+    Icon,    ///< battery symbol only (level shown by its fill)
+    Percent, ///< symbol and the percentage
+};
+
+struct PowerSettings
+{
+    uint16_t wifi_idle_off_min = 0;  ///< no web requests / no device use for this long -> Wi-Fi mode becomes Disabled
+    uint16_t ble_idle_off_min = 0;   ///< no use for this long -> the dongle link is paused (resumes on "Print")
+    bool cpu_idle_low = false;       ///< screen off and nothing going on -> CPU runs at 80 MHz instead of 240
+    BatteryDisplay battery_display = BatteryDisplay::Icon;
+};
+
 struct AllSettings
 {
     GeneralSettings general;
@@ -240,6 +258,7 @@ struct AllSettings
     GuiSettings gui;
     WifiSettings wifi;
     PasswordGenSettings password_gen;
+    PowerSettings power;
 };
 
 } // namespace settings

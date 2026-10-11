@@ -1,6 +1,7 @@
 #include "ui/screens/settings_screen.hpp"
 
 #include "ui/screens/general_settings_screen.hpp"
+#include "ui/screens/power_settings_screen.hpp"
 #if !CONFIG_KEYKEEPER_LITE
 #include "ui/screens/password_gen_settings_screen.hpp"
 #endif
@@ -30,8 +31,9 @@ const char* item_name(size_t index)
             case 2: return "Безопасность";
             case 3: return "Система";
             case 4: return "Wi-Fi";
+            case 5: return "Экономия энергии";
 #if !CONFIG_KEYKEEPER_LITE
-            case 5: return "Генератор паролей";
+            case 6: return "Генератор паролей";
 #endif
             default: return "";
         }
@@ -43,8 +45,9 @@ const char* item_name(size_t index)
         case 2: return "Security";
         case 3: return "System";
         case 4: return "WiFi";
+        case 5: return "Energy saving";
 #if !CONFIG_KEYKEEPER_LITE
-        case 5: return "Password Gen";
+        case 6: return "Password Gen";
 #endif
         default: return "";
     }
@@ -146,15 +149,19 @@ void SettingsScreen::activate()
             manager().push(std::make_unique<WifiSettingsScreen>());
             return;
 
+        case Item::Power:
+            manager().push(std::make_unique<PowerSettingsScreen>());
+            return;
+
 #if !CONFIG_KEYKEEPER_LITE
         case Item::PasswordGen:
             manager().push(std::make_unique<PasswordGenSettingsScreen>());
             return;
 #else
         case Item::PasswordGen:
-            // Unreachable in a Lite build -- ITEM_COUNT is 5, so
+            // Unreachable in a Lite build -- ITEM_COUNT is 6, so
             // selected_ (clamped in move_selection()) can never equal
-            // this enumerator's ordinal (5). Case kept, not omitted,
+            // this enumerator's ordinal (6). Case kept, not omitted,
             // specifically so the switch stays exhaustive over Item
             // either way -- Item itself isn't behind #if (see the
             // header's own comment), so an omitted case here would

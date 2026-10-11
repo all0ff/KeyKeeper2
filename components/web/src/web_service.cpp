@@ -21,7 +21,10 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 
+#include "esp_timer.h"
+
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <string>
 
@@ -33,6 +36,21 @@ constexpr char TAG[] = "web";
 
 bool initialized = false;
 httpd_handle_t server = nullptr;
+
+// Time of the last request that reached a real page or API route (not the "/*" catch-all, which is what
+// phones' automatic connectivity probes hit). 0 = none yet. Read by energy:: to switch Wi-Fi off when the web
+// page is no longer in use. httpd calls the match function for every request and every registered route, so
+// noting the time when a non-catch-all route matches costs nothing extra.
+std::atomic<uint32_t> g_last_request_ms{0};
+
+bool match_and_note(const char* reference_uri, const char* uri_to_match, size_t match_upto)
+{
+    const bool match = httpd_uri_match_wildcard(reference_uri, uri_to_match, match_upto);
+    if (match && std::strcmp(reference_uri, "/*") != 0) {
+        g_last_request_ms.store(static_cast<uint32_t>(esp_timer_get_time() / 1000), std::memory_order_relaxed);
+    }
+    return match;
+}
 
 void publish(WebEventId id)
 {
@@ -282,7 +300,7 @@ bool start()
     // Needed for the wildcard "/*" catch-all registered below --
     // without this, httpd only ever matches a request's exact literal
     // path, and an unmatched one just gets its own bare 404.
-    config.uri_match_fn = httpd_uri_match_wildcard;
+    config.uri_match_fn = match_and_note;
 
     if (httpd_start(&server, &config) != ESP_OK) {
         ESP_LOGE(TAG, "httpd_start() failed");
@@ -353,6 +371,11 @@ void stop()
     server = nullptr;
     ESP_LOGI(TAG, "HTTP server stopped");
     publish(WebEventId::ServerStopped);
+}
+
+uint32_t last_request_ms()
+{
+    return g_last_request_ms.load(std::memory_order_relaxed);
 }
 
 bool is_running()

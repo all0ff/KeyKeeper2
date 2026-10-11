@@ -103,4 +103,7 @@ bool restart();
 
 bool is_running();
 
+/// Uptime (ms, esp_timer based) of the last request to a real web page / API route; 0 if there has been none.
+uint32_t last_request_ms();
+
 } // namespace web

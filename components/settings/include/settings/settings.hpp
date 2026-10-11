@@ -60,6 +60,7 @@ bool set_security(const SecuritySettings& value);
 bool set_gui(const GuiSettings& value);
 bool set_wifi(const WifiSettings& value);
 bool set_password_gen(const PasswordGenSettings& value);
+bool set_power(const PowerSettings& value);
 
 /**
  * @brief Reset every section to its default values and persist all

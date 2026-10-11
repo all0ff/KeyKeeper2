@@ -30,6 +30,7 @@ idf_component_register(
         display
         event_bus
         esp_http_server
+        esp_timer
         nvs_flash
         log
 

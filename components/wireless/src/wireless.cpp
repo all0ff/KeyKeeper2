@@ -295,7 +295,37 @@ public:
         unlock();
     }
 
+    // Power saving (see wireless.hpp): pause the BLE link / resume it.
+    void set_idle_pause(bool pause)
+    {
+        lock();
+        if (pause) {
+            cmd_.pause = true;
+        } else {
+            cmd_.resume = true;
+        }
+        unlock();
+    }
+
     // ---- usb::DongleChannel (called from the typing task)
+    bool paused() override { return idle_paused_.load(); }
+
+    void wake(uint32_t wait_ms) override
+    {
+        if (!idle_paused_.load()) {
+            return;
+        }
+        ESP_LOGI(TAG, "print request: waking the paused dongle link");
+        set_idle_pause(false);
+        const uint32_t t0 = now_ms();
+        // Wait for the encrypted session and the dongle's report that a PC is behind its USB port.
+        while (now_ms() - t0 < wait_ms && !(a_linked_.load() && a_usb_.load())) {
+            vTaskDelay(pdMS_TO_TICKS(50));
+        }
+        ESP_LOGI(TAG, "wake: linked=%d usb=%d after %u ms", a_linked_.load() ? 1 : 0, a_usb_.load() ? 1 : 0,
+                 static_cast<unsigned>(now_ms() - t0));
+    }
+
     bool linked() override { return a_linked_.load(); }
     bool usb_ready() override { return a_usb_.load(); }
 
@@ -414,6 +444,8 @@ private:
         uint8_t confirm = 0; // 1 yes, 2 no
         bool cancel = false;
         bool forget = false;
+        bool pause = false;  ///< power saving: pause the BLE link
+        bool resume = false; ///< power saving: bring it back
     };
 
     struct Req {
@@ -613,6 +645,9 @@ private:
             nvs_forget_key(KEY_BADDR);
             ESP_LOGI(TAG, "dongle forgotten");
         }
+        if (c.apply_enabled || c.forget || c.pair) {
+            idle_paused_ = false; // any explicit action ends a power-saving pause (the branches below re-aim)
+        }
         if (c.apply_enabled || c.forget) {
             if (on && !port_up_ && !radio_ok_.load()) {
                 // the radio is held back until the UI is up (start_radio): BLE needs ~60 KB of internal RAM
@@ -636,7 +671,24 @@ private:
             }
         }
         if (!on || !port_up_) {
+            idle_paused_ = false;
             return;
+        }
+        if (BLE && c.resume && idle_paused_.load()) {
+            idle_paused_ = false;
+            ble_aim(); // the session starts when the BLE link comes up (ble_link_changed)
+        }
+        if (BLE && c.pause && !idle_paused_.load() && !pairing_wanted_ && ep_->has_trusted_peer() &&
+            ep_->state() != kk::link::State::Pairing && ep_->state() != kk::link::State::Confirming) {
+            ESP_LOGI(TAG, "no activity: pausing the dongle link");
+            idle_paused_ = true;
+            ep_->disconnect();
+            ep_->tick(now); // let the Bye out
+            fail_request();
+            vTaskDelay(pdMS_TO_TICKS(60));
+            blelink::stop(); // drops the link and stops scanning
+            ep_->reset();
+            refresh_atomics();
         }
         const kk::link::State st = ep_->state();
         if (c.cancel && (st == kk::link::State::Pairing || st == kk::link::State::Confirming || pairing_wanted_)) {
@@ -688,6 +740,7 @@ private:
                 break;
             }
         }
+        s.idle_paused = on && idle_paused_.load();
         s.dongle_usb_ready = s.phase == Phase::Linked && ep_->peer_usb_mounted();
         if (s.phase == Phase::Confirming && ep_->code() != nullptr) {
             std::snprintf(s.code, sizeof s.code, "%s", ep_->code());
@@ -812,6 +865,7 @@ private:
     std::atomic<bool> radio_ok_{false}; ///< set by start_radio(): the port may be brought up
     std::atomic<bool> a_linked_{false};
     std::atomic<bool> a_usb_{false};
+    std::atomic<bool> idle_paused_{false}; ///< BLE link paused to save power (set/cleared by the link task)
 
     // used by the link task only
     bool port_up_ = false;
@@ -869,6 +923,10 @@ Status status()
         return s;
     }
     return g_link->status();
+}
+void set_idle_pause(bool pause)
+{
+    if (g_link != nullptr) g_link->set_idle_pause(pause);
 }
 bool start_pairing() { return g_link != nullptr && g_link->start_pairing(); }
 void confirm(bool accept)

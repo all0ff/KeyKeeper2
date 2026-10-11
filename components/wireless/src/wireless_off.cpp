@@ -16,6 +16,7 @@ Status status()
     s.phase = Phase::Unsupported;
     return s;
 }
+void set_idle_pause(bool) {}
 bool start_pairing() { return false; }
 void confirm(bool) {}
 void cancel_pairing() {}

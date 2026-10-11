@@ -90,6 +90,7 @@ private:
     lv_obj_t* web_icon_ = nullptr;   ///< the web interface is running
     lv_obj_t* radio_icon_ = nullptr; ///< wireless typing through the dongle
     lv_obj_t* wifi_icon_ = nullptr;
+    lv_obj_t* battery_icon_ = nullptr; ///< battery level (energy::battery()), hidden when no battery / switched off
     lv_timer_t* status_timer_ = nullptr;
     lv_obj_t* content_ = nullptr;
     lv_obj_t* footer_ = nullptr;
