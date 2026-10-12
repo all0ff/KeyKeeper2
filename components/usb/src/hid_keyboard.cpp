@@ -270,6 +270,16 @@ bool is_connected()
     return tud_mounted();
 }
 
+void reattach()
+{
+    if (report_complete_sem == nullptr || !tusb_inited()) {
+        return; // init() never ran (DIAGNOSTIC_SKIP_USB_HID) or failed
+    }
+    tud_disconnect();
+    vTaskDelay(pdMS_TO_TICKS(150));
+    tud_connect();
+}
+
 bool send_key(uint8_t keycode, uint8_t modifier, uint32_t press_ms)
 {
     // A bare modifier combination (the layout hotkey Alt+Shift) is pressed and released the way a person

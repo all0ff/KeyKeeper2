@@ -10,7 +10,7 @@
 // ui::screens::PowerSettingsScreen -- "Energy saving"
 //
 // Rows: Wi-Fi off after N min of no web use, dongle link (BLE) off after N min of no use, lower the CPU
-// frequency at idle, battery icon style (off / icon / percent), Save. The timeouts step through a fixed list
+// frequency at idle, battery icon style (off / icon / percent), experimental light sleep on/off, Save. The timeouts step through a fixed list
 // (off, 1, 2, 5, 10, 15, 30, 60 min). Same interaction as the other settings screens: rotate = move, OK = edit
 // the row, OK = keep the value / BACK = cancel it, the Save row writes settings::PowerSettings.
 // What each setting does is in components/energy/include/energy/energy.hpp.
@@ -35,9 +35,10 @@ private:
         BleOff,
         CpuIdle,
         Battery,
+        LightSleep,
         Save,
     };
-    static constexpr size_t ROW_COUNT = 5;
+    static constexpr size_t ROW_COUNT = 6;
 
     enum class Mode : uint8_t
     {

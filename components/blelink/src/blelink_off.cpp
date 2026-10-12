@@ -14,5 +14,7 @@ void scan_pairing() {}
 void scan_any() {}
 void scan_addr(const Addr&) {}
 void stop() {}
+bool suspend_stack() { return false; }
+bool resume_stack() { return false; }
 bool peer_addr(Addr*) { return false; }
 } // namespace blelink

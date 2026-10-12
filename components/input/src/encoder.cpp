@@ -18,6 +18,8 @@ constexpr int16_t PCNT_LOW_LIMIT = -4000;
 
 bool Encoder::init(const Config& cfg)
 {
+    pin_a_ = cfg.pin_a;
+    pin_b_ = cfg.pin_b;
     if (unit_ != nullptr) {
         ESP_LOGW(TAG, "init() called more than once, ignoring");
         return true;
@@ -113,6 +115,14 @@ Encoder::~Encoder()
         pcnt_unit_disable(unit_);
         pcnt_del_unit(unit_);
     }
+}
+
+uint8_t Encoder::raw_levels() const
+{
+    if (unit_ == nullptr) {
+        return 0;
+    }
+    return static_cast<uint8_t>((gpio_get_level(pin_a_) ? 1 : 0) | (gpio_get_level(pin_b_) ? 2 : 0));
 }
 
 int32_t Encoder::take_delta()

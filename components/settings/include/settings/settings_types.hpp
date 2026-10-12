@@ -248,6 +248,7 @@ struct PowerSettings
     uint16_t ble_idle_off_min = 0;   ///< no use for this long -> the dongle link is paused (resumes on "Print")
     bool cpu_idle_low = false;       ///< screen off and nothing going on -> CPU runs at 80 MHz instead of 240
     BatteryDisplay battery_display = BatteryDisplay::Icon;
+    bool light_sleep = false;        ///< EXPERIMENTAL: MCU light sleep when on battery (no USB host), screen off, Wi-Fi and dongle link off
 };
 
 struct AllSettings

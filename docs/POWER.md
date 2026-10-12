@@ -12,9 +12,9 @@
 
 ```
 батарея (+) ──[220 кОм]──┬── GPIO8
-                         │
+                          │
                        [220 кОм]    + 100 нФ между GPIO8 и GND
-                         │
+                          │
 батарея (−) ─────────────┴── GND
 ```
 Коэффициент 2:1; при 4,2 В на пине 2,1 В. Постоянный ток делителя около 10 мкА. Подключать «+» делителя к
@@ -42,3 +42,25 @@ Component config → Power Management → Support for power management).
 | экран погашен, радио включено | 80 мА |
 | Wi-Fi клиент, экран горит | 150–180 мА |
 | экран горит, радио выключено | 150–200 мА |
+
+## Light sleep (experimental)
+
+Settings -> Energy saving -> **Sleep (exp.)**, off by default. The MCU light-sleeps (RAM kept, wakes in under a
+millisecond) only when ALL of these hold:
+
+- no USB host is mounted (a computer on the cable keeps the device awake as before),
+- the screen is off (display timeout),
+- Wi-Fi is stopped (its "off after" timer fired, or Wi-Fi mode is off),
+- the dongle link is paused (its "off after" timer fired) -- the BLE stack is then shut down completely, because a
+  running BLE controller forbids light sleep. The first Print afterwards starts it again (about one second extra).
+
+While asleep the input task polls the knob and buttons every 20 ms (the chip sleeps in between), LVGL runs at 10 Hz
+without its tick timer, the energy task ticks once a second. The first button press or knob turn wakes the screen.
+After a sleep of more than 3 s without a USB host the firmware detaches and attaches USB once, so a computer that
+was plugged in during the sleep enumerates the device.
+
+Build requirements (in `sdkconfig.defaults`): `CONFIG_PM_ENABLE=y`, `CONFIG_FREERTOS_USE_TICKLESS_IDLE=y`; delete
+`sdkconfig` once so they are picked up. Log lines: `energy: entering light sleep ...`, `light sleep over after N s`,
+`blelink: BLE stack shut down`, `wireless: BLE stack is back`.
+
+Measure with the lab supply on the 5V pin and no data cable. Expected: a few mA to a few tens of mA instead of 49 mA.

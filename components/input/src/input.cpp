@@ -4,6 +4,7 @@
 #include "input/encoder.hpp"
 
 #include "bsp/pins.hpp"
+#include "bsp/idle_hint.hpp"
 #include "display/display.hpp"
 
 #include "esp_log.h"
@@ -21,6 +22,7 @@ namespace {
 constexpr char TAG[] = "input";
 
 constexpr uint32_t POLL_PERIOD_MS = 5;
+constexpr uint32_t DEEP_IDLE_POLL_PERIOD_MS = 20; // the MCU light-sleeps between polls (see bsp::deep_idle)
 constexpr uint32_t TASK_STACK_SIZE = 3072;
 constexpr uint8_t TASK_PRIORITY = 5;
 constexpr UBaseType_t EVENT_QUEUE_LEN = 16;
@@ -107,6 +109,8 @@ void handle_button_event(ButtonEvent be,
 void input_task(void* /*arg*/)
 {
     const TickType_t period = pdMS_TO_TICKS(POLL_PERIOD_MS);
+    const TickType_t slow_period = pdMS_TO_TICKS(DEEP_IDLE_POLL_PERIOD_MS);
+    uint8_t last_raw = encoder.raw_levels();
 
     while (true) {
         // display::is_asleep() (NOT is_backlight_enabled()) -- see
@@ -127,15 +131,22 @@ void input_task(void* /*arg*/)
         const ButtonEvent ok_event = button_ok.poll();
         const ButtonEvent back_event = button_back.poll();
 
+        // In deep idle the PCNT does not count while the chip sleeps, so a turn of the knob is noticed by a change of
+        // the A/B levels. That is only a wake-up gesture, like the first action after a display timeout.
+        const uint8_t raw = encoder.raw_levels();
+        const bool knob_moved = bsp::deep_idle.load() && raw != last_raw;
+        last_raw = raw;
+
         if (display_was_off) {
-            const bool input_detected =
-                delta != 0 || ok_event != ButtonEvent::None || back_event != ButtonEvent::None;
+            const bool input_detected = delta != 0 || knob_moved || ok_event != ButtonEvent::None ||
+                                        back_event != ButtonEvent::None;
 
             if (input_detected) {
                 // The first physical action after the display timeout is
                 // wake-only. It never reaches the normal UI event queue.
                 display::set_asleep(false);
                 activity_ms = now_ms();
+                bsp::deep_idle = false; // back to full speed at once; the energy task re-evaluates later
 
                 if (ok_event != ButtonEvent::None) {
                     suppress_ok_until_release = true;
@@ -178,7 +189,7 @@ void input_task(void* /*arg*/)
             push_event(EventType::EncoderRotate, delta);
         }
 
-        vTaskDelay(period);
+        vTaskDelay(bsp::deep_idle.load() ? slow_period : period);
     }
 }
 

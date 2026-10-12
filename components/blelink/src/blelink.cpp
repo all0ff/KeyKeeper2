@@ -1,6 +1,7 @@
 #include "blelink/blelink.hpp"
 
 #include <atomic>
+#include <cstdio>
 #include <cstring>
 
 #include "esp_heap_caps.h"
@@ -53,6 +54,7 @@ enum class Mode : uint8_t { Idle, Pairing, Any, Addr };
 
 // ---- state shared between the owner task and the NimBLE host task
 Role g_role = Role::Peripheral;
+char g_name[32] = "KeyKeeper";
 std::atomic<bool> g_started{false};
 std::atomic<bool> g_synced{false};
 std::atomic<bool> g_ready{false};      // link usable for messages
@@ -478,8 +480,9 @@ bool start(Role role, const char* device_name)
         return true;
     }
     g_role = role;
-    g_mu = xSemaphoreCreateMutex();
-    g_rxq = xQueueCreate(kQueueDepth, sizeof(Msg));
+    std::snprintf(g_name, sizeof g_name, "%s", device_name != nullptr ? device_name : "KeyKeeper");
+    if (g_mu == nullptr) g_mu = xSemaphoreCreateMutex();
+    if (g_rxq == nullptr) g_rxq = xQueueCreate(kQueueDepth, sizeof(Msg));
     if (g_mu == nullptr || g_rxq == nullptr) {
         return false;
     }
@@ -521,6 +524,45 @@ bool start(Role role, const char* device_name)
 }
 
 bool started() { return g_started.load(); }
+
+// Full shutdown of the BLE host and controller (frees ~34 KB and, more to the point, lets the MCU light-sleep: a
+// running controller forbids it). resume_stack() starts everything again with the same role and name.
+bool suspend_stack()
+{
+    if (!g_started.load()) {
+        return false;
+    }
+    g_mode = Mode::Idle;
+    if (g_synced.load()) {
+        apply_mode();
+    }
+    disconnect();
+    for (int i = 0; i < 20 && g_conn.load() != BLE_HS_CONN_HANDLE_NONE; ++i) {
+        vTaskDelay(pdMS_TO_TICKS(25));
+    }
+    g_ready = false;
+    g_synced = false;
+    g_busy = false;
+    const int rc = nimble_port_stop();
+    if (rc != 0) {
+        ESP_LOGE(TAG, "nimble_port_stop rc=%d", rc);
+        return false;
+    }
+    nimble_port_deinit();
+    g_started = false;
+    ++g_epoch;
+    ESP_LOGW(TAG, "BLE stack shut down, internal heap %u bytes free",
+             static_cast<unsigned>(heap_caps_get_free_size(MALLOC_CAP_INTERNAL)));
+    return true;
+}
+
+bool resume_stack()
+{
+    if (g_started.load()) {
+        return true;
+    }
+    return start(g_role, g_name);
+}
 
 bool send(const uint8_t* msg, size_t n)
 {
@@ -577,6 +619,9 @@ uint32_t epoch() { return g_epoch.load(); }
 
 void disconnect()
 {
+    if (!g_started.load()) {
+        return;
+    }
     const uint16_t c = g_conn.load();
     if (c != BLE_HS_CONN_HANDLE_NONE) {
         ble_gap_terminate(c, BLE_ERR_REM_USER_CONN_TERM);

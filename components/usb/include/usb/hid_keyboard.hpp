@@ -21,6 +21,10 @@ bool init();
 // Check whether USB cable is connected and host enumerated us.
 bool is_connected();
 
+/// Detaches from the USB bus and attaches again, so a host that was plugged in while the MCU slept enumerates the
+/// device from scratch. A no-op when the HID driver is not running.
+void reattach();
+
 // Send a single key press (modifier + keycode) and hold for |press_ms|.
 // Automatically releases all keys afterwards.
 // Returns false if not connected.

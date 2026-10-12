@@ -17,6 +17,7 @@ Status status()
     return s;
 }
 void set_idle_pause(bool) {}
+void set_stack_down(bool) {}
 bool start_pairing() { return false; }
 void confirm(bool) {}
 void cancel_pairing() {}

@@ -131,6 +131,10 @@ void PowerSettingsScreen::render()
                 lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, ru() ? "Заряд" : "Battery", v);
                 break;
             }
+            case Row::LightSleep:
+                lv_label_set_text_fmt(row_labels_[i], "%s%s: %s", prefix, ru() ? "Сон (опыт.)" : "Sleep (exp.)",
+                                      work_.light_sleep ? (ru() ? "вкл." : "on") : i18n::tr(i18n::Key::Off));
+                break;
             case Row::Save:
                 lv_label_set_text_fmt(row_labels_[i], "%s%s", prefix, i18n::tr(i18n::Key::Save));
                 break;
@@ -175,6 +179,9 @@ void PowerSettingsScreen::adjust_value(int32_t delta)
             work_.battery_display = static_cast<settings::BatteryDisplay>(v);
             break;
         }
+        case Row::LightSleep:
+            work_.light_sleep = !work_.light_sleep;
+            break;
         case Row::Save:
             break;
     }
@@ -209,9 +216,9 @@ void PowerSettingsScreen::activate()
 void PowerSettingsScreen::save()
 {
     if (settings::set_power(work_)) {
-        ESP_LOGI(TAG, "Energy settings saved: wifi_off=%u ble_off=%u cpu_low=%d battery=%d",
+        ESP_LOGI(TAG, "Energy settings saved: wifi_off=%u ble_off=%u cpu_low=%d battery=%d sleep=%d",
                  static_cast<unsigned>(work_.wifi_idle_off_min), static_cast<unsigned>(work_.ble_idle_off_min),
-                 work_.cpu_idle_low ? 1 : 0, static_cast<int>(work_.battery_display));
+                 work_.cpu_idle_low ? 1 : 0, static_cast<int>(work_.battery_display), work_.light_sleep ? 1 : 0);
         manager().pop();
     } else {
         lv_label_set_text(status_label_, i18n::tr(i18n::Key::SaveFailed));

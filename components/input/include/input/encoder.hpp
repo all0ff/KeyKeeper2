@@ -71,11 +71,19 @@ public:
      */
     int32_t take_delta();
 
+    /**
+     * @brief Current levels of A and B as two bits (A = bit 0). Used in deep idle, when the PCNT does not count
+     *        (the MCU is light-sleeping between polls): any change of this value means "the knob was turned".
+     */
+    uint8_t raw_levels() const;
+
 private:
     pcnt_unit_handle_t unit_ = nullptr;
     pcnt_channel_handle_t chan_a_ = nullptr;
     pcnt_channel_handle_t chan_b_ = nullptr;
 
+    gpio_num_t pin_a_ = GPIO_NUM_NC;
+    gpio_num_t pin_b_ = GPIO_NUM_NC;
     uint8_t steps_per_notch_ = 4;
     bool invert_ = false;
 

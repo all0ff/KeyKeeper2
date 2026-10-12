@@ -307,6 +307,17 @@ public:
         unlock();
     }
 
+    void set_stack_down(bool down)
+    {
+        lock();
+        if (down) {
+            cmd_.stack_down = true;
+        } else {
+            cmd_.resume = true;
+        }
+        unlock();
+    }
+
     // ---- usb::DongleChannel (called from the typing task)
     bool paused() override { return idle_paused_.load(); }
 
@@ -446,6 +457,7 @@ private:
         bool forget = false;
         bool pause = false;  ///< power saving: pause the BLE link
         bool resume = false; ///< power saving: bring it back
+        bool stack_down = false; ///< power saving: also shut the BLE stack down (needs the pause)
     };
 
     struct Req {
@@ -495,6 +507,15 @@ private:
     {
         if (!BLE) {
             return;
+        }
+        if (stack_down_.load()) {
+            if (!blelink::resume_stack()) {
+                ESP_LOGE(TAG, "could not bring the BLE stack back");
+                return;
+            }
+            stack_down_ = false;
+            ble_epoch_ = blelink::epoch();
+            ESP_LOGI(TAG, "BLE stack is back");
         }
         if (pairing_wanted_) {
             blelink::scan_pairing();
@@ -577,6 +598,7 @@ private:
                 return false;
             }
             ble_epoch_ = blelink::epoch();
+            stack_down_ = false;
             port_up_ = true;
             return true;
         }
@@ -690,6 +712,13 @@ private:
             ep_->reset();
             refresh_atomics();
         }
+        if (BLE && c.stack_down && idle_paused_.load() && !stack_down_.load()) {
+            if (blelink::suspend_stack()) {
+                stack_down_ = true;
+                ble_epoch_ = blelink::epoch();
+                ESP_LOGI(TAG, "paused link: BLE stack shut down (light sleep allowed)");
+            }
+        }
         const kk::link::State st = ep_->state();
         if (c.cancel && (st == kk::link::State::Pairing || st == kk::link::State::Confirming || pairing_wanted_)) {
             ep_->reject_pairing();
@@ -741,6 +770,7 @@ private:
             }
         }
         s.idle_paused = on && idle_paused_.load();
+        s.stack_down = on && stack_down_.load();
         s.dongle_usb_ready = s.phase == Phase::Linked && ep_->peer_usb_mounted();
         if (s.phase == Phase::Confirming && ep_->code() != nullptr) {
             std::snprintf(s.code, sizeof s.code, "%s", ep_->code());
@@ -813,7 +843,8 @@ private:
                     ble_epoch_ = blelink::epoch();
                     ble_link_changed();
                 }
-                const int len = blelink::recv(rx_, sizeof rx_, POLL_TICKS);
+                // With the stack shut down there is nothing to read: poll slowly so the MCU can sleep.
+                const int len = blelink::recv(rx_, sizeof rx_, stack_down_.load() ? pdMS_TO_TICKS(100) : POLL_TICKS);
                 if (len > 0) {
                     ep_->on_frame(rx_, static_cast<size_t>(len), now_ms());
                 }
@@ -865,6 +896,7 @@ private:
     std::atomic<bool> radio_ok_{false}; ///< set by start_radio(): the port may be brought up
     std::atomic<bool> a_linked_{false};
     std::atomic<bool> a_usb_{false};
+    std::atomic<bool> stack_down_{false}; ///< the whole BLE stack is shut down (only while idle_paused_)
     std::atomic<bool> idle_paused_{false}; ///< BLE link paused to save power (set/cleared by the link task)
 
     // used by the link task only
@@ -927,6 +959,10 @@ Status status()
 void set_idle_pause(bool pause)
 {
     if (g_link != nullptr) g_link->set_idle_pause(pause);
+}
+void set_stack_down(bool down)
+{
+    if (g_link != nullptr) g_link->set_stack_down(down);
 }
 bool start_pairing() { return g_link != nullptr && g_link->start_pairing(); }
 void confirm(bool accept)

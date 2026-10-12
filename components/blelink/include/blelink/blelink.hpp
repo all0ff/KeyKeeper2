@@ -69,6 +69,11 @@ void scan_any();
 void scan_addr(const Addr& addr);
 /// No scanning, no connection.
 void stop();
+/// Power saving: shuts the whole BLE stack down (host and controller) so the MCU may light-sleep, and starts it
+/// again with the same role and name. After resume_stack() the owner must re-issue its scan_*() command.
+/// suspend_stack() returns false if nothing was running or the host would not stop.
+bool suspend_stack();
+bool resume_stack();
 /// Address of the current connection (central), false if not connected.
 bool peer_addr(Addr* out);
 

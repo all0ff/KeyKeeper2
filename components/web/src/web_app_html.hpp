@@ -523,6 +523,12 @@ R"HTML(    <div class="help-section">
         <li><strong>CPU at idle</strong> &mdash; 80 MHz: when the screen is off and the web page is quiet the processor runs slower and
           draws less current; the first key press brings 240 MHz back. (Needs a firmware built with power management enabled.)</li>
         <li><strong>Battery</strong> &mdash; off / symbol / percentage in the header.</li>
+        <li><strong>Sleep (exp.)</strong> &mdash; experimental. On battery only (never while a computer is connected over USB):
+          when the screen is off, Wi-Fi has been switched off by its timer and the dongle link has been paused by its timer,
+          the Bluetooth stack is shut down completely and the processor light-sleeps between short wake-ups. Any button
+          press or knob turn wakes the screen (the first action only wakes it). The first Print afterwards waits a little
+          longer while Bluetooth starts again. If the device is plugged into a computer while it sleeps, press a button
+          once so the computer sees it. Needs both timers above to be set.</li>
       </ul>
       <p>With a battery, the largest consumer is the backlight: a lower brightness and a short Screen Timeout (General settings) save
         more than anything else.</p>
@@ -757,6 +763,12 @@ R"HTML(    <div class="help-section">
         <li><strong>CPU в простое</strong> &mdash; 80 МГц: когда экран погашен и веб-страница не используется, процессор работает
           медленнее и потребляет меньше; первое нажатие возвращает 240 МГц. (Нужна прошивка, собранная с включённым управлением питанием.)</li>
         <li><strong>Заряд</strong> &mdash; в шапке: выкл. / значок / проценты.</li>
+        <li><strong>Сон (опыт.)</strong> &mdash; экспериментально. Только от батареи (никогда, пока компьютер подключён по USB):
+          когда экран погашен, Wi-Fi выключен своим таймером, а связь с донглом приостановлена своим таймером, стек
+          Bluetooth выключается полностью, а процессор засыпает между короткими пробуждениями. Любое нажатие кнопки
+          или поворот ручки будит экран (первое действие только будит). Первое &laquo;Напечатать&raquo; после этого
+          ждёт чуть дольше, пока Bluetooth запускается заново. Если устройство воткнули в компьютер, пока оно спало,
+          нажмите кнопку один раз, чтобы компьютер его увидел. Нужны оба таймера выше.</li>
       </ul>
       <p>При работе от батареи больше всего потребляет подсветка: меньшая яркость и короткий таймаут экрана (Общие настройки)
         экономят больше всего остального.</p>

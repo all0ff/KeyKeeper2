@@ -46,6 +46,9 @@ bool is_connected();
 /// stack is not running. Used by energy:: to tell "powered from a computer" from "on battery".
 bool cable_connected();
 
+/// Re-enumerates on the USB bus (see hid::reattach()). Call after waking from sleep.
+void reattach();
+
 // Last status message for UI feedback.
 const char* last_status();
 

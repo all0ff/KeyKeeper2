@@ -6,6 +6,7 @@
 
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "bsp/idle_hint.hpp"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -100,7 +101,19 @@ void lvgl_task(void* /*arg*/)
 {
     const TickType_t period = pdMS_TO_TICKS(display::params::Lvgl::task_period_ms);
 
+    bool tick_stopped = false;
     while (true) {
+        // Deep idle (screen off, MCU may light-sleep): the 2 ms tick timer and this 5 ms loop would wake the chip
+        // 700 times a second, so both are slowed down. Nothing is drawn while the screen is dark anyway.
+        const bool deep = bsp::deep_idle.load();
+        if (deep && !tick_stopped && tick_timer != nullptr) {
+            esp_timer_stop(tick_timer);
+            tick_stopped = true;
+        } else if (!deep && tick_stopped && tick_timer != nullptr) {
+            esp_timer_start_periodic(tick_timer, static_cast<uint64_t>(display::params::Lvgl::tick_period_ms) * 1000);
+            tick_stopped = false;
+        }
+
         lock();
         const uint32_t delay_ms = lv_timer_handler();
         unlock();
@@ -109,7 +122,7 @@ void lvgl_task(void* /*arg*/)
         // configured task period, and never longer than it either --
         // this task only needs to be responsive, not exact.
         (void)delay_ms;
-        vTaskDelay(period);
+        vTaskDelay(deep ? pdMS_TO_TICKS(100) : period);
     }
 }
 

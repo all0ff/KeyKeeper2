@@ -47,6 +47,7 @@ struct Status {
     bool dongle_usb_ready = false; ///< Linked, and the dongle reports a PC behind its USB port
     bool local_confirmed = false;  ///< Confirming: this side already said yes
     bool idle_paused = false;      ///< the link was paused to save power; "Print" wakes it (see set_idle_pause)
+    bool stack_down = false;       ///< ...and the whole BLE stack is shut down (set_stack_down), so the MCU may light-sleep
     char code[8] = {};             ///< "123456" while Confirming, else ""
     char peer[17] = {};            ///< first 8 bytes of the paired dongle's key in hex, "" if none
     Outcome outcome = Outcome::None;
@@ -75,6 +76,11 @@ Status status();
 /// few seconds for the link. Ignored while a pairing is in progress, with wireless typing off, and on the UART
 /// transport.
 void set_idle_pause(bool pause);
+
+/// Deeper than set_idle_pause(): also shuts the BLE stack (host and controller) down, which light sleep requires.
+/// Only takes effect while the link is idle-paused; any wake-up (set_idle_pause(false), a Print) brings the stack
+/// back first. Costs about a second of extra delay on the next Print.
+void set_stack_down(bool down);
 
 /// Starts a pairing with a dongle whose pairing window is open. Switches wireless typing on. The user must
 /// confirm() the code shown by status().code; the dongle's user confirms theirs.

@@ -199,6 +199,11 @@ bool cable_connected()
     return hid::is_connected();
 }
 
+void reattach()
+{
+    hid::reattach();
+}
+
 const char* last_status()
 {
     return status_msg;

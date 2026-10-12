@@ -1,5 +1,6 @@
 #include "energy/energy.hpp"
 
+#include "bsp/idle_hint.hpp"
 #include "bsp/pins.hpp"
 #include "display/display.hpp"
 #include "input/input.hpp"
@@ -33,6 +34,7 @@ constexpr gpio_num_t PIN_BAT_ADC = bsp::pins::HEADER_GPIO8;  // ADC1 channel 7
 constexpr gpio_num_t PIN_CHRG = bsp::pins::HEADER_GPIO9;
 constexpr int DIVIDER_RATIO = 2;           // 220k / 220k
 constexpr uint32_t TICK_MS = 500;
+constexpr uint32_t SLEEP_TICK_MS = 1000;
 constexpr uint32_t BATTERY_EVERY_MS = 5000;
 constexpr uint32_t WEB_QUIET_FOR_LOW_CPU_MS = 60'000;
 
@@ -159,7 +161,11 @@ void update_battery()
 esp_pm_lock_handle_t g_cpu_lock = nullptr;
 bool g_lock_held = false;
 bool g_pm_ok = false;
+esp_pm_lock_handle_t g_nols_lock = nullptr; // ESP_PM_NO_LIGHT_SLEEP: held except while the device may sleep
+bool g_nols_held = false;
+bool g_ls_configured = false;
 #endif
+std::atomic<bool> g_sleeping{false};
 
 void pm_setup()
 {
@@ -168,6 +174,7 @@ void pm_setup()
     pm.max_freq_mhz = 240;
     pm.min_freq_mhz = 80;
     pm.light_sleep_enable = false;
+    g_ls_configured = false;
     if (esp_pm_configure(&pm) != ESP_OK) {
         ESP_LOGW(TAG, "esp_pm_configure failed -- CPU stays at its fixed frequency");
         return;
@@ -178,11 +185,55 @@ void pm_setup()
     }
     esp_pm_lock_acquire(g_cpu_lock); // start at full speed
     g_lock_held = true;
+    if (esp_pm_lock_create(ESP_PM_NO_LIGHT_SLEEP, 0, "kk_nosleep", &g_nols_lock) == ESP_OK) {
+        esp_pm_lock_acquire(g_nols_lock); // no sleep until the energy task says so
+        g_nols_held = true;
+    }
     g_pm_ok = true;
     ESP_LOGI(TAG, "power management on: 80..240 MHz, no light sleep");
 #else
     ESP_LOGW(TAG, "CONFIG_PM_ENABLE is off -- lowering the CPU frequency at idle is not available "
                   "(add CONFIG_PM_ENABLE=y to sdkconfig.defaults and recreate sdkconfig)");
+#endif
+}
+
+// Light sleep needs the PM driver switched to "light_sleep_enable" (and tickless idle in the build). It is only
+// switched on once the setting is on, so a build or a user without the feature runs exactly as before.
+bool ensure_light_sleep_configured()
+{
+#if CONFIG_PM_ENABLE && CONFIG_FREERTOS_USE_TICKLESS_IDLE
+    if (!g_pm_ok || g_nols_lock == nullptr) return false;
+    if (g_ls_configured) return true;
+    esp_pm_config_t pm = {};
+    pm.max_freq_mhz = 240;
+    pm.min_freq_mhz = 80;
+    pm.light_sleep_enable = true;
+    if (esp_pm_configure(&pm) != ESP_OK) {
+        ESP_LOGW(TAG, "light sleep could not be enabled");
+        return false;
+    }
+    g_ls_configured = true;
+    ESP_LOGI(TAG, "light sleep enabled in the PM driver");
+    return true;
+#else
+    return false;
+#endif
+}
+
+// Lets the MCU light-sleep (true) or forbids it (false).
+void set_sleep_allowed(bool allowed)
+{
+#if CONFIG_PM_ENABLE
+    if (g_nols_lock == nullptr) return;
+    if (allowed && g_nols_held) {
+        esp_pm_lock_release(g_nols_lock);
+        g_nols_held = false;
+    } else if (!allowed && !g_nols_held) {
+        esp_pm_lock_acquire(g_nols_lock);
+        g_nols_held = true;
+    }
+#else
+    (void)allowed;
 #endif
 }
 
@@ -209,8 +260,9 @@ void task(void*)
 {
     uint32_t last_battery = 0;
     uint32_t wifi_suspended_at = 0;
+    uint32_t sleep_since = 0;
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(TICK_MS));
+        vTaskDelay(pdMS_TO_TICKS(g_sleeping.load() ? SLEEP_TICK_MS : TICK_MS));
         const uint32_t now = now_ms();
         const settings::PowerSettings& ps = settings::all().power;
 
@@ -260,6 +312,35 @@ void task(void*)
                    (ws.phase == wireless::Phase::Linked || ws.phase == wireless::Phase::Connecting) &&
                    input_idle_ms >= static_cast<uint32_t>(ps.ble_idle_off_min) * 60'000u) {
             wireless::set_idle_pause(true);
+        }
+
+        // Light sleep. Only when nothing needs the MCU: running from the battery (no USB host -- a host would lose the
+        // device while the USB block sleeps), the screen is dark, Wi-Fi is stopped and the dongle link is down.
+        // The BLE stack must be shut down completely first: a running controller forbids light sleep.
+        {
+            const bool screen_dark = display::is_asleep();
+            const bool wifi_stopped = wifi::state() == wifi::ConnectionState::Idle;
+            const bool candidate = ps.light_sleep && !g_usb_host.load() && screen_dark && wifi_stopped;
+            bool ble_ready = !ws.enabled || ws.stack_down;
+            if (candidate && ws.enabled && ws.idle_paused && !ws.stack_down) {
+                wireless::set_stack_down(true); // takes a moment; sleep starts on a later tick
+            }
+            const bool want_sleep = candidate && ble_ready && ensure_light_sleep_configured();
+            if (want_sleep && !g_sleeping.load()) {
+                ESP_LOGI(TAG, "entering light sleep (screen off, Wi-Fi and dongle link off, no USB host)");
+                sleep_since = now;
+                bsp::deep_idle = true;
+                set_sleep_allowed(true);
+                g_sleeping = true;
+            } else if (!want_sleep && g_sleeping.load()) {
+                set_sleep_allowed(false);
+                bsp::deep_idle = false;
+                g_sleeping = false;
+                ESP_LOGI(TAG, "light sleep over after %u s", static_cast<unsigned>((now - sleep_since) / 1000));
+                if (!g_usb_host.load() && now - sleep_since > 3000) {
+                    usb::reattach(); // a PC plugged in while we slept must enumerate us afresh
+                }
+            }
         }
 
         // CPU frequency.

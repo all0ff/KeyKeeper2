@@ -171,8 +171,10 @@ CONFIG_ESP_WIFI_STATIC_RX_BUFFER_NUM=6
 CONFIG_ESP_WIFI_DYNAMIC_RX_BUFFER_NUM=16
 CONFIG_ESP_WIFI_DYNAMIC_TX_BUFFER_NUM=16
 
-# Power management: lets energy:: lower the CPU to 80 MHz when idle (no light sleep, that is left off)
+# Power management: lets energy:: lower the CPU to 80 MHz when idle. Tickless idle is needed for the experimental
+# light sleep (Energy saving -> Sleep); it only does something once that setting is on.
 CONFIG_PM_ENABLE=y
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=y
 
 # Allocations over 4 KB go to PSRAM (default limit is 16 KB)
 CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL=4096
