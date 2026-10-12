@@ -44,6 +44,7 @@ std::atomic<uint16_t> g_mv{0};
 std::atomic<bool> g_charging{false};
 std::atomic<bool> g_usb_host{false};
 std::atomic<bool> g_cpu_reduced{false};
+std::atomic<bool> g_wifi_suspended{false};
 
 uint32_t now_ms()
 {
@@ -130,7 +131,13 @@ int read_battery_mv()
     } else {
         pin_mv = raw * 2500 / 4095; // rough, 12 dB attenuation
     }
-    return pin_mv * DIVIDER_RATIO;
+    // Measured against a lab supply (4190 / 3910 / 3550 mV real -> 4238 / 3950 / 3588 mV read): the chain reads
+    // about 1.5 % high (divider resistor tolerance plus ADC). Least-squares fit: real = 0.985 * read + 17 mV,
+    // within 2 mV of all three points. For another board or other resistors measure the same way and adjust
+    // these two numbers.
+    constexpr int CAL_GAIN_PERMILLE = 985;
+    constexpr int CAL_OFFSET_MV = 17;
+    return (pin_mv * DIVIDER_RATIO * CAL_GAIN_PERMILLE) / 1000 + CAL_OFFSET_MV;
 }
 
 void update_battery()
@@ -201,7 +208,7 @@ void set_cpu_reduced(bool reduced)
 void task(void*)
 {
     uint32_t last_battery = 0;
-    bool wifi_off_logged = false;
+    uint32_t wifi_suspended_at = 0;
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(TICK_MS));
         const uint32_t now = now_ms();
@@ -219,22 +226,28 @@ void task(void*)
         const uint32_t idle_ms = now - use_last;
         const uint32_t input_idle_ms = now - input_last;
 
-        // Wi-Fi.
+        // Wi-Fi: after the timeout the radio is stopped for now (wifi::stop(), the saved mode is NOT touched), and the
+        // first use of the device after that brings it back with the saved settings.
         const settings::WifiSettings& w = settings::all().wifi;
-        if (ps.wifi_idle_off_min > 0 && w.mode != settings::WifiMode::Disabled) {
-            if (idle_ms >= static_cast<uint32_t>(ps.wifi_idle_off_min) * 60'000u) {
-                if (!wifi_off_logged) {
-                    ESP_LOGI(TAG, "no web use for %u min -- switching Wi-Fi off", static_cast<unsigned>(ps.wifi_idle_off_min));
-                    wifi_off_logged = true;
-                }
-                settings::WifiSettings off = w;
-                off.mode = settings::WifiMode::Disabled;
-                if (settings::set_wifi(off)) {
-                    wifi::apply_settings();
-                }
+        if (g_wifi_suspended.load()) {
+            if (wifi::state() != wifi::ConnectionState::Idle) {
+                g_wifi_suspended = false; // somebody (the Wi-Fi menu) started it again meanwhile
+            } else if (ps.wifi_idle_off_min == 0 || w.mode == settings::WifiMode::Disabled) {
+                // the timeout was switched off (or Wi-Fi was switched off by hand): restore, if Wi-Fi is wanted
+                g_wifi_suspended = false;
+                if (w.mode != settings::WifiMode::Disabled) wifi::apply_settings();
+            } else if (input_last > wifi_suspended_at) {
+                ESP_LOGI(TAG, "device used again -- Wi-Fi back on");
+                g_wifi_suspended = false;
+                wifi::apply_settings();
             }
-        } else {
-            wifi_off_logged = false;
+        } else if (ps.wifi_idle_off_min > 0 && w.mode != settings::WifiMode::Disabled &&
+                   idle_ms >= static_cast<uint32_t>(ps.wifi_idle_off_min) * 60'000u) {
+            ESP_LOGI(TAG, "no use for %u min -- Wi-Fi off until the device is used again",
+                     static_cast<unsigned>(ps.wifi_idle_off_min));
+            wifi::stop();
+            wifi_suspended_at = now;
+            g_wifi_suspended = true;
         }
 
         // BLE link to the dongle.
@@ -298,6 +311,11 @@ BatteryStatus battery()
 bool cpu_reduced()
 {
     return g_cpu_reduced.load();
+}
+
+bool wifi_suspended()
+{
+    return g_wifi_suspended.load();
 }
 
 } // namespace energy

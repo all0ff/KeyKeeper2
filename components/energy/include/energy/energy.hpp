@@ -7,8 +7,9 @@
 //
 // One low-priority task. Every ~0.5 s it looks at how long nothing has happened and, according to
 // settings::PowerSettings (menu "Energy saving"):
-//   - Wi-Fi: no request to a real web page/API route and no use of the device for N minutes -> the Wi-Fi mode
-//     is set to Disabled (the same as switching it off in the Wi-Fi menu; persisted, switch it on again there);
+//   - Wi-Fi: no request to a real web page/API route and no use of the device for N minutes -> the radio is
+//     stopped (wifi::stop; the saved mode is not touched). The first key press afterwards starts it again with
+//     the saved settings;
 //   - BLE: no use of the device for N minutes -> the dongle link is paused (wireless::set_idle_pause). A
 //     "Print" action wakes it by itself (usb::OutputSink::prepare) and waits a few seconds for the link;
 //   - CPU: screen asleep and the web page idle -> the CPU runs at 80 MHz instead of 240 (needs
@@ -42,5 +43,9 @@ BatteryStatus battery();
 
 /// True while the CPU is held at the reduced 80 MHz frequency.
 bool cpu_reduced();
+
+/// True while Wi-Fi is switched off by the idle timeout (the saved mode is unchanged; the next use of the device
+/// switches it back on).
+bool wifi_suspended();
 
 } // namespace energy

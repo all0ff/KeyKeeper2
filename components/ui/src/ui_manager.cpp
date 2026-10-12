@@ -193,7 +193,7 @@ void UiManager::update_status_icons()
     lv_color_t wc = pal.secondary_text;
     bool show = true;
     switch (wifi::state()) {
-        case wifi::ConnectionState::Idle: show = false; break;
+        case wifi::ConnectionState::Idle: show = energy::wifi_suspended(); break; // grey: off by the idle timeout
         case wifi::ConnectionState::Connecting: wc = pal.warning; break;
         case wifi::ConnectionState::Connected: wc = pal.success; break;
         case wifi::ConnectionState::Disconnected: wc = pal.secondary_text; break;

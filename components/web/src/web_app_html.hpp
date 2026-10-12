@@ -514,8 +514,9 @@ R"HTML(    <div class="help-section">
       <p>Settings &rarr; <strong>Energy saving</strong> (on the device). Nothing is switched off by itself until you set a time:</p>
       <ul>
         <li><strong>Wi-Fi off after</strong> &mdash; if no web page was opened or used and the device was not touched for this long,
-          the Wi-Fi mode is set to Disabled (the same as switching it off in the Wi-Fi menu; to use the web page again,
-          choose the mode there). Phones merely staying connected to the access point do not count as use.</li>
+          Wi-Fi is switched off (the symbol turns grey; the saved mode is not changed). The next
+          button press or knob turn on the device switches it on again with the same settings. Phones merely staying
+          connected to the access point do not count as use.</li>
         <li><strong>Dongle off after</strong> &mdash; after this long without touching the device the Bluetooth link to the dongle is paused
           (grey Bluetooth symbol). Pressing a Print action wakes it up by itself: expect a wait of one to a few seconds
           before the text starts to type. Pairing is not affected.</li>
@@ -747,8 +748,9 @@ R"HTML(    <div class="help-section">
       <p>Настройки &rarr; <strong>Экономия энергии</strong> (на устройстве). Пока вы не задали время, ничего само не выключается:</p>
       <ul>
         <li><strong>Wi-Fi выкл. через</strong> &mdash; если веб-страницу не открывали и устройством не пользовались столько времени,
-          режим Wi-Fi переключается в &laquo;Отключено&raquo; (как выключение в меню Wi-Fi; чтобы снова пользоваться веб-страницей,
-          выберите режим там). Телефоны, которые просто остались подключены к точке доступа, использованием не считаются.</li>
+          Wi-Fi выключается (значок становится серым, сохранённый режим не меняется). Следующее нажатие
+          кнопки или поворот ручки на устройстве снова включает его с теми же настройками. Телефоны, которые просто
+          остались подключены к точке доступа, использованием не считаются.</li>
         <li><strong>Донгл выкл. через</strong> &mdash; после такого бездействия связь Bluetooth с донглом приостанавливается
           (серый значок Bluetooth). Нажатие &laquo;Напечатать&raquo; будит её само: подождите от одной до нескольких секунд, пока
           начнётся ввод. Сопряжение не затрагивается.</li>
